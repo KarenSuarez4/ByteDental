@@ -41,17 +41,30 @@ const Login = () => {
   const handlePasswordChange = (e) => {
     const value = e.target.value;
     setPassword(value);
-    if (value.length < 8) {
-      setPasswordError('"La contraseña debe tener al menos 8 caracteres, incluir una letra mayúscula y un número."');
-    } else {
-      setPasswordError('');
+    setPasswordError('');
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (isFormValid) {
+        handleLogin();
+      }
+    }
+  };
+
+  // Función para manejar el envío del formulario
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (isFormValid) {
+      handleLogin();
     }
   };
 
   // --- Funciones de Autenticación con Firebase ---
   const handleLogin = async () => {
     // Validaciones finales antes de intentar el login
-    if (usernameError || passwordError || !username || !password) {
+    if (usernameError || !username || !password) {
       setLoginError('Por favor, completa todos los campos correctamente.');
       return;
     }
@@ -116,7 +129,7 @@ const Login = () => {
   };
 
   // Deshabilita el botón si hay errores o campos vacíos
-  const isFormValid =!usernameError &&!passwordError && username.length > 0 && password.length > 0;
+  const isFormValid = !usernameError && username.length > 0 && password.length > 0;
 
   if (loading) {
     return <LoadingScreen />;
@@ -135,59 +148,64 @@ const Login = () => {
             </h1>
           </div>
 
-          {/* Mostrar error de login si existe */}
-          {loginError && (
-            <div className="mb-4 w-[338px] p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-              {loginError}
+          {/* Formulario de Login */}
+          <form onSubmit={handleSubmit} className="w-full flex flex-col items-center">
+            {/* Mostrar error de login si existe */}
+            {loginError && (
+              <div className="mb-4 w-[338px] p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                {loginError}
+              </div>
+            )}
+
+            {/* Campo de Usuario con validación de email */}
+            <div className="mb-5 w-[338px]">
+              <label htmlFor="username" className="block text-header-blue text-sm font-poppins mb-1 font-bold">
+                Usuario
+              </label>
+              <Input
+                id="username"
+                placeholder="Ingrese su correo electrónico"
+                value={username}
+                onChange={handleUsernameChange}
+                onKeyDown={handleKeyPress}
+                error={!!usernameError}
+              />
+              {usernameError && (
+                <p className="text-red-500 text-xs font-poppins mt-0">{usernameError}</p>
+              )}
             </div>
-          )}
 
-          {/* Campo de Usuario con validación de email */}
-          <div className="mb-5 w-[338px]">
-            <label htmlFor="username" className="block text-header-blue text-sm font-poppins mb-1 font-bold">
-              Usuario
-            </label>
-            <Input
-              id="username"
-              placeholder="Ingrese su correo electrónico"
-              value={username}
-              onChange={handleUsernameChange}
-              error={!!usernameError}
-            />
-            {usernameError && (
-              <p className="text-red-500 text-xs font-poppins mt-0">{usernameError}</p>
-            )}
-          </div>
+            {/* Campo de Contraseña */}
+            <div className="mb-8 w-[338px]">
+              <label htmlFor="password" className="block text-header-blue text-sm font-poppins mb-1 font-bold">
+                Contraseña
+              </label>
+              <InputPassword
+                id="password"
+                placeholder="************"
+                value={password}
+                onChange={handlePasswordChange}
+                onKeyDown={handleKeyPress}
+                error={!!passwordError}
+              />
+              {passwordError && (
+                <p className="text-red-500 text-xs font-poppins mt-2">{passwordError}</p>
+              )}
+            </div>
 
-          {/* Campo de Contraseña */}
-          <div className="mb-8 w-[338px]">
-            <label htmlFor="password" className="block text-header-blue text-sm font-poppins mb-1 font-bold">
-              Contraseña
-            </label>
-            <InputPassword
-              id="password"
-              placeholder="************"
-              value={password}
-              onChange={handlePasswordChange}
-              error={!!passwordError}
-            />
-            {passwordError && (
-              <p className="text-red-500 text-xs font-poppins mt-2">{passwordError}</p>
-            )}
-          </div>
+            {/* Enlace ¿Olvidó su contraseña? */}
+            <a
+              onClick={handleForgotPasswordClick}
+              className="text-header-blue hover:underline text-sm font-poppins mb-5 self-start ml-[calc(50%-169px)] font-bold cursor-pointer" 
+            >
+                ¿Olvidó su contraseña?
+            </a>
 
-          {/* Enlace ¿Olvidó su contraseña? */}
-          <a
-            onClick={handleForgotPasswordClick}
-            className="text-header-blue hover:underline text-sm font-poppins mb-5 self-start ml-[calc(50%-169px)] font-bold cursor-pointer" 
-          >
-              ¿Olvidó su contraseña?
-          </a>
-
-          {/* Botón de Ingresar */}
-          <Button onClick={handleLogin} className="shadow-md mb-5" disabled={!isFormValid}>
-            Ingresar
-          </Button>
+            {/* Botón de Ingresar */}
+            <Button type="submit" onClick={handleLogin} className="shadow-md mb-5" disabled={!isFormValid}>
+              Ingresar
+            </Button>
+          </form>
 
           {/* Divisor "O inicia sesión con" */}
           <div className="flex items-center w-[338px] mb-6">
