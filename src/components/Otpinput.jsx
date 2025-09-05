@@ -20,19 +20,16 @@ const OtpInput = ({ length = 4, onComplete }) => {
     newOtp[index] = value.substring(value.length - 1);
     setOtp(newOtp);
 
-    // Mueve el foco al siguiente input
     if (value && index < length - 1) {
       inputRefs.current[index + 1].focus();
     }
 
-    // Llama a onComplete si todos los campos están llenos
     if (newOtp.every(digit => digit !== '')) {
       onComplete(newOtp.join(''));
     }
   };
 
   const handleKeyDown = (e, index) => {
-    // Maneja el retroceso (backspace) para mover el foco hacia atrás
     if (e.key === 'Backspace' &&!otp[index] && index > 0) {
       inputRefs.current[index - 1].focus();
     }
