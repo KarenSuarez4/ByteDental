@@ -11,7 +11,7 @@ const ProgressIndicator = ({ step = 1 }) => {
   const steps = [1, 2, 3];
 
   return (
-    <div className="flex items-center space-x-4 mb-8">
+    <div className="flex items-center space-x-4 mb-6">
       {steps.map((num) => (
         <div
           key={num}

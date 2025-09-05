@@ -16,7 +16,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // --- Lógica de Manejo de Entradas y Validación (Frontend) ---
+  // --- Lógica de Manejo de Entradas y Validación  ---
   const handleUsernameChange = (event) => {
     const value = event.target.value;
     setUsername(value);
@@ -31,8 +31,8 @@ const Login = () => {
   const handlePasswordChange = (e) => {
     const value = e.target.value;
     setPassword(value);
-    if (value.length < 6) {
-      setPasswordError('La contraseña debe tener al menos 6 caracteres');
+    if (value.length < 8) {
+      setPasswordError('"La contraseña debe tener al menos 8 caracteres, incluir una letra mayúscula y un número."');
     } else {
       setPasswordError('');
     }
@@ -65,7 +65,7 @@ const Login = () => {
     setLoading(true); // Mostrar pantalla de carga
     setTimeout(() => {
       setLoading(false); 
-      navigate('/PasswordReset'); // Redirigir a PasswordReset
+      navigate('/PasswordReset'); // Redirigir
     }, 2000);
   };
 

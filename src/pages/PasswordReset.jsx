@@ -52,7 +52,7 @@ const PasswordReset = () => {
         </h1>
         <Input 
           placeholder="Ingrese su correo electrónico"
-          className="mb-2"
+          className="w-150 mb-4"
           value={email}
           onChange={handleEmailChange}
           error={!!emailError} // El `!!` convierte la cadena de error a booleano
@@ -60,10 +60,10 @@ const PasswordReset = () => {
         {emailError && (
           <p className="text-red-500 text-xs font-poppins mb-5">{emailError}</p>
         )}
-        <Button onClick={handleButtonClick} className="shadow-md mb-4 mt-2" disabled={!isEmailValid}>
+        <Button onClick={handleButtonClick} className="shadow-md mb-4 mt-9" disabled={!isEmailValid}>
           Enviar correo
         </Button>
-        <a onClick={() => navigate('/')} className="mt-18 text-header-blue hover:underline font-bold cursor-pointer">
+        <a onClick={() => navigate('/')} className="mt-15 text-header-blue hover:underline font-bold cursor-pointer">
           Volver a Inicio de sesión
         </a>
       </main>

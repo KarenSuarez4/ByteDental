@@ -22,7 +22,7 @@ const PasswordReset2 = () => {
     if (code === '1234') {
       setShowError(false);
       console.log('Código validado. Procediendo a cambiar contraseña.');
-      navigate('/PasswordReset3'); // Redirige a PasswordReset3
+      navigate('/PasswordReset3');
     } else {
       setShowError(true);
       console.log('Código incorrecto.');

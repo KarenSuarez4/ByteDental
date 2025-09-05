@@ -1,13 +1,19 @@
 @import "tailwindcss";
 @source "./components/**/*.jsx";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @theme {
   /* Colores personalizados */
   --color-primary-blue: #48A4D6;
   --color-primary-blue-hover: #3a8bb8;
   --color-header-blue: #1C628C;
-  --color-google-blue: #4285F4; /* Nuevo: Color azul de Google */
-  --color-gray-line: #E0E0E0;   /* Nuevo: Color de línea divisoria */
+  --color-google-blue: #4285F4;
+  --color-gray-line: #E0E0E0;  
+  --color-weak: #f74537;
+  --color-medium: #fbab34;
+  --color-strong: #3bbba1; 
   
   /* Fuentes personalizadas */
   --font-poppins: "Poppins", system-ui, sans-serif;

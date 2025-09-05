@@ -22,7 +22,7 @@ const GoogleSignIn = ({ onClick, className = '',...props }) => {
         'font-medium', 
         'cursor-pointer',
         'flex items-center justify-center',
-        'space-x-4', // Espacio entre el logo y el texto
+        'space-x-4', 
         'transition-colors duration-200',
         'hover:bg-gray-50', 
         className
