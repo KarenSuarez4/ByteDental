@@ -75,3 +75,9 @@ ehthumbs.db
 # package-lock.json
 # yarn.lock
 
+# Test coverage
+coverage/
+
+# Test reports
+coverage-reports/
+
