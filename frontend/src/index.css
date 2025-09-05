@@ -1,0 +1,35 @@
+@import "tailwindcss";
+@source "./components/**/*.jsx";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@theme {
+  /* Colores personalizados */
+  --color-primary-blue: #48A4D6;
+  --color-primary-blue-hover: #3a8bb8;
+  --color-header-blue: #1C628C;
+  --color-google-blue: #4285F4;
+  --color-gray-line: #E0E0E0;  
+  --color-weak: #f74537;
+  --color-medium: #fbab34;
+  --color-strong: #3bbba1; 
+  
+  /* Fuentes personalizadas */
+  --font-poppins: "Poppins", system-ui, sans-serif;
+
+  /* Tamaño de fuente */
+  --text-18: 1.125rem;
+  --text-24: 1.5rem;
+  --text-46: 2.875rem;
+  --text-16: 1rem; /* Nuevo: Tamaño de fuente para textos pequeños/enlaces */
+
+  /* Espaciado personalizado */
+  --spacing-18: 4.5rem;
+  --spacing-22: 5.5rem;
+  --spacing-4: 1rem; /* Nuevo: Espaciado más pequeño */
+  
+  /* Bordes personalizados */
+  --radius-card: 0.75rem;
+  --radius-button: 0.5rem;
+}
