@@ -6,7 +6,7 @@ import LoadingScreen from '../components/LoadingScreen';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import ProgressIndicator from '../components/ProgressIndicator';
-import { resetPassword } from '../Firebase/client';
+import { otpService } from '../services/otpService';
 
 const PasswordReset = () => {
   const [email, setEmail] = useState('');
@@ -38,31 +38,36 @@ const PasswordReset = () => {
     setResetSuccess(false);
 
     try {
-      await resetPassword(email);
-      setResetSuccess(true);
+      // Usar el nuevo servicio OTP
+      const result = await otpService.sendOTP(email);
       
-      // Esperar un momento y luego redirigir a la siguiente página
-      setTimeout(() => {
-        setLoading(false);
-        navigate('/PasswordReset2');
-      }, 2000);
+      if (result.success) {
+        setResetSuccess(true);
+        
+        // Guardar el email en localStorage para usarlo en la siguiente página
+        localStorage.setItem('resetEmail', email);
+        
+        // Esperar un momento y luego redirigir a la siguiente página
+        setTimeout(() => {
+          setLoading(false);
+          navigate('/PasswordReset2');
+        }, 2000);
+      } else {
+        throw new Error(result.message);
+      }
     } catch (error) {
-      console.error('Error al enviar email de restablecimiento:', error);
+      console.error('Error al enviar código OTP:', error);
       
-      let errorMessage = 'Error al enviar el correo de restablecimiento';
+      let errorMessage = 'Error al enviar el código de verificación';
       
-      switch (error.code) {
-        case 'auth/user-not-found':
-          errorMessage = 'No existe una cuenta con este correo electrónico';
-          break;
-        case 'auth/invalid-email':
-          errorMessage = 'Correo electrónico inválido';
-          break;
-        case 'auth/too-many-requests':
-          errorMessage = 'Demasiados intentos. Intenta más tarde';
-          break;
-        default:
-          errorMessage = error.message;
+      if (error.message.includes('correo')) {
+        errorMessage = 'No existe una cuenta con este correo electrónico';
+      } else if (error.message.includes('inválido')) {
+        errorMessage = 'Correo electrónico inválido';
+      } else if (error.message.includes('intentos')) {
+        errorMessage = 'Demasiados intentos. Intenta más tarde';
+      } else {
+        errorMessage = error.message || 'Error al enviar el código';
       }
       
       setResetError(errorMessage);
@@ -88,7 +93,7 @@ const PasswordReset = () => {
         {/* Mostrar mensaje de éxito */}
         {resetSuccess && (
           <div className="mb-4 w-150 p-3 bg-green-100 border border-green-400 text-green-700 rounded text-center">
-            ¡Correo de restablecimiento enviado exitosamente! Revisa tu bandeja de entrada.
+            ¡Código de verificación enviado exitosamente! Revisa tu bandeja de entrada.
           </div>
         )}
 
@@ -115,7 +120,7 @@ const PasswordReset = () => {
           className="shadow-md mb-4 mt-9" 
           disabled={!isEmailValid || resetSuccess || loading}
         >
-          {resetSuccess ? 'Correo enviado' : 'Enviar correo'}
+          {resetSuccess ? 'Código enviado' : 'Enviar código'}
         </Button>
         <a onClick={() => navigate('/')} className="mt-15 text-header-blue hover:underline font-bold cursor-pointer">
           Volver a Inicio de sesión
