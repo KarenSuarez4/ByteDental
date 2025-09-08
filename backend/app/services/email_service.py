@@ -1,7 +1,6 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from email.mime.image import MIMEImage
 from jinja2 import Environment, FileSystemLoader
 import os
 from typing import List, Optional
@@ -29,28 +28,6 @@ class EmailService:
         # Configurar Jinja2 para templates
         template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
         self.jinja_env = Environment(loader=FileSystemLoader(template_dir))
-    
-    def _attach_logo(self, message: MIMEMultipart):
-        """
-        Adjunta el logo de ByteDental al email
-        """
-        try:
-            # Ruta al logo
-            logo_path = os.path.join(os.path.dirname(__file__), "..", "templates", "images", "bytedental-logo.png")
-            
-            if os.path.exists(logo_path):
-                with open(logo_path, 'rb') as f:
-                    img_data = f.read()
-                
-                # Crear la imagen MIME
-                image = MIMEImage(img_data)
-                image.add_header('Content-ID', '<logo>')
-                message.attach(image)
-                logger.info("Logo adjuntado exitosamente al email")
-            else:
-                logger.warning(f"Logo no encontrado en: {logo_path}")
-        except Exception as e:
-            logger.error(f"Error adjuntando logo: {e}")
 
     async def send_email(
         self,
@@ -104,10 +81,6 @@ class EmailService:
                 msg_alternative.attach(text_part)
             
             message.attach(msg_alternative)
-            
-            # Adjuntar logo si es HTML (los templates lo usan)
-            if is_html:
-                self._attach_logo(message)
             
             # Enviar el email
             success = await self._send_message(message)

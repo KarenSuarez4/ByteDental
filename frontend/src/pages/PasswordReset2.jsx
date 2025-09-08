@@ -22,8 +22,8 @@ const PasswordReset2 = () => {
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [email, setEmail] = useState('');
-  const [otpValidated, setOtpValidated] = useState(false); // Estado para controlar si OTP fue validado
-  const [redirectCountdown, setRedirectCountdown] = useState(null); // Contador para redirección
+  const [otpValidated, setOtpValidated] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(null);
 
   useEffect(() => {
     // Obtener el email del localStorage
