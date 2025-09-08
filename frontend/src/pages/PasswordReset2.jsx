@@ -8,6 +8,7 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useNavigate } from 'react-router-dom';
 import { otpService } from '../services/otpService';
+import { getAuth, sendPasswordResetEmail } from 'firebase/auth';
 
 function cn(...args) {
   return twMerge(clsx(args));
@@ -21,6 +22,8 @@ const PasswordReset2 = () => {
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [email, setEmail] = useState('');
+  const [otpValidated, setOtpValidated] = useState(false); // Estado para controlar si OTP fue validado
+  const [redirectCountdown, setRedirectCountdown] = useState(null); // Contador para redirección
 
   useEffect(() => {
     // Obtener el email del localStorage
@@ -43,10 +46,56 @@ const PasswordReset2 = () => {
       const result = await otpService.verifyOTP(email, code);
       
       if (result.success) {
-        console.log('Código validado. Procediendo a cambiar contraseña.');
-        // Guardar que el OTP fue verificado
-        localStorage.setItem('otpVerified', 'true');
-        navigate('/PasswordReset3');
+        console.log('Código OTP validado. Enviando email de restablecimiento de Firebase...');
+        
+        // Después de validar OTP, enviar email de restablecimiento de Firebase
+        const auth = getAuth();
+        
+        try {
+          // Firebase manejará la URL automáticamente basándose en la configuración del console
+          await sendPasswordResetEmail(auth, email);
+          
+          console.log('Email de restablecimiento enviado exitosamente');
+          setOtpValidated(true);
+          
+          // Mostrar mensaje de éxito
+          setErrorMessage('Código validado. Se ha enviado un enlace de restablecimiento a tu correo.');
+          setShowError(false);
+          
+          // Guardar que el OTP fue verificado y que se envió el email
+          localStorage.setItem('otpVerified', 'true');
+          localStorage.setItem('firebaseEmailSent', 'true');
+          
+          // Esperar un poco para que el usuario lea el mensaje y luego informar sobre el enlace
+          setTimeout(() => {
+            setErrorMessage('Revisa tu correo y haz clic en el enlace para crear tu nueva contraseña.');
+            
+            // Iniciar contador de redirección a login
+            setRedirectCountdown(10);
+            const countdownInterval = setInterval(() => {
+              setRedirectCountdown(prev => {
+                if (prev <= 1) {
+                  clearInterval(countdownInterval);
+                  navigate('/'); // Redirigir al login
+                  return 0;
+                }
+                return prev - 1;
+              });
+            }, 1000);
+          }, 2000);
+          
+        } catch (firebaseError) {
+          console.error('Error enviando email de Firebase:', firebaseError);
+          setShowError(true);
+          if (firebaseError.code === 'auth/user-not-found') {
+            setErrorMessage('No existe una cuenta con este correo electrónico.');
+          } else if (firebaseError.code === 'auth/invalid-email') {
+            setErrorMessage('El correo electrónico no es válido.');
+          } else {
+            setErrorMessage('Error enviando el enlace de restablecimiento. Intenta nuevamente.');
+          }
+        }
+        
       } else {
         setShowError(true);
         // Personalizar el mensaje según el tipo de error
@@ -119,38 +168,67 @@ const PasswordReset2 = () => {
         <h1 className="text-header-blue text-46 font-bold font-poppins mb-2">
           Restablecer contraseña
         </h1>
-        <p className="text-center w-[338px] mb-3 font-poppins">
-          Se acaba de enviar un código de verificación de cuatro dígitos a su correo electrónico. Ingréselo a continuación
-        </p>
-
-        <div className="mb-8">
-          <OtpInput onComplete={handleOtpComplete} />
-          {showError && errorMessage && (
-            <p className="text-red-500 text-xs font-poppins mt-2 text-center">
-              {errorMessage}
-            </p>
-          )}
-          {!showError && errorMessage && (
-            <p className="text-green-500 text-xs font-poppins mt-2 text-center">
-              {errorMessage}
-            </p>
-          )}
-        </div>
-
-        <Button 
-          onClick={handleVerify} 
-          disabled={otpCode.length !== 4 || loading}
-        >
-          {loading ? 'Verificando...' : 'Verificar'}
-        </Button>
         
-        <button 
-          onClick={handleResendCode}
-          disabled={resendLoading}
-          className="text-primary-blue hover:underline mt-4 disabled:opacity-50"
-        >
-          {resendLoading ? 'Reenviando...' : 'Reenviar código'}
-        </button>
+        {/* Mostrar contenido diferente según si el OTP fue validado */}
+        {!otpValidated ? (
+          <>
+            <p className="text-center w-[338px] mb-3 font-poppins">
+              Se acaba de enviar un código de verificación de cuatro dígitos a su correo electrónico. Ingréselo a continuación
+            </p>
+
+            <div className="mb-8">
+              <OtpInput onComplete={handleOtpComplete} />
+              {showError && errorMessage && (
+                <p className="text-red-500 text-xs font-poppins mt-2 text-center">
+                  {errorMessage}
+                </p>
+              )}
+            </div>
+
+            <Button 
+              onClick={handleVerify} 
+              disabled={otpCode.length !== 4 || loading}
+            >
+              {loading ? 'Verificando...' : 'Verificar'}
+            </Button>
+            
+            <button 
+              onClick={handleResendCode}
+              disabled={resendLoading}
+              className="text-primary-blue hover:underline mt-4 disabled:opacity-50"
+            >
+              {resendLoading ? 'Reenviando...' : 'Reenviar código'}
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="w-[338px] text-center mb-8">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6">
+                <div className="text-green-600 text-4xl mb-4">✅</div>
+                <h2 className="text-green-800 text-xl font-semibold font-poppins mb-2">
+                  ¡Código validado exitosamente!
+                </h2>
+                <p className="text-green-700 text-sm font-poppins">
+                  {errorMessage}
+                </p>
+                {redirectCountdown !== null && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-blue-700 text-sm font-poppins">
+                      🔄 Redirigiendo al login en {redirectCountdown}s...
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+        
+        {/* Mensaje de error general (solo cuando hay error y no se validó OTP) */}
+        {!otpValidated && !showError && errorMessage && (
+          <p className="text-green-500 text-xs font-poppins mt-2 text-center">
+            {errorMessage}
+          </p>
+        )}
         <a onClick={() => navigate('/')} className="mt-8 text-header-blue hover:underline font-bold cursor-pointer">
           Volver a Inicio de sesión
         </a>

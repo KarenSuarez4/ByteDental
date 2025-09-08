@@ -74,7 +74,6 @@ const Login = () => {
 
     try {
       const user = await loginWithEmailAndPassword(username, password);
-      console.log('Usuario autenticado:', user);
       // Redirigir al dashboard
       navigate('/dashboard');
     } catch (error) {
@@ -94,7 +93,6 @@ const Login = () => {
 
     try {
       const user = await loginWithGoogle();
-      console.log('Usuario autenticado con Google:', user);
       navigate('/dashboard');
     } catch (error) {
       console.error('Error de inicio de sesión con Google:', error);

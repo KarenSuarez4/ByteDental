@@ -27,6 +27,13 @@ const PasswordReset = () => {
     }
   };
 
+  const handleKeyPress = (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleButtonClick();
+    }
+  };
+
   const handleButtonClick = async () => {
     if (emailError || !email) {
       setResetError('Por favor, ingrese un correo electrónico válido antes de continuar.');
@@ -109,6 +116,7 @@ const PasswordReset = () => {
           className="w-150 mb-4"
           value={email}
           onChange={handleEmailChange}
+          onKeyPress={handleKeyPress}
           error={!!emailError} // El `!!` convierte la cadena de error a booleano
           disabled={resetSuccess} // Deshabilitar si ya se envió exitosamente
         />
