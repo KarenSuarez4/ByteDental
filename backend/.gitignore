@@ -211,3 +211,32 @@ coverage.xml
 
 # Profiling
 *.prof
+
+# Test and migration files (ByteDental specific)
+test_*.py
+*_test.py
+migrate_*.py
+*_migrate.py
+init_db_*.py
+verify_*.py
+*_verify.py
+
+# Firebase credentials (IMPORTANT: Never commit these)
+*firebase-adminsdk*.json
+serviceAccountKey.json
+firebase-config.json
+
+# Documentation files (remove for production)
+*.md
+!README.md
+
+# JWT tokens and auth test files
+test_tokens.json
+*_tokens.json
+authorization_test_*.py
+generate_test_*.py
+
+# Database dumps and backups
+*.sql.gz
+*.dump
+database_backup_*

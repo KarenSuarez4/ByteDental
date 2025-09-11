@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChange, getCurrentUser, logout } from '../Firebase/client';
+import { registerLogoutEvent } from '../services/authAuditService';
 
 const AuthContext = createContext();
 
@@ -26,10 +27,14 @@ export function AuthProvider({ children }) {
 
   const signOut = async () => {
     try {
+      // Registrar logout en auditoría antes de cerrar sesión
+      if (currentUser) {
+        await registerLogoutEvent(currentUser.uid);
+      }
+      
       await logout();
       setCurrentUser(null);
     } catch (error) {
-      console.error('Error al cerrar sesión:', error);
       throw error;
     }
   };

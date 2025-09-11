@@ -40,10 +40,3 @@ async def send_email(email_request: EmailRequest, background_tasks: BackgroundTa
     except Exception as e:
         logger.error(f"Error programando email: {e}")
         raise HTTPException(status_code=500, detail="Error interno del servidor")
-
-@router.get("/health")
-async def health_check():
-    """
-    Endpoint para verificar el estado del servicio de email
-    """
-    return {"status": "ok", "service": "email_service"}

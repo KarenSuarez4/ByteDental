@@ -22,6 +22,17 @@ class Settings(BaseSettings):
     # URLs del frontend
     frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
     
+    # Configuración de Base de Datos
+    database_url: str = os.getenv("DATABASE_URL", "postgresql://username:password@localhost:5432/bytedental_db")
+    db_host: str = os.getenv("DB_HOST", "localhost")
+    db_port: int = int(os.getenv("DB_PORT", "5432"))
+    db_name: str = os.getenv("DB_NAME", "bytedental_db")
+    db_user: str = os.getenv("DB_USER", "username")
+    db_password: str = os.getenv("DB_PASSWORD", "password")
+    
+    # Firebase
+    firebase_credentials_path: str = os.getenv("FIREBASE_CREDENTIALS_PATH", "firebase-credentials.json")
+    
     class Config:
         env_file = ".env"
 

@@ -40,11 +40,9 @@ PROVIDER_GOOGLE.setCustomParameters({
 export function loginWithGoogle() {
   return signInWithPopup(auth, PROVIDER_GOOGLE)
     .then((result) => {
-      console.log("Google sign-in successful:", result);
       return result.user;
     })
     .catch((error) => {
-      console.error("Error during Google sign-in:", error);
       const customError = new Error(getCustomErrorMessage(error));
       customError.code = error.code;
       customError.originalError = error;
@@ -75,11 +73,9 @@ function getCustomErrorMessage(firebaseError) {
 export function loginWithEmailAndPassword(email, password) {
   return signInWithEmailAndPassword(auth, email, password)
     .then((userCredential) => {
-      console.log("Email sign-in successful:", userCredential);
       return userCredential.user;
     })
     .catch((error) => {
-      console.error("Error during email sign-in:", error);
       const customError = new Error(getCustomErrorMessage(error));
       customError.code = error.code;
       customError.originalError = error;
@@ -91,11 +87,9 @@ export function loginWithEmailAndPassword(email, password) {
 export function registerWithEmailAndPassword(email, password) {
   return createUserWithEmailAndPassword(auth, email, password)
     .then((userCredential) => {
-      console.log("User registration successful:", userCredential);
       return userCredential.user;
     })
     .catch((error) => {
-      console.error("Error during user registration:", error);
       const customError = new Error(getCustomErrorMessage(error));
       customError.code = error.code;
       customError.originalError = error;
