@@ -29,7 +29,6 @@ const PasswordReset2 = () => {
     // Obtener el email del localStorage
     const storedEmail = localStorage.getItem('resetEmail');
     if (!storedEmail) {
-      // Si no hay email, redirigir al primer paso
       navigate('/PasswordReset');
       return;
     }
@@ -47,8 +46,6 @@ const PasswordReset2 = () => {
       
       if (result.success) {
         console.log('Código OTP validado. Enviando email de restablecimiento de Firebase...');
-        
-        // Después de validar OTP, enviar email de restablecimiento de Firebase
         const auth = getAuth();
         
         try {

@@ -53,8 +53,6 @@ const PasswordReset = () => {
         
         // Guardar el email en localStorage para usarlo en la siguiente página
         localStorage.setItem('resetEmail', email);
-        
-        // Esperar un momento y luego redirigir a la siguiente página
         setTimeout(() => {
           setLoading(false);
           navigate('/PasswordReset2');

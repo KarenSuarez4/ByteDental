@@ -43,7 +43,6 @@ const Dashboard = () => {
             Funcionalidades del Sistema
           </h2>
           <p className="text-gray-600">
-            Aquí puedes agregar las funcionalidades específicas de tu aplicación ByteDental.
           </p>
         </div>
       </div>

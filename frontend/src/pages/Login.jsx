@@ -63,7 +63,6 @@ const Login = () => {
 
   // --- Funciones de Autenticación con Firebase ---
   const handleLogin = async () => {
-    // Validaciones finales antes de intentar el login
     if (usernameError || !username || !password) {
       setLoginError('Por favor, completa todos los campos correctamente.');
       return;
