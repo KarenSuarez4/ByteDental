@@ -6,7 +6,11 @@ import InputPassword from '../components/InputPassword';
 import Button from '../components/Button';
 import GoogleSignIn from '../components/GoogleSignIn';
 import LoadingScreen from '../components/LoadingScreen';
-import { loginWithGoogle, loginWithEmailAndPassword } from '../Firebase/client';
+import { loginWithGoogle, loginWithEmailAndPassword, logout } from '../Firebase/client';
+import { 
+  registerLoginEvent, 
+  checkUserActiveStatus 
+} from '../services/authAuditService';
 
 
 const Login = () => {
@@ -71,14 +75,60 @@ const Login = () => {
     setLoading(true);
     setLoginError('');
 
+    let user = null;
+    let loginSuccessful = false;
+
     try {
-      const user = await loginWithEmailAndPassword(username, password);
+      // Intentar login con Firebase
+      const userCredential = await loginWithEmailAndPassword(username, password);
+      
+      // Verificar si userCredential es directamente el usuario o contiene una propiedad user
+      user = userCredential.user || userCredential;
+      
+      // Verificar que el usuario se haya obtenido correctamente
+      if (!user || !user.uid) {
+        throw new Error('No se pudo obtener la información del usuario de Firebase');
+      }
+      
+      loginSuccessful = true;
+      
+      // Verificar si el usuario está activo en el backend
+      try {
+        const isActive = await checkUserActiveStatus(user.uid);
+        if (isActive === false) {
+          // Usuario existe pero está desactivado
+          await registerLoginEvent(username, false, "Usuario desactivado", user.uid);
+          await logout();
+          setLoginError('Tu cuenta ha sido desactivada. Contacta al administrador.');
+          return;
+        } else if (isActive === null) {
+          // Error al verificar estado - continuar con el login pero registrar warning
+        }
+      } catch (statusError) {
+        // Continuar con el login aunque no se pueda verificar el estado
+      }
+      
+      // Registrar login exitoso en auditoría
+      try {
+        await registerLoginEvent(username, true, null, user.uid);
+      } catch (auditError) {
+        // No bloquear el login por errores de auditoría
+      }
+      
       // Redirigir al dashboard
       navigate('/dashboard');
-    } catch (error) {
-      console.error('Error de inicio de sesión:', error);
       
-      // Ahora simplemente usar el mensaje de error personalizado que viene del client.js
+    } catch (error) {
+      // Solo registrar como LOGIN_FAILED si realmente falló el login de Firebase
+      if (!loginSuccessful) {
+        try {
+          await registerLoginEvent(username, false, error.message);
+        } catch (auditError) {
+          // Error registrando en auditoría - continuar
+        }
+      }
+      
+      // Mostrar error al usuario
       setLoginError(error.message);
     } finally {
       setLoading(false);
@@ -90,11 +140,57 @@ const Login = () => {
     setLoading(true);
     setLoginError('');
 
+    let user = null;
+    let loginSuccessful = false;
+
     try {
-      const user = await loginWithGoogle();
+      // Intentar login con Google
+      const googleUser = await loginWithGoogle();
+      
+      // Verificar si googleUser es directamente el usuario o contiene una propiedad user
+      user = googleUser.user || googleUser;
+      
+      // Verificar que el usuario se haya obtenido correctamente
+      if (!user || !user.uid || !user.email) {
+        throw new Error('No se pudo obtener la información del usuario de Google');
+      }
+      
+      loginSuccessful = true;
+      
+      // Verificar si el usuario está activo en el backend
+      try {
+        const isActive = await checkUserActiveStatus(user.uid);
+        if (isActive === false) {
+          // Usuario existe pero está desactivado
+          await registerLoginEvent(user.email, false, "Usuario desactivado", user.uid);
+          await logout();
+          setLoginError('Tu cuenta ha sido desactivada. Contacta al administrador.');
+          return;
+        } else if (isActive === null) {
+          // Error al verificar estado - continuar con el login pero registrar warning
+        }
+      } catch (statusError) {
+        // Continuar con el login aunque no se pueda verificar el estado
+      }
+      
+      // Registrar login exitoso en auditoría
+      try {
+        await registerLoginEvent(user.email, true, null, user.uid);
+      } catch (auditError) {
+        // No bloquear el login por errores de auditoría
+      }
+      
       navigate('/dashboard');
+      
     } catch (error) {
-      console.error('Error de inicio de sesión con Google:', error);
+      // Solo registrar como LOGIN_FAILED si realmente falló el login de Google
+      if (!loginSuccessful) {
+        try {
+          await registerLoginEvent('google-signin-attempt', false, error.message);
+        } catch (auditError) {
+          // Error registrando en auditoría - continuar
+        }
+      }
       
       let errorMessage = 'Error al iniciar sesión con Google';
       

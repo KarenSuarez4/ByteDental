@@ -77,6 +77,38 @@ ehthumbs.db
 
 # Test coverage
 coverage/
+lcov-report/
 
 # Test reports
 coverage-reports/
+
+# Firebase config (sensitive data)
+firebase-config.js
+firebaseConfig.js
+*firebase-config*.js
+
+# Build artifacts
+.vite/
+dist/
+build/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Documentation files
+*.md
+!README.md
+
+# Development files
+.env.development
+.env.staging
+.env.production
+
+# Storybook build outputs
+storybook-static/
+
+# JWT tokens and test files
+test_tokens.json
+*_tokens.json
