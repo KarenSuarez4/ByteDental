@@ -18,7 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     permissions:
-      # Permisos necesarios para CodeQL
       security-events: write
       packages: read
       actions: read
@@ -32,10 +31,7 @@ jobs:
         - language: python
           build-mode: none
         # Análisis de JavaScript/TypeScript (React frontend)
-        - language: javascript-typescript
-          build-mode: none
-        # Análisis de GitHub Actions
-        - language: actions
+        - language: javascript
           build-mode: none
 
     steps:
@@ -50,7 +46,7 @@ jobs:
         python-version: '3.11'
         cache: 'pip'
 
-    # Instalar dependencias de Python para mejor análisis
+    # Instalar dependencias de Python
     - name: Install Python dependencies
       if: matrix.language == 'python'
       run: |
@@ -60,19 +56,20 @@ jobs:
 
     # Configuración específica para Node.js/React
     - name: Set up Node.js
-      if: matrix.language == 'javascript-typescript'
+      if: matrix.language == 'javascript'
       uses: actions/setup-node@v4
       with:
         node-version: '18'
         cache: 'npm'
 
-    # Instalar dependencias de Node.js para mejor análisis
+    # Instalar dependencias de Node.js
     - name: Install Node.js dependencies
-      if: matrix.language == 'javascript-typescript'
+      if: matrix.language == 'javascript'
       run: |
-        npm ci
-        # Si tienes un directorio frontend específico, ajusta la ruta:
-        # cd frontend && npm ci
+        if [ -f "frontend/package.json" ]; then
+          cd frontend
+          npm ci
+        fi
 
     # Inicializar CodeQL
     - name: Initialize CodeQL
@@ -80,9 +77,7 @@ jobs:
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
-        # Consultas de seguridad extendidas y calidad
         queries: security-extended,security-and-quality
-        # Configuración adicional para mejorar el análisis
         config: |
           paths-ignore:
             - "**/*.md"
@@ -94,15 +89,14 @@ jobs:
             - "**/dist/**"
             - "**/build/**"
 
-    # Paso específico para análisis manual si es necesario
+    # Build manual (si aplica)
     - name: Manual build (if needed)
       if: matrix.build-mode == 'manual'
       shell: bash
       run: |
         echo "Configurando build manual..."
-        # Para FastAPI, normalmente no es necesario un build
-        # Para React con Vite:
-        if [ -f "package.json" ]; then
+        if [ -f "frontend/package.json" ]; then
+          cd frontend
           npm run build
         fi
 
@@ -111,8 +105,6 @@ jobs:
       uses: github/codeql-action/analyze@v3
       with:
         category: "/language:${{matrix.language}}"
-        # Subir resultados incluso si hay errores menores
-        upload: true
 
   # Job adicional para análisis de dependencias
   dependency-check:
@@ -135,17 +127,16 @@ jobs:
     - name: Python Security Check
       run: |
         pip install safety bandit
-        # Verificar vulnerabilidades conocidas en dependencias
-        safety check --json || true
-        # Análisis estático de código Python para problemas de seguridad
+        safety check --json > safety-report.json || true
         bandit -r . -f json -o bandit-report.json || true
 
     # Análisis de vulnerabilidades en dependencias de Node.js
     - name: Node.js Security Audit
       run: |
-        if [ -f "package.json" ]; then
-          npm audit --audit-level moderate || true
-          # Si usas yarn: yarn audit || true
+        if [ -f "frontend/package.json" ]; then
+          cd frontend
+          npm ci
+          npm audit --json > ../npm-audit-report.json || true
         fi
 
     # Subir reportes como artefactos
@@ -172,7 +163,7 @@ jobs:
     - name: TruffleHog OSS
       uses: trufflesecurity/trufflehog@main
       with:
-        path: ./
+        path: ./ 
         base: main
         head: HEAD
         extra_args: --debug --only-verified
