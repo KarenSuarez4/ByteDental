@@ -73,7 +73,7 @@ jobs:
 
     # Inicializar CodeQL
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
+      uses: github/codeql-action/init@v4
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
@@ -163,7 +163,5 @@ jobs:
     - name: TruffleHog OSS
       uses: trufflesecurity/trufflehog@main
       with:
-        path: ./ 
-        base: main
-        head: HEAD
-        extra_args: --debug --only-verified
+          path: ./
+          extra_args: --debug --only-verified
