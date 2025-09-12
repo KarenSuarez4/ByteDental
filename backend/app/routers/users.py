@@ -206,6 +206,14 @@ def get_users(
     
     return [UserResponse(**user_to_dict(user)) for user in users]
 
+@router.get("/me", response_model=UserResponse)
+async def get_current_user_info(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Devuelve los datos del usuario autenticado"""
+    return UserResponse(**user_to_dict(current_user))
+
 @router.get("/{user_uid}", response_model=UserResponse)
 def get_user(
     user_uid: str, 
@@ -214,13 +222,11 @@ def get_user(
 ):
     """Obtener un usuario por UID - Solo ADMINISTRADORES"""
     user = db.query(User).join(Role).filter(User.uid == user_uid).first()
-    
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Usuario no encontrado"
         )
-    
     return UserResponse(**user_to_dict(user))
 
 @router.put("/{user_uid}", response_model=UserResponse)
@@ -439,3 +445,4 @@ def get_roles(
     """Obtener lista de roles disponibles - Para usuarios autenticados"""
     roles = db.query(Role).filter(Role.is_active == True).all()
     return roles
+

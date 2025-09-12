@@ -14,7 +14,8 @@ const RegisterUser = () => {
     documentType: "",
     documentNumber: "",
     phoneNumber: "",
-    fullName: "",
+    firstName: "",
+    lastName: "",
     email: "",
     role: "",
     specialty: "",
@@ -27,10 +28,10 @@ const RegisterUser = () => {
 
   const roles = ["Asistente", "Doctor", "Administrador"];
   const specialties = [
-    "Medicina General",
-    "Cardiología",
-    "Pediatría",
-    "Odontología",
+    "Periodoncia",
+    "Endodoncia",
+    "Cirugía oral y maxilofacial",
+    "Odontopediatría",
   ];
 
   const handleChange = (e) => {
@@ -57,7 +58,8 @@ const RegisterUser = () => {
     if (
       !formData.documentType ||
       !formData.documentNumber ||
-      !formData.fullName ||
+      !formData.firstName ||      // <-- ahora valida nombre
+      !formData.lastName ||       // <-- ahora valida apellido
       !formData.email ||
       !formData.role ||
       (isDoctor && !formData.specialty)
@@ -95,7 +97,8 @@ const RegisterUser = () => {
       documentType: "",
       documentNumber: "",
       phoneNumber: "",
-      fullName: "",
+      firstName: "",
+      lastName: "",
       email: "",
       role: "",
       specialty: "",
@@ -122,6 +125,7 @@ const RegisterUser = () => {
         </div>
       )}
       <form onSubmit={handleSubmit} className="w-full max-w-[700px] grid grid-cols-1 md:grid-cols-2 gap-x-[75px] gap-y-6">
+        {/* Columna Izquierda */}
         <div className="flex flex-col items-start">
           <label className="block text-gray-700 font-poppins font-semibold mb-2">Tipo de documento *</label>
           <Select
@@ -136,16 +140,7 @@ const RegisterUser = () => {
             <option value="passport">Pasaporte</option>
           </Select>
         </div>
-        <div className="flex flex-col items-start">
-          <label className="block text-gray-700 font-poppins font-semibold mb-2">Teléfono</label>
-          <Input
-            name="phoneNumber"
-            placeholder="Ingrese el número de teléfono"
-            value={formData.phoneNumber}
-            onChange={handleChange}
-          />
-        </div>
-        
+        {/* Columna Derecha */}
         <div className="flex flex-col items-start">
           <label className="block text-gray-700 font-poppins font-semibold mb-2">Número de documento *</label>
           <Input
@@ -156,6 +151,56 @@ const RegisterUser = () => {
             error={!formData.documentNumber && formError}
           />
         </div>
+
+        {/* Columna Izquierda */}
+        <div className="flex flex-col items-start">
+          <label className="block text-gray-700 font-poppins font-semibold mb-2">Nombre *</label>
+          <Input
+            name="firstName"
+            placeholder="Ingrese el nombre"
+            value={formData.firstName}
+            onChange={handleChange}
+            error={!formData.firstName && formError}
+          />
+        </div>
+        {/* Columna Derecha */}
+        <div className="flex flex-col items-start">
+          <label className="block text-gray-700 font-poppins font-semibold mb-2">Apellido *</label>
+          <Input
+            name="lastName"
+            placeholder="Ingrese el apellido"
+            value={formData.lastName}
+            onChange={handleChange}
+            error={!formData.lastName && formError}
+          />
+        </div>
+
+        {/* Columna Izquierda */}
+        <div className="flex flex-col items-start">
+          <label className="block text-gray-700 font-poppins font-semibold mb-2">Teléfono</label>
+          <Input
+            name="phoneNumber"
+            placeholder="Ingrese el número de teléfono"
+            value={formData.phoneNumber}
+            onChange={handleChange}
+          />
+        </div>
+        {/* Columna Derecha */}
+        <div className="flex flex-col items-start">
+          <label className="block text-gray-700 font-poppins font-semibold mb-2">Correo Electrónico *</label>
+          <Input
+            name="email"
+            placeholder="Ingrese el correo electrónico"
+            value={formData.email}
+            onChange={handleEmailChange}
+            error={!!emailError}
+          />
+          {emailError && (
+            <p className="text-red-500 text-sm mt-2 font-poppins">{emailError}</p>
+          )}
+        </div>
+
+        {/* Columna Izquierda */}
         <div className="flex flex-col items-start">
           <label className="block text-gray-700 font-poppins font-semibold mb-2">Rol *</label>
           <Select
@@ -170,20 +215,10 @@ const RegisterUser = () => {
             ))}
           </Select>
         </div>
-
-        <div className="flex flex-col items-start">
-          <label className="block text-gray-700 font-poppins font-semibold mb-2">Nombre completo *</label>
-          <Input
-            name="fullName"
-            placeholder="Ingrese el nombre completo"
-            value={formData.fullName}
-            onChange={handleChange}
-            error={!formData.fullName && formError}
-          />
-        </div>
+        {/* Columna Derecha */}
         <div className="flex flex-col items-start">
           <label className={cn("block text-gray-700 font-poppins font-semibold mb-2", !isDoctor && 'text-gray-400')}>
-            Especialidad del medico {isDoctor && '*'}
+            Especialidad del doctor {isDoctor && '*'}
           </label>
           <Select
             name="specialty"
@@ -198,21 +233,6 @@ const RegisterUser = () => {
             ))}
           </Select>
         </div>
-
-        <div className="flex flex-col items-start">
-          <label className="block text-gray-700 font-poppins font-semibold mb-2">Correo Electrónico *</label>
-          <Input
-            name="email"
-            placeholder="Ingrese el correo electrónico"
-            value={formData.email}
-            onChange={handleEmailChange}
-            error={!!emailError}
-          />
-          {emailError && (
-            <p className="text-red-500 text-sm mt-2 font-poppins">{emailError}</p>
-          )}
-        </div>
-        <div></div>
       </form>
 
       <div className="flex justify-center space-x-6 mt-10">
