@@ -41,7 +41,7 @@ jobs:
     # Configuración específica para Python
     - name: Set up Python
       if: matrix.language == 'python'
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         cache: 'pip'
@@ -51,8 +51,9 @@ jobs:
       if: matrix.language == 'python'
       run: |
         python -m pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+        if [ -f backend/requirements.txt ]; then 
+          pip install -r backend/requirements.txt
+        fi
 
     # Configuración específica para Node.js/React
     - name: Set up Node.js
@@ -61,19 +62,18 @@ jobs:
       with:
         node-version: '18'
         cache: 'npm'
+        cache-dependency-path: 'frontend/package-lock.json'
 
     # Instalar dependencias de Node.js
     - name: Install Node.js dependencies
       if: matrix.language == 'javascript'
       run: |
-        if [ -f "frontend/package.json" ]; then
-          cd frontend
-          npm ci
-        fi
+        cd frontend
+        npm ci
 
     # Inicializar CodeQL
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v4
+      uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
@@ -88,17 +88,7 @@ jobs:
             - "**/__pycache__/**"
             - "**/dist/**"
             - "**/build/**"
-
-    # Build manual (si aplica)
-    - name: Manual build (if needed)
-      if: matrix.build-mode == 'manual'
-      shell: bash
-      run: |
-        echo "Configurando build manual..."
-        if [ -f "frontend/package.json" ]; then
-          cd frontend
-          npm run build
-        fi
+            - "**/.vite/**"
 
     # Ejecutar análisis de CodeQL
     - name: Perform CodeQL Analysis
@@ -114,7 +104,7 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
@@ -127,21 +117,21 @@ jobs:
     - name: Python Security Check
       run: |
         pip install safety bandit
-        safety check --json > safety-report.json || true
-        bandit -r . -f json -o bandit-report.json || true
+        if [ -f backend/requirements.txt ]; then
+          safety check -r backend/requirements.txt --json > safety-report.json || true
+        fi
+        bandit -r backend/ -f json -o bandit-report.json || true
 
     # Análisis de vulnerabilidades en dependencias de Node.js
     - name: Node.js Security Audit
       run: |
-        if [ -f "frontend/package.json" ]; then
-          cd frontend
-          npm ci
-          npm audit --json > ../npm-audit-report.json || true
-        fi
+        cd frontend
+        npm ci
+        npm audit --json > ../npm-audit-report.json || true
 
     # Subir reportes como artefactos
     - name: Upload security reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: security-reports
