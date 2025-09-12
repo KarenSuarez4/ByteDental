@@ -1,0 +1,65 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [frontend, backend]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node (for frontend)
+        if: matrix.service == 'frontend'
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install deps & test frontend
+        if: matrix.service == 'frontend'
+        run: |
+          cd frontend
+          npm install
+          npm run test
+
+      - name: Set up Python (for backend)
+        if: matrix.service == 'backend'
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install deps & test backend
+        if: matrix.service == 'backend'
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pytest
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Deploy frontend staging
+        run: curl -X POST ${{ secrets.RENDER_STAGING_FRONT }}
+
+      - name: Deploy backend staging
+        run: curl -X POST ${{ secrets.RENDER_STAGING_BACK }}
+
+  deploy-dev:
+    name: Deploy to Dev
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    steps:
+      - name: Deploy frontend dev
+        run: curl -X POST ${{ secrets.RENDER_DEV_FRONT }}
+
+      - name: Deploy backend dev
+        run: curl -X POST ${{ secrets.RENDER_DEV_BACK }}
