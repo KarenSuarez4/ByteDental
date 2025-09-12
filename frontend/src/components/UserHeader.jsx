@@ -1,7 +1,9 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useAuth } from '../contexts/AuthContext';
+import StyledLogoutButton from './StyledLogoutButton'; // Renombra tu botón a StyledLogoutButton.jsx
 
 function cn(...args) {
   return twMerge(clsx(args));
@@ -9,6 +11,8 @@ function cn(...args) {
 
 const UserHeader = ({ userRole }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
 
   const navLinks = {
     'Administrador': [
@@ -16,10 +20,8 @@ const UserHeader = ({ userRole }) => {
       { path: "/users/manage", label: "Gestión de usuarios" },
       { path: "/reports", label: "Reportes" },
       { path: "/services", label: "Catálogo de servicios" },
-      { path: "/audit", label: "Auditoría de usuarios" },
     ],
     'Asistente': [
-      /*{ path: "/schedule", label: "Agendamiento de citas" },*/
       { path: "/patients", label: "Gestión de pacientes" },
     ],
     'Doctor': [
@@ -29,7 +31,7 @@ const UserHeader = ({ userRole }) => {
     ],
     'Auditor': [
       { path: "/audit-logs", label: "Registros de Auditoría" },
-      { path: "/user-activity", label: "Actividad de Usuarios" },   
+      { path: "/user-activity", label: "Actividad de Usuarios" },
     ],
   };
 
@@ -41,6 +43,11 @@ const UserHeader = ({ userRole }) => {
   };
 
   const currentNavLinks = navLinks[userRole] || [];
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+  };
 
   return (
     <header className="bg-header-blue w-full h-[145px] flex items-center justify-between px-10 relative">
@@ -68,6 +75,7 @@ const UserHeader = ({ userRole }) => {
           <path d="M12 17c-2.76 0-5 2.24-5 5h10c0-2.76-2.24-5-5-5z" stroke="white" strokeWidth="2" />
         </svg>
         <span className="font-semibold">{userRole}</span>
+        <StyledLogoutButton onClick={handleSignOut} />
       </div>
     </header>
   );

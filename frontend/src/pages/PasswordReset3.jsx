@@ -225,7 +225,7 @@ const PasswordReset3 = () => {
               {redirectCountdown !== null && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-blue-700 text-sm font-poppins">
-                    🔄 Redirigiendo al login en {redirectCountdown}s...
+                    Redirigiendo al login en {redirectCountdown}s...
                   </p>
                 </div>
               )}
