@@ -1,0 +1,20 @@
+fastapi
+uvicorn
+python-multipart
+pydantic
+pydantic-settings
+python-dotenv
+jinja2
+aiofiles
+python-jose[cryptography]
+passlib[bcrypt]
+# Para envío de emails - usamos smtplib estándar
+email-validator
+
+# Base de datos PostgreSQL
+sqlalchemy
+psycopg2-binary
+alembic
+
+# Firebase Admin SDK
+firebase-admin

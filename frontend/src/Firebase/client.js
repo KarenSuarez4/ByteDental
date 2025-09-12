@@ -7,6 +7,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
+  verifyPasswordResetCode,
+  confirmPasswordReset,
   signOut,
   onAuthStateChanged,
   updatePassword,
@@ -38,11 +40,9 @@ PROVIDER_GOOGLE.setCustomParameters({
 export function loginWithGoogle() {
   return signInWithPopup(auth, PROVIDER_GOOGLE)
     .then((result) => {
-      console.log("Google sign-in successful:", result);
       return result.user;
     })
     .catch((error) => {
-      console.error("Error during Google sign-in:", error);
       const customError = new Error(getCustomErrorMessage(error));
       customError.code = error.code;
       customError.originalError = error;
@@ -73,11 +73,9 @@ function getCustomErrorMessage(firebaseError) {
 export function loginWithEmailAndPassword(email, password) {
   return signInWithEmailAndPassword(auth, email, password)
     .then((userCredential) => {
-      console.log("Email sign-in successful:", userCredential);
       return userCredential.user;
     })
     .catch((error) => {
-      console.error("Error during email sign-in:", error);
       const customError = new Error(getCustomErrorMessage(error));
       customError.code = error.code;
       customError.originalError = error;
@@ -89,11 +87,9 @@ export function loginWithEmailAndPassword(email, password) {
 export function registerWithEmailAndPassword(email, password) {
   return createUserWithEmailAndPassword(auth, email, password)
     .then((userCredential) => {
-      console.log("User registration successful:", userCredential);
       return userCredential.user;
     })
     .catch((error) => {
-      console.error("Error during user registration:", error);
       const customError = new Error(getCustomErrorMessage(error));
       customError.code = error.code;
       customError.originalError = error;
@@ -168,6 +164,38 @@ export async function changePassword(currentPassword, newPassword) {
 // Función para verificar si el usuario está autenticado
 export function isAuthenticated() {
   return auth.currentUser !== null;
+}
+
+// Función para verificar código de restablecimiento de contraseña
+export function verifyPasswordResetCodeCustom(oobCode) {
+  return verifyPasswordResetCode(auth, oobCode)
+    .then((email) => {
+      console.log("Password reset code verified for:", email);
+      return email;
+    })
+    .catch((error) => {
+      console.error("Error verifying password reset code:", error);
+      const customError = new Error(getCustomErrorMessage(error));
+      customError.code = error.code;
+      customError.originalError = error;
+      throw customError;
+    });
+}
+
+// Función para confirmar restablecimiento de contraseña
+export function confirmPasswordResetCustom(oobCode, newPassword) {
+  return confirmPasswordReset(auth, oobCode, newPassword)
+    .then(() => {
+      console.log("Password reset successful");
+      return true;
+    })
+    .catch((error) => {
+      console.error("Error confirming password reset:", error);
+      const customError = new Error(getCustomErrorMessage(error));
+      customError.code = error.code;
+      customError.originalError = error;
+      throw customError;
+    });
 }
 
 // Exportar la instancia de auth para uso en otras partes de la aplicación
