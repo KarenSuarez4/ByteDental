@@ -1,0 +1,114 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build directories
+dist
+dist-ssr
+build
+out
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Testing
+coverage
+.nyc_output
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Yarn Integrity file
+.yarn-integrity
+
+# Local environment files
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+
+# OS generated files
+Thumbs.db
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# Vite specific
+.vite/
+
+# Package lock files (if you prefer to ignore them)
+# package-lock.json
+# yarn.lock
+
+# Test coverage
+coverage/
+lcov-report/
+
+# Test reports
+coverage-reports/
+
+# Firebase config (sensitive data)
+firebase-config.js
+firebaseConfig.js
+*firebase-config*.js
+
+# Build artifacts
+.vite/
+dist/
+build/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Documentation files
+*.md
+!README.md
+
+# Development files
+.env.development
+.env.staging
+.env.production
+
+# Storybook build outputs
+storybook-static/
+
+# JWT tokens and test files
+test_tokens.json
+*_tokens.json
