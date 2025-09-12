@@ -1,0 +1,50 @@
+name: Performance & Load Testing
+
+on:
+  push:
+    branches: [ "main" ]
+  schedule:
+    - cron: '0 1 * * *' # Diariamente a la 1:00 AM
+
+jobs:
+  load-test:
+    name: Load Testing
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install load testing tools
+      run: |
+        pip install locust requests
+
+    - name: Run load tests
+      env:
+        TARGET_URL: ${{ secrets.STAGING_URL }}
+      run: |
+        # Crear script de Locust para load testing
+        cat > locustfile.py << 'EOF'
+        from locust import HttpUser, task, between
+        import json
+
+        class LoginUser(HttpUser):
+            wait_time = between(1, 3)
+            
+            @task
+            def test_login_page(self):
+                self.client.get("/")
+                
+            @task
+            def test_login_attempt(self):
+                self.client.post("/api/auth/login", json={
+                    "email": "test@example.com",
+                    "password": "testpass"
+                })
+        EOF
+        
+        locust -f locustfile.py --headless -u 50 -r 10 -t 60s --host $TARGET_URL

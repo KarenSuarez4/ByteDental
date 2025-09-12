@@ -1,0 +1,150 @@
+name: Security Testing Suite
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  security-scan:
+    name: Login Security Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test-type: ['sql-injection', 'xss-injection', 'auth-bypass', 'brute-force']
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests urllib3 pytest
+
+    - name: Wait for deployment
+      if: github.event_name == 'push'
+      run: |
+        echo "Esperando que el deployment esté listo..."
+        sleep 60
+
+    - name: Run Security Tests
+      env:
+        TARGET_URL: ${{ secrets.STAGING_URL || 'http://localhost:5173' }}
+        TEST_TYPE: ${{ matrix.test-type }}
+      run: |
+        python SecurityTesting.py --test-type $TEST_TYPE --url $TARGET_URL
+
+    - name: Upload Security Reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-reports-${{ matrix.test-type }}
+        path: |
+          security_report_*.json
+          security_report_*.csv
+          security_test_*.log
+        retention-days: 30
+
+  consolidate-results:
+    name: Consolidate Security Results
+    runs-on: ubuntu-latest
+    needs: security-scan
+    if: always()
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+
+    - name: Consolidate reports
+      run: |
+        mkdir -p consolidated-reports
+        find . -name "security_report_*.json" -exec cp {} consolidated-reports/ \;
+        
+        # Crear reporte consolidado
+        python -c "
+        import json, glob, os
+        from datetime import datetime
+        
+        all_results = []
+        for file in glob.glob('consolidated-reports/*.json'):
+            try:
+                with open(file, 'r') as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        all_results.extend(data)
+                    else:
+                        all_results.append(data)
+            except Exception as e:
+                print(f'Error reading {file}: {e}')
+        
+        # Crear reporte final
+        final_report = {
+            'timestamp': datetime.now().isoformat(),
+            'total_tests': len(all_results),
+            'vulnerabilities': [r for r in all_results if r.get('vulnerable', False)],
+            'all_results': all_results
+        }
+        
+        with open('consolidated-security-report.json', 'w') as f:
+            json.dump(final_report, f, indent=2)
+        
+        # Mostrar resumen
+        vuln_count = len(final_report['vulnerabilities'])
+        print(f'Total tests: {len(all_results)}')
+        print(f'Vulnerabilities found: {vuln_count}')
+        
+        if vuln_count > 0:
+            print('CRITICAL: Vulnerabilities detected!')
+        "
+
+    - name: Upload Consolidated Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: consolidated-security-report
+        path: consolidated-security-report.json
+
+    - name: Comment PR with results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          if (!fs.existsSync('consolidated-security-report.json')) {
+            console.log('No consolidated report found');
+            return;
+          }
+          
+          const report = JSON.parse(fs.readFileSync('consolidated-security-report.json', 'utf8'));
+          
+          const comment = `## 🛡️ Security Test Results
+          
+          **Total Tests:** ${report.total_tests}
+          **Vulnerabilities:** ${report.vulnerabilities.length}
+          
+          ${report.vulnerabilities.length > 0 ? 
+            '⚠️ **CRITICAL**: Vulnerabilities detected!\n\n' + 
+            report.vulnerabilities.map(v => `- **${v.test_type}**: ${v.payload || v.description || 'No details'}`).join('\n') 
+            : '✅ No vulnerabilities detected'}
+          `;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
