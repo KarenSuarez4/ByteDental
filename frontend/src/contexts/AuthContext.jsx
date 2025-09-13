@@ -23,26 +23,38 @@ export function useAuth() {
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChange(async (user) => {
       setCurrentUser(user);
       if (user) {
-        const token = await user.getIdToken();
-        const uid = user.uid;
-        const response = await fetch(`${API_BASE_URL}/api/users/me`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (response.ok) {
-          const backendUser = await response.json();
-          // Mapea el rol del backend al nombre usado en el frontend
-          setUserRole(ROLE_MAP[backendUser.role_name] || backendUser.role_name);
-        } else {
+        try {
+          const token = await user.getIdToken();
+          const uid = user.uid;
+          const response = await fetch(`${API_BASE_URL}/api/users/me`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (response.ok) {
+            const backendUser = await response.json();
+            // Mapea el rol del backend al nombre usado en el frontend
+            const mappedRole = ROLE_MAP[backendUser.role_name] || backendUser.role_name;
+            setUserRole(mappedRole);
+            setMustChangePassword(backendUser.must_change_password || false);
+          } else {
+            console.warn('No se pudo obtener información del backend del usuario:', response.status);
+            setUserRole(null);
+            setMustChangePassword(false);
+          }
+        } catch (error) {
+          console.error('Error obteniendo información del usuario del backend:', error);
           setUserRole(null);
+          setMustChangePassword(false);
         }
       } else {
         setUserRole(null);
+        setMustChangePassword(false);
       }
       setLoading(false);
     });
@@ -64,11 +76,17 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const updatePasswordChangeStatus = () => {
+    setMustChangePassword(false);
+  };
+
   const value = {
     currentUser,
     userRole,
+    mustChangePassword,
     loading,
     signOut,
+    updatePasswordChangeStatus,
     isAuthenticated: !!currentUser
   };
 

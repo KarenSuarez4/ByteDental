@@ -2,15 +2,43 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, EmailStr
+import secrets
+import string
 
 from ..database import get_db
 from ..models.user_models import User
 from ..models.rol_models import Role
 from ..services.firebase_service import FirebaseService
 from ..services.auditoria_service import AuditoriaService
+from ..services.email_service import EmailService
 from ..middleware.auth_middleware import get_current_admin_user, get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+def generate_temporary_password(length: int = 12) -> str:
+    """Generar contraseña temporal segura para nuevos usuarios"""
+    # Asegurar que tenga al menos una mayúscula, minúscula, número y símbolo
+    lowercase = string.ascii_lowercase
+    uppercase = string.ascii_uppercase
+    digits = string.digits
+    symbols = "!@#$%&*"
+    
+    # Garantizar al menos un carácter de cada tipo
+    password = [
+        secrets.choice(uppercase),
+        secrets.choice(lowercase),
+        secrets.choice(digits),
+        secrets.choice(symbols)
+    ]
+    
+    # Completar el resto de la contraseña
+    all_characters = lowercase + uppercase + digits + symbols
+    for _ in range(length - 4):
+        password.append(secrets.choice(all_characters))
+    
+    # Mezclar la contraseña
+    secrets.SystemRandom().shuffle(password)
+    return ''.join(password)
 
 # Schemas de Pydantic actualizados con nombres en inglés
 class UserCreate(BaseModel):
@@ -22,7 +50,7 @@ class UserCreate(BaseModel):
     phone: Optional[str] = None
     role_id: int
     specialty: Optional[str] = None
-    password: str
+    # Nota: password será generada automáticamente por el sistema
 
 class UserUpdate(BaseModel):
     document_number: Optional[str] = None
@@ -46,6 +74,7 @@ class UserResponse(BaseModel):
     role_id: int
     specialty: Optional[str]
     is_active: bool
+    must_change_password: bool
     created_at: str
     updated_at: str
     role_name: Optional[str] = None
@@ -62,6 +91,16 @@ class RoleResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class PasswordChange(BaseModel):
+    """Schema para cambio de contraseña normal"""
+    current_password: str
+    new_password: str
+
+class ForcePasswordChange(BaseModel):
+    """Schema para cambio obligatorio de contraseña en primer login"""
+    new_password: str
+    confirm_password: str
+
 def user_to_dict(user: User) -> Dict[str, Any]:
     """Convierte un objeto User a diccionario"""
     return {
@@ -75,6 +114,7 @@ def user_to_dict(user: User) -> Dict[str, Any]:
         "role_id": user.role_id,
         "specialty": user.specialty,
         "is_active": user.is_active,
+        "must_change_password": user.must_change_password,
         "created_at": user.created_at.isoformat() if user.created_at is not None else None,
         "updated_at": user.updated_at.isoformat() if user.updated_at is not None else None,
         "role_name": user.role.name if hasattr(user, 'role') and user.role else None
@@ -121,14 +161,31 @@ async def create_user(
         )
     
     firebase_uid = None
+    temporal_password = None
     try:
+        # Generar contraseña temporal para el nuevo usuario
+        temporal_password = generate_temporary_password()
+        
         # Crear usuario en Firebase
-        firebase_uid = FirebaseService.create_firebase_user(
-            email=user_data.email,
-            password=user_data.password,
-            display_name=f"{user_data.first_name} {user_data.last_name}",
-            phone_number=user_data.phone
-        )
+        try:
+            firebase_uid = FirebaseService.create_firebase_user(
+                email=user_data.email,
+                password=temporal_password,
+                display_name=f"{user_data.first_name} {user_data.last_name}",
+                phone_number=user_data.phone
+            )
+        except Exception as firebase_error:
+            error_message = str(firebase_error)
+            if "EMAIL_EXISTS" in error_message:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="El email ya está registrado en el sistema de autenticación"
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Error al crear usuario en Firebase: {error_message}"
+                )
         
         if not firebase_uid:
             raise HTTPException(
@@ -147,7 +204,8 @@ async def create_user(
             phone=user_data.phone,
             role_id=user_data.role_id,
             specialty=user_data.specialty,
-            is_active=True
+            is_active=True,
+            must_change_password=True  # Usuario debe cambiar contraseña en primer login
         )
         
         db.add(db_user)
@@ -164,21 +222,49 @@ async def create_user(
             ip_origen=ip_cliente
         )
         
+        # Enviar email de bienvenida con credenciales temporales
+        try:
+            email_service = EmailService()
+            await email_service.send_welcome_email(
+                to_email=user_data.email,
+                user_name=f"{user_data.first_name} {user_data.last_name}",
+                temporal_password=temporal_password,
+                role_name=str(role.name)
+            )
+        except Exception as e:
+            # Log el error pero no falla la creación del usuario
+            print(f"Error enviando email de bienvenida: {e}")
+        
         # Agregar rol para la respuesta
         db_user.role = role
         
         return UserResponse(**user_to_dict(db_user))
         
+    except HTTPException:
+        # Re-lanzar HTTPExceptions específicas
+        raise
     except Exception as e:
         # Si hay error, limpiar Firebase si se creó
         if firebase_uid:
-            FirebaseService.delete_firebase_user(firebase_uid)
+            try:
+                FirebaseService.delete_firebase_user(firebase_uid)
+            except:
+                pass  # Ignorar errores al limpiar
         
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al crear usuario: {str(e)}"
-        )
+        
+        # Manejo específico de errores comunes
+        error_message = str(e)
+        if "EMAIL_EXISTS" in error_message:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El email ya está registrado en el sistema"
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error al crear usuario: {error_message}"
+            )
 
 @router.get("/", response_model=List[UserResponse])
 def get_users(
@@ -207,12 +293,15 @@ def get_users(
     return [UserResponse(**user_to_dict(user)) for user in users]
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(
-    db: Session = Depends(get_db),
+def get_current_user_info(
     current_user: User = Depends(get_current_user)
 ):
-    """Devuelve los datos del usuario autenticado"""
-    return UserResponse(**user_to_dict(current_user))
+    """Obtener información del usuario actual autenticado"""
+    user_dict = user_to_dict(current_user)
+    # Agregar nombre del rol
+    if current_user.role:
+        user_dict["role_name"] = current_user.role.name
+    return UserResponse(**user_dict)
 
 @router.get("/{user_uid}", response_model=UserResponse)
 def get_user(
@@ -445,4 +534,111 @@ def get_roles(
     """Obtener lista de roles disponibles - Para usuarios autenticados"""
     roles = db.query(Role).filter(Role.is_active == True).all()
     return roles
+
+@router.put("/me/change-password", response_model=dict)
+async def change_password(
+    current_password: str,
+    new_password: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Cambiar contraseña del usuario actual"""
+    try:
+        # Actualizar contraseña en Firebase
+        FirebaseService.update_firebase_user(str(current_user.uid), password=new_password)
+        
+        # Si es el primer cambio de contraseña, actualizar el flag
+        if current_user.must_change_password is True:
+            setattr(current_user, 'must_change_password', False)
+            db.commit()
+        
+        # Registrar en auditoría
+        ip_cliente = get_client_ip(request)
+        AuditoriaService.registrar_evento(
+            db=db,
+            usuario_id=str(current_user.uid),
+            tipo_evento="PASSWORD_CHANGE",
+            registro_afectado_id=str(current_user.uid),
+            registro_afectado_tipo="users",
+            descripcion_evento="Usuario cambió su contraseña",
+            detalles_cambios={"message": "Contraseña actualizada", "must_change_password_updated": True},
+            ip_origen=ip_cliente
+        )
+        
+        return {"message": "Contraseña actualizada exitosamente", "must_change_password": current_user.must_change_password}
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al cambiar contraseña: {str(e)}"
+        )
+
+@router.post("/force-password-change")
+async def force_password_change(
+    password_data: ForcePasswordChange,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Endpoint para cambio obligatorio de contraseña en primer login
+    Solo funciona si must_change_password=True
+    """
+    try:
+        # Verificar que el usuario debe cambiar contraseña
+        if current_user.must_change_password is not True:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No es necesario cambiar la contraseña"
+            )
+        
+        # Validar que las contraseñas coincidan
+        if password_data.new_password != password_data.confirm_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Las contraseñas no coinciden"
+            )
+        
+        # Validar complejidad de contraseña
+        if len(password_data.new_password) < 8:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La contraseña debe tener al menos 8 caracteres"
+            )
+        
+        # Actualizar contraseña en Firebase
+        FirebaseService.update_firebase_user(str(current_user.uid), password=password_data.new_password)
+        
+        # Marcar que ya no necesita cambiar contraseña
+        setattr(current_user, 'must_change_password', False)
+        db.commit()
+        
+        # Registrar en auditoría
+        ip_cliente = get_client_ip(request)
+        AuditoriaService.registrar_evento(
+            db=db,
+            usuario_id=str(current_user.uid),
+            tipo_evento="FORCE_PASSWORD_CHANGE",
+            registro_afectado_id=str(current_user.uid),
+            registro_afectado_tipo="users",
+            descripcion_evento="Usuario completó cambio obligatorio de contraseña",
+            detalles_cambios={"message": "Primer cambio de contraseña completado"},
+            ip_origen=ip_cliente
+        )
+        
+        return {
+            "message": "Contraseña actualizada exitosamente. Ya puedes usar el sistema",
+            "must_change_password": False
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al cambiar contraseña: {str(e)}"
+        )
 

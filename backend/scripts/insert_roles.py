@@ -10,18 +10,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy import create_engine, text
 from app.config import settings
 
-"""
-Script para insertar roles básicos en la base de datos
-"""
-import sys
-import os
-
-# Agregar el directorio padre al path para importar módulos
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from sqlalchemy import create_engine, text
-from app.config import settings
-
 def insert_basic_roles():
     """Insertar roles básicos del sistema"""
     # Usar la configuración de la aplicación
@@ -43,10 +31,6 @@ def insert_basic_roles():
         {
             'name': 'Assistant',
             'description': 'Operational support, appointment and patient management'
-        },
-        {
-            'name': 'Receptionist',
-            'description': 'Front desk operations, appointment scheduling'
         }
     ]
     

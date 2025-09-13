@@ -16,6 +16,7 @@ class User(Base):
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)  # Referencia a tabla de roles
     specialty = Column(String(100), nullable=True)  # Especialidad (para doctores)
     is_active = Column(Boolean, default=True)  # Si está activo
+    must_change_password = Column(Boolean, default=False, nullable=False)  # Debe cambiar contraseña en primer login
     created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)  # Fecha de creación
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now(), nullable=False)  # Fecha de actualización
     
