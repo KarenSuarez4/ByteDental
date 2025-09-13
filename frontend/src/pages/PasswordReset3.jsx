@@ -134,7 +134,7 @@ const PasswordReset3 = () => {
     }
     setPasswordStrength(strength);
 
-    if (value.length < 8) {
+    if (value.length < 8 || !/[A-Z]/.test(value) || !/[0-9]/.test(value)) {
       setNewPasswordError("La contraseña debe tener al menos 8 caracteres, incluir una letra mayúscula y un número.");
     } else {
       setNewPasswordError("");
@@ -170,7 +170,6 @@ const PasswordReset3 = () => {
   if (generalError && !isValidCode) {
     return (
       <div className="min-h-screen w-full flex flex-col">
-        <Header />
         <main className="flex-1 flex flex-col items-center justify-center bg-gray-50 mt-2">
           <div className="w-[338px] text-center">
             <h1 className="text-header-blue text-46 font-bold font-poppins mb-4">

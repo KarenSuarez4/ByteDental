@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Input from '../components/Input';
 import InputPassword from '../components/InputPassword';
@@ -21,14 +21,17 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentUser } = useAuth();
 
   // Redirigir si el usuario ya está autenticado
   useEffect(() => {
-    if (currentUser) {
+    // Permitir todas las rutas que incluyan "PasswordReset"
+    const isRecoveryRoute = location.pathname.toLowerCase().includes('passwordreset');
+    if (currentUser && !isRecoveryRoute) {
       navigate('/dashboard');
     }
-  }, [currentUser, navigate]);
+  }, [currentUser, navigate, location]);
 
   // --- Lógica de Manejo de Entradas y Validación  ---
   const handleUsernameChange = (event) => {

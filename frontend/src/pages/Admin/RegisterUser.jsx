@@ -1,12 +1,30 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Button from "../../components/Button";
 import Input from "../../components/Input";
 import Select from "../../components/Select";
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { createUser } from "../../services/userService";
+import { getRoles } from "../../services/userService";
+import { useAuth } from "../../contexts/AuthContext"; 
 
 function cn(...args) {
   return twMerge(clsx(args));
+}
+
+function generateRandomPassword(length = 10) {
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const numbers = "0123456789";
+  const all = upper + lower + numbers;
+
+  let password = "";
+  password += upper[Math.floor(Math.random() * upper.length)];
+  password += numbers[Math.floor(Math.random() * numbers.length)];
+  for (let i = 2; i < length; i++) {
+    password += all[Math.floor(Math.random() * all.length)];
+  }
+  return password;
 }
 
 const RegisterUser = () => {
@@ -21,18 +39,33 @@ const RegisterUser = () => {
     specialty: "",
   });
 
+  const [rolesList, setRolesList] = useState([]);
   const [isDoctor, setIsDoctor] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [generatedPassword, setGeneratedPassword] = useState("");
+  const { currentUser, token } = useAuth();
 
-  const roles = ["Asistente", "Doctor", "Administrador"];
   const specialties = [
     "Periodoncia",
     "Endodoncia",
     "Cirugía oral y maxilofacial",
     "Odontopediatría",
   ];
+
+  useEffect(() => {
+    async function fetchRoles() {
+      try {
+        const roles = await getRoles(token);
+        setRolesList(roles);
+      } catch (err) {
+        setFormError("No se pudieron cargar los roles.");
+        console.error("Error en fetchRoles:", err);
+      }
+    }
+    if (token) fetchRoles();
+  }, [token]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -58,8 +91,8 @@ const RegisterUser = () => {
     if (
       !formData.documentType ||
       !formData.documentNumber ||
-      !formData.firstName ||      // <-- ahora valida nombre
-      !formData.lastName ||       // <-- ahora valida apellido
+      !formData.firstName ||      
+      !formData.lastName ||       
       !formData.email ||
       !formData.role ||
       (isDoctor && !formData.specialty)
@@ -77,18 +110,26 @@ const RegisterUser = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSuccessMessage('');
-    if (!validateForm()) {
-      return;
-    }
+    const randomPassword = generateRandomPassword(10);
+
+    const userData = {
+      document_type: formData.documentType,
+      document_number: formData.documentNumber,
+      phone: formData.phoneNumber,
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      email: formData.email,
+      role_id: formData.role,
+      specialty: formData.specialty,
+      password: randomPassword,
+    };
 
     try {
-      console.log("Datos a enviar:", formData);
-      setSuccessMessage("Usuario registrado con éxito!");
-      handleCancel();
+      await createUser(userData, token);
+      setGeneratedPassword(randomPassword); 
+      setSuccessMessage("Usuario creado exitosamente.");
     } catch (error) {
-      console.error('Error al registrar el usuario:', error);
-      setFormError(error.message || 'Error al registrar el usuario.');
+      setFormError("Error al crear usuario.");
     }
   };
 
@@ -109,6 +150,8 @@ const RegisterUser = () => {
     setSuccessMessage('');
   };
 
+  if (!token) return <p>Cargando autenticación...</p>;
+
   return (
     <main className="flex-1 flex flex-col items-center bg-gray-50 pt-16 pb-20 px-8">
       <h1 className="text-header-blue text-[46px] font-bold font-poppins mb-15">
@@ -122,6 +165,11 @@ const RegisterUser = () => {
       {successMessage && (
         <div className="mb-4 w-full max-w-[700px] p-3 bg-green-100 border border-green-400 text-green-700 rounded text-center">
           {successMessage}
+        </div>
+      )}
+      {generatedPassword && (
+        <div className="mb-4 w-full p-3 bg-blue-100 border border-blue-400 text-blue-700 rounded text-center">
+          <strong>Contraseña temporal del usuario:</strong> {generatedPassword}
         </div>
       )}
       <form onSubmit={handleSubmit} className="w-full max-w-[700px] grid grid-cols-1 md:grid-cols-2 gap-x-[75px] gap-y-6">
@@ -210,8 +258,10 @@ const RegisterUser = () => {
             error={!formData.role && formError}
             placeholder="Seleccione el Rol"
           >
-            {roles.map((role) => (
-              <option key={role} value={role}>{role}</option>
+            {rolesList.map((role) => (
+              <option key={role.id} value={role.name}>
+                {role.name}
+              </option>
             ))}
           </Select>
         </div>

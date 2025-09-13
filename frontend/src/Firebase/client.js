@@ -40,6 +40,7 @@ PROVIDER_GOOGLE.setCustomParameters({
 export function loginWithGoogle() {
   return signInWithPopup(auth, PROVIDER_GOOGLE)
     .then((result) => {
+      console.log("Google sign-in successful");
       return result.user;
     })
     .catch((error) => {

@@ -159,7 +159,6 @@ const PasswordReset2 = () => {
 
   return (
     <div className="min-h-screen w-full flex flex-col">
-      <Header />
       <main className="flex-1 flex flex-col items-center justify-center bg-gray-50">
         <ProgressIndicator step={2} />
         <h1 className="text-header-blue text-46 font-bold font-poppins mb-2">

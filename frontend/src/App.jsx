@@ -27,7 +27,7 @@ function AppContent() {
         {/* Rutas públicas */}
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password" element={<PasswordReset />} />
+        <Route path="/passwordReset" element={<PasswordReset />} />
         <Route path="/PasswordReset2" element={<PasswordReset2 />} />
         <Route path="/PasswordReset3" element={<PasswordReset3 />} />
 
@@ -108,11 +108,11 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
+    <Router>
+      <AuthProvider>
         <AppContent />
-      </Router>
-    </AuthProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 

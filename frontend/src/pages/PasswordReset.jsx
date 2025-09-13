@@ -1,5 +1,5 @@
 // src/pages/PasswordReset.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import LoadingScreen from '../components/LoadingScreen';
@@ -7,6 +7,7 @@ import Button from '../components/Button';
 import Input from '../components/Input';
 import ProgressIndicator from '../components/ProgressIndicator';
 import { otpService } from '../services/otpService';
+import { getCurrentUser, logout } from '../Firebase/client';
 
 const PasswordReset = () => {
   const [email, setEmail] = useState('');
@@ -15,6 +16,14 @@ const PasswordReset = () => {
   const [resetSuccess, setResetSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Si el usuario está autenticado, cerrar sesión automáticamente
+    const user = getCurrentUser();
+    if (user) {
+      logout();
+    }
+  }, []);
 
   const handleEmailChange = (event) => {
     const value = event.target.value;
@@ -88,7 +97,6 @@ const PasswordReset = () => {
 
   return (
     <div className="min-h-screen w-full flex flex-col">
-      <Header />
       <main className="flex-1 flex flex-col items-center justify-center bg-gray-50 mb-11">
         <ProgressIndicator step={1} />
         <h1 className="text-header-blue text-46 font-bold font-poppins mb-15">
