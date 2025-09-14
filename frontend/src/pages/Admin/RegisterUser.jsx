@@ -1,9 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Button from "../../components/Button";
 import Input from "../../components/Input";
 import Select from "../../components/Select";
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { createUser } from "../../services/userService";
+import { getRoles } from "../../services/userService";
+import { useAuth } from "../../contexts/AuthContext"; 
 
 function cn(...args) {
   return twMerge(clsx(args));
@@ -21,12 +24,13 @@ const RegisterUser = () => {
     specialty: "",
   });
 
+  const [rolesList, setRolesList] = useState([]);
   const [isDoctor, setIsDoctor] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const { currentUser, token } = useAuth();
 
-  const roles = ["Asistente", "Doctor", "Administrador"];
   const specialties = [
     "Periodoncia",
     "Endodoncia",
@@ -34,12 +38,27 @@ const RegisterUser = () => {
     "Odontopediatría",
   ];
 
+  useEffect(() => {
+    async function fetchRoles() {
+      try {
+        const roles = await getRoles(token);
+        setRolesList(roles);
+      } catch (err) {
+        setFormError("No se pudieron cargar los roles.");
+        console.error("Error en fetchRoles:", err);
+      }
+    }
+    if (token) fetchRoles();
+  }, [token]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
 
     if (name === "role") {
-      setIsDoctor(value === "Doctor");
+      // Find the role object to check if it's a doctor
+      const selectedRole = rolesList.find(role => role.id === parseInt(value));
+      setIsDoctor(selectedRole?.name === "Doctor");
     }
   };
 
@@ -77,18 +96,43 @@ const RegisterUser = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSuccessMessage('');
+    
     if (!validateForm()) {
       return;
     }
 
+    const userData = {
+      document_type: formData.documentType,
+      document_number: formData.documentNumber,
+      phone: formData.phoneNumber,
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      email: formData.email,
+      role_id: parseInt(formData.role),
+      specialty: formData.specialty
+      // El backend generará la contraseña temporal automáticamente
+    };
+
     try {
-      console.log("Datos a enviar:", formData);
-      setSuccessMessage("Usuario registrado con éxito!");
-      handleCancel();
+      await createUser(userData, token);
+      setSuccessMessage("Usuario creado exitosamente. Se han enviado las credenciales por correo electrónico.");
+      setFormError('');
+      // Limpiar el formulario después del éxito
+      setFormData({
+        documentType: "",
+        documentNumber: "",
+        phoneNumber: "",
+        firstName: "",
+        lastName: "",
+        email: "",
+        role: "",
+        specialty: "",
+      });
+      setIsDoctor(false);
     } catch (error) {
       console.error('Error al registrar el usuario:', error);
       setFormError(error.message || 'Error al registrar el usuario.');
+      setSuccessMessage('');
     }
   };
 
@@ -108,6 +152,12 @@ const RegisterUser = () => {
     setFormError('');
     setSuccessMessage('');
   };
+
+  if (!token) return <p>Cargando autenticación...</p>;
+  
+  if (!rolesList || rolesList.length === 0) {
+    return <p>Cargando roles...</p>;
+  }
 
   return (
     <main className="flex-1 flex flex-col items-center bg-gray-50 pt-16 pb-20 px-8">
@@ -135,9 +185,10 @@ const RegisterUser = () => {
             error={!formData.documentType && formError}
             placeholder="Seleccione tipo de documento"
           >
-            <option value="cc">Cédula de Ciudadanía</option>
-            <option value="ti">Tarjeta de Identidad</option>
-            <option value="passport">Pasaporte</option>
+            <option value="CC">Cédula de Ciudadanía</option>
+            <option value="TI">Tarjeta de Identidad</option>
+            <option value="CE">Cédula de Extranjería</option>
+            <option value="PP">Pasaporte</option>
           </Select>
         </div>
         {/* Columna Derecha */}
@@ -210,8 +261,10 @@ const RegisterUser = () => {
             error={!formData.role && formError}
             placeholder="Seleccione el Rol"
           >
-            {roles.map((role) => (
-              <option key={role} value={role}>{role}</option>
+            {rolesList.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.name}
+              </option>
             ))}
           </Select>
         </div>

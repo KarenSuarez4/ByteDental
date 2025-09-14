@@ -64,7 +64,7 @@ async def health_check(db: Session = Depends(get_db)):
     # Verificar la conexión a la base de datos
     try:
         result = db.execute(text("SELECT 1")).fetchone()
-        db_connected = result[0] == 1
+        db_connected = result is not None and result[0] == 1
         health_status["database"] = {
             "connected": db_connected,
             "status": "ok" if db_connected else "error"

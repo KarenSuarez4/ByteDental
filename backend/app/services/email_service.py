@@ -98,33 +98,38 @@ class EmailService:
     async def send_welcome_email(
         self,
         to_email: str,
-        user_name: str
+        user_name: str,
+        temporal_password: str,
+        role_name: str
     ) -> bool:
-        """
-        Envía email de bienvenida usando el template moderno
-        """
         template_data = {
             "app_name": settings.app_name,
-            "subject": "¡Bienvenido a ByteDental!",
+            "subject": "¡Bienvenido a ByteDental! - Credenciales de acceso",
             "message_body": f"""
                 <h2 style="color: #2B5797; margin-bottom: 20px;">¡Hola {user_name}!</h2>
-                <p>¡Bienvenido a <strong>ByteDental</strong>! Estamos emocionados de tenerte como parte de nuestra familia dental.</p>
-                <p>En ByteDental, combinamos la tecnología más avanzada con el cuidado personalizado para brindarte la mejor experiencia dental posible.</p>
+                <p>¡Bienvenido a <strong>ByteDental</strong>! Tu cuenta ha sido creada exitosamente.</p>
+                
+                <div style="background: #f8f9fa; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #2B5797;">
+                    <h3 style="color: #2B5797; margin-top: 0;">🔐 Credenciales de acceso</h3>
+                    <p><strong>Email:</strong> {to_email}</p>
+                    <p><strong>Contraseña temporal:</strong> <code style="background: #e9ecef; padding: 5px 10px; border-radius: 5px; font-family: monospace;">{temporal_password}</code></p>
+                    <p><strong>Rol asignado:</strong> {role_name}</p>
+                </div>
+                
+                <div style="background: #fff3cd; border-radius: 10px; padding: 15px; margin: 20px 0; border-left: 4px solid #ffc107;">
+                    <h4 style="color: #856404; margin-top: 0;">⚠️ Importante</h4>
+                    <p style="color: #856404; margin-bottom: 0;">Por seguridad, <strong>debes cambiar tu contraseña</strong> en el primer inicio de sesión.</p>
+                </div>
+                
+                <p>Puedes acceder al sistema haciendo clic en el botón de abajo:</p>
             """,
-            "features": [
-                "🦷 Tecnología dental de vanguardia",
-                "👨‍⚕️ Equipo de profesionales especializados", 
-                "📱 Plataforma digital moderna y fácil de usar",
-                "🕒 Horarios flexibles adaptados a tu rutina",
-                "💎 Tratamientos personalizados para cada paciente"
-            ],
-            "cta_text": "Explorar Servicios",
-            "cta_url": f"{settings.frontend_url}/services"
+            "cta_text": "Iniciar Sesión",
+            "cta_url": f"{settings.frontend_url}/login"
         }
         
         return await self.send_email(
             to_email=to_email,
-            subject="¡Bienvenido a ByteDental! 🦷✨",
+            subject="¡Bienvenido a ByteDental! - Credenciales de acceso 🦷🔐",
             body="",  # El body se generará desde el template
             template_name="general_email.html",
             template_data=template_data

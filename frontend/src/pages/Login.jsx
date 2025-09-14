@@ -21,14 +21,25 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, isAuthenticated, userRole, mustChangePassword } = useAuth();
 
   // Redirigir si el usuario ya está autenticado
   useEffect(() => {
-    if (currentUser) {
-      navigate('/dashboard');
+    if (isAuthenticated && userRole && !mustChangePassword) {
+      console.log('Login: Usuario ya autenticado, redirigiendo...', { userRole, mustChangePassword });
+      // Redirigir según el rol (solo si no debe cambiar contraseña)
+      if (userRole === "Administrador") {
+        navigate('/users/register');
+      } else if (userRole === "Doctor" || userRole === "Asistente") {
+        navigate('/patients');
+      } else if (userRole === "Auditor") {
+        navigate('/audit-logs');
+      } else {
+        navigate('/login');
+      }
     }
-  }, [currentUser, navigate]);
+    // Si mustChangePassword es true, el App.jsx manejará la redirección automáticamente
+  }, [isAuthenticated, userRole, mustChangePassword, navigate]);
 
   // --- Lógica de Manejo de Entradas y Validación  ---
   const handleUsernameChange = (event) => {
@@ -115,8 +126,32 @@ const Login = () => {
         // No bloquear el login por errores de auditoría
       }
       
-      // Redirigir al dashboard
-      navigate('/dashboard');
+      // Verificar si el usuario necesita cambiar contraseña
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/users/me`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          
+          // Si debe cambiar contraseña, redirigir a ForcePasswordChange
+          if (userData.must_change_password) {
+            navigate('/force-password-change');
+            return;
+          }
+        }
+      } catch (userInfoError) {
+        console.error('Error obteniendo información del usuario:', userInfoError);
+        // Continuar con redirección automática - App.jsx manejará la redirección
+      }
+      
+      // App.jsx se encarga de la redirección automática basada en el estado de autenticación
       
     } catch (error) {
       // Solo registrar como LOGIN_FAILED si realmente falló el login de Firebase
@@ -180,7 +215,32 @@ const Login = () => {
         // No bloquear el login por errores de auditoría
       }
       
-      navigate('/dashboard');
+      // Verificar si el usuario necesita cambiar contraseña
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/users/me`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          
+          // Si debe cambiar contraseña, redirigir a ForcePasswordChange
+          if (userData.must_change_password) {
+            navigate('/force-password-change');
+            return;
+          }
+        }
+      } catch (userInfoError) {
+        console.error('Error obteniendo información del usuario:', userInfoError);
+        // Continuar con redirección automática - App.jsx manejará la redirección
+      }
+      
+      // App.jsx se encarga de la redirección automática basada en el estado de autenticación
       
     } catch (error) {
       // Solo registrar como LOGIN_FAILED si realmente falló el login de Google

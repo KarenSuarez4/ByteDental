@@ -2,12 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 from ..database import get_db
 from ..models.auditoria_models import Audit
 from ..models.user_models import User
 from ..middleware.auth_middleware import get_current_auditor_user
+from ..services.auditoria_service import AuditoriaService
+
+# Zona horaria de Colombia (UTC-5)
+COLOMBIA_TZ = timezone(timedelta(hours=-5))
 
 router = APIRouter(prefix="/auditoria", tags=["auditoria"])
 
@@ -15,6 +19,8 @@ router = APIRouter(prefix="/auditoria", tags=["auditoria"])
 class AuditResponse(BaseModel):
     id: str
     user_id: str
+    user_role: Optional[str] = None
+    user_email: Optional[str] = None
     event_type: str
     event_description: Optional[str]
     affected_record_id: str
@@ -22,6 +28,7 @@ class AuditResponse(BaseModel):
     change_details: Optional[dict]
     integrity_hash: str
     event_timestamp: datetime
+    event_timestamp_colombia: Optional[datetime] = None
     source_ip: Optional[str]
 
     class Config:
@@ -34,6 +41,8 @@ def get_eventos_auditoria(
     user_id: Optional[str] = Query(None),
     event_type: Optional[str] = Query(None),
     affected_record_type: Optional[str] = Query(None),
+    fecha_inicio: Optional[datetime] = Query(None, description="Fecha de inicio (YYYY-MM-DD HH:MM:SS). Si no se especifica zona horaria, se asume Colombia"),
+    fecha_fin: Optional[datetime] = Query(None, description="Fecha de fin (YYYY-MM-DD HH:MM:SS). Si no se especifica zona horaria, se asume Colombia"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_auditor_user)
 ):
@@ -46,11 +55,13 @@ def get_eventos_auditoria(
         user_id: Filtrar por usuario que realizó la acción
         event_type: Filtrar por tipo de evento (CREATE, UPDATE, DELETE, etc.)
         affected_record_type: Filtrar por tipo de entidad afectada
+        fecha_inicio: Fecha de inicio del rango (formato: YYYY-MM-DD HH:MM:SS)
+        fecha_fin: Fecha de fin del rango (formato: YYYY-MM-DD HH:MM:SS)
     """
     
     query = db.query(Audit)
     
-    # Aplicar filtros
+    # Aplicar filtros básicos
     if user_id:
         query = query.filter(Audit.user_id == user_id)
     
@@ -60,8 +71,29 @@ def get_eventos_auditoria(
     if affected_record_type:
         query = query.filter(Audit.affected_record_type == affected_record_type)
     
+    # Aplicar filtros de fecha
+    if fecha_inicio:
+        # Si la fecha no tiene zona horaria, asumimos que es hora de Colombia
+        if fecha_inicio.tzinfo is None:
+            fecha_inicio = fecha_inicio.replace(tzinfo=COLOMBIA_TZ)
+        # Convertir a UTC para comparar con la base de datos
+        fecha_inicio_utc = fecha_inicio.astimezone(timezone.utc)
+        query = query.filter(Audit.event_timestamp >= fecha_inicio_utc)
+    
+    if fecha_fin:
+        # Si la fecha no tiene zona horaria, asumimos que es hora de Colombia
+        if fecha_fin.tzinfo is None:
+            fecha_fin = fecha_fin.replace(tzinfo=COLOMBIA_TZ)
+        # Convertir a UTC para comparar con la base de datos
+        fecha_fin_utc = fecha_fin.astimezone(timezone.utc)
+        query = query.filter(Audit.event_timestamp <= fecha_fin_utc)
+    
     # Ordenar por timestamp descendente (más recientes primero)
     eventos = query.order_by(Audit.event_timestamp.desc()).offset(skip).limit(limit).all()
+    
+    # Agregar timestamp en hora de Colombia a la respuesta
+    for evento in eventos:
+        evento.event_timestamp_colombia = AuditoriaService.convertir_a_hora_colombia(evento.event_timestamp)
     
     return eventos
 
@@ -81,6 +113,9 @@ def get_evento_auditoria(
             detail="Evento de auditoría no encontrado"
         )
     
+    # Agregar timestamp en hora de Colombia
+    evento.event_timestamp_colombia = AuditoriaService.convertir_a_hora_colombia(evento.event_timestamp)
+    
     return evento
 
 @router.get("/usuario/{usuario_id}", response_model=List[AuditResponse])
@@ -88,16 +123,33 @@ def get_eventos_por_usuario(
     usuario_id: str,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
+    fecha_inicio: Optional[datetime] = Query(None, description="Fecha de inicio (YYYY-MM-DD HH:MM:SS). Si no se especifica zona horaria, se asume Colombia"),
+    fecha_fin: Optional[datetime] = Query(None, description="Fecha de fin (YYYY-MM-DD HH:MM:SS). Si no se especifica zona horaria, se asume Colombia"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_auditor_user)
 ):
     """Obtener todos los eventos de auditoría de un usuario específico - Solo AUDITORES"""
     
-    eventos = db.query(Audit).filter(
-        Audit.user_id == usuario_id
-    ).order_by(
-        Audit.event_timestamp.desc()
-    ).offset(skip).limit(limit).all()
+    query = db.query(Audit).filter(Audit.user_id == usuario_id)
+    
+    # Aplicar filtros de fecha
+    if fecha_inicio:
+        if fecha_inicio.tzinfo is None:
+            fecha_inicio = fecha_inicio.replace(tzinfo=COLOMBIA_TZ)
+        fecha_inicio_utc = fecha_inicio.astimezone(timezone.utc)
+        query = query.filter(Audit.event_timestamp >= fecha_inicio_utc)
+    
+    if fecha_fin:
+        if fecha_fin.tzinfo is None:
+            fecha_fin = fecha_fin.replace(tzinfo=COLOMBIA_TZ)
+        fecha_fin_utc = fecha_fin.astimezone(timezone.utc)
+        query = query.filter(Audit.event_timestamp <= fecha_fin_utc)
+    
+    eventos = query.order_by(Audit.event_timestamp.desc()).offset(skip).limit(limit).all()
+    
+    # Agregar timestamp en hora de Colombia
+    for evento in eventos:
+        evento.event_timestamp_colombia = AuditoriaService.convertir_a_hora_colombia(evento.event_timestamp)
     
     return eventos
 
@@ -106,16 +158,33 @@ def get_eventos_por_registro(
     registro_id: str,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
+    fecha_inicio: Optional[datetime] = Query(None, description="Fecha de inicio (YYYY-MM-DD HH:MM:SS). Si no se especifica zona horaria, se asume Colombia"),
+    fecha_fin: Optional[datetime] = Query(None, description="Fecha de fin (YYYY-MM-DD HH:MM:SS). Si no se especifica zona horaria, se asume Colombia"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_auditor_user)
 ):
     """Obtener todos los eventos de auditoría de un registro específico - Solo AUDITORES"""
     
-    eventos = db.query(Audit).filter(
-        Audit.affected_record_id == registro_id
-    ).order_by(
-        Audit.event_timestamp.desc()
-    ).offset(skip).limit(limit).all()
+    query = db.query(Audit).filter(Audit.affected_record_id == registro_id)
+    
+    # Aplicar filtros de fecha
+    if fecha_inicio:
+        if fecha_inicio.tzinfo is None:
+            fecha_inicio = fecha_inicio.replace(tzinfo=COLOMBIA_TZ)
+        fecha_inicio_utc = fecha_inicio.astimezone(timezone.utc)
+        query = query.filter(Audit.event_timestamp >= fecha_inicio_utc)
+    
+    if fecha_fin:
+        if fecha_fin.tzinfo is None:
+            fecha_fin = fecha_fin.replace(tzinfo=COLOMBIA_TZ)
+        fecha_fin_utc = fecha_fin.astimezone(timezone.utc)
+        query = query.filter(Audit.event_timestamp <= fecha_fin_utc)
+    
+    eventos = query.order_by(Audit.event_timestamp.desc()).offset(skip).limit(limit).all()
+    
+    # Agregar timestamp en hora de Colombia
+    for evento in eventos:
+        evento.event_timestamp_colombia = AuditoriaService.convertir_a_hora_colombia(evento.event_timestamp)
     
     return eventos
 
@@ -138,3 +207,68 @@ def get_entidades_afectadas(
     
     entidades = db.query(Audit.affected_record_type).distinct().all()
     return [entidad[0] for entidad in entidades]
+
+@router.get("/rango-fechas/", response_model=List[AuditResponse])
+def get_eventos_por_rango_fechas(
+    fecha_inicio: datetime = Query(..., description="Fecha de inicio (YYYY-MM-DD HH:MM:SS). Si no se especifica zona horaria, se asume Colombia"),
+    fecha_fin: datetime = Query(..., description="Fecha de fin (YYYY-MM-DD HH:MM:SS). Si no se especifica zona horaria, se asume Colombia"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    event_type: Optional[str] = Query(None),
+    user_id: Optional[str] = Query(None),
+    affected_record_type: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_auditor_user)
+):
+    """
+    Obtener eventos de auditoría en un rango de fechas específico - Solo AUDITORES
+    
+    Args:
+        fecha_inicio: Fecha de inicio del rango (obligatoria)
+        fecha_fin: Fecha de fin del rango (obligatoria)
+        skip: Número de registros a omitir
+        limit: Máximo número de registros a retornar
+        event_type: Filtrar por tipo de evento
+        user_id: Filtrar por usuario
+        affected_record_type: Filtrar por tipo de entidad afectada
+    """
+    
+    # Validar que fecha_inicio sea menor que fecha_fin
+    if fecha_inicio >= fecha_fin:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La fecha de inicio debe ser menor que la fecha de fin"
+        )
+    
+    # Si las fechas no tienen zona horaria, asumimos que son hora de Colombia
+    if fecha_inicio.tzinfo is None:
+        fecha_inicio = fecha_inicio.replace(tzinfo=COLOMBIA_TZ)
+    if fecha_fin.tzinfo is None:
+        fecha_fin = fecha_fin.replace(tzinfo=COLOMBIA_TZ)
+    
+    # Convertir a UTC para comparar con la base de datos
+    fecha_inicio_utc = fecha_inicio.astimezone(timezone.utc)
+    fecha_fin_utc = fecha_fin.astimezone(timezone.utc)
+    
+    query = db.query(Audit).filter(
+        Audit.event_timestamp >= fecha_inicio_utc,
+        Audit.event_timestamp <= fecha_fin_utc
+    )
+    
+    # Aplicar filtros adicionales
+    if event_type:
+        query = query.filter(Audit.event_type == event_type)
+    
+    if user_id:
+        query = query.filter(Audit.user_id == user_id)
+    
+    if affected_record_type:
+        query = query.filter(Audit.affected_record_type == affected_record_type)
+    
+    eventos = query.order_by(Audit.event_timestamp.desc()).offset(skip).limit(limit).all()
+    
+    # Agregar timestamp en hora de Colombia
+    for evento in eventos:
+        evento.event_timestamp_colombia = AuditoriaService.convertir_a_hora_colombia(evento.event_timestamp)
+    
+    return eventos

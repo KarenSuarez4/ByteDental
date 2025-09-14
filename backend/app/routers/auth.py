@@ -67,18 +67,10 @@ async def register_login_event(
             # Verificar si el usuario está activo
             if user.is_active is False:
                 # Usuario desactivado intentando hacer login
-                audit_record = AuditoriaService.registrar_evento(
+                audit_record = AuditoriaService.registrar_login(
                     db=db,
                     usuario_id=str(user.uid),
-                    tipo_evento="LOGIN_BLOCKED",
-                    registro_afectado_id=str(user.uid),
-                    registro_afectado_tipo="users",
-                    descripcion_evento=f"Intento de login de usuario desactivado: {user_name}",
-                    detalles_cambios={
-                        "accion": "login_blocked",
-                        "email": login_data.email,
-                        "razon": "usuario_desactivado"
-                    },
+                    exitoso=False,
                     ip_origen=get_client_ip(request)
                 )
                 
@@ -99,6 +91,10 @@ async def register_login_event(
         
         # Agregar detalles adicionales del error si el login falló
         if not login_data.success and login_data.error_message:
+            # Obtener datos del usuario para el registro detallado
+            user_role = user.role.name if user and user.role else None
+            user_email = str(user.email) if user else str(login_data.email)
+            
             # Crear un nuevo registro con detalles adicionales
             audit_record_with_error = AuditoriaService.registrar_evento(
                 db=db,
@@ -112,7 +108,9 @@ async def register_login_event(
                     "error_message": login_data.error_message,
                     "email": login_data.email
                 },
-                ip_origen=get_client_ip(request)
+                ip_origen=get_client_ip(request),
+                usuario_rol=user_role,
+                usuario_email=user_email
             )
         
         message = "Login exitoso registrado" if login_data.success else "Login fallido registrado"
@@ -152,17 +150,9 @@ async def register_logout_event(
             )
         
         # Registrar evento de logout
-        audit_record = AuditoriaService.registrar_evento(
+        audit_record = AuditoriaService.registrar_logout(
             db=db,
             usuario_id=str(user.uid),
-            tipo_evento="LOGOUT",
-            registro_afectado_id=str(user.uid),
-            registro_afectado_tipo="users",
-            descripcion_evento=f"Cierre de sesión: {user.first_name} {user.last_name}",
-            detalles_cambios={
-                "accion": "logout",
-                "email": user.email
-            },
             ip_origen=get_client_ip(request)
         )
         

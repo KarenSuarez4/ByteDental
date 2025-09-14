@@ -8,20 +8,27 @@ import Login from './pages/Login.jsx';
 import PasswordReset from './pages/PasswordReset.jsx';
 import PasswordReset2 from './pages/PasswordReset2.jsx';
 import PasswordReset3 from './pages/PasswordReset3.jsx';
+import ForcePasswordChange from './pages/ForcePasswordChange.jsx';
 import RegisterUser from './pages/Admin/RegisterUser';
 import DummyPage from './pages/DummyPage';
 
 function AppContent() {
-  const { isAuthenticated, userRole, loading } = useAuth();
+  const { isAuthenticated, userRole, mustChangePassword, loading } = useAuth();
   const location = useLocation();
 
   if (loading) return <div>Cargando...</div>;
 
+  // Si el usuario está autenticado pero debe cambiar contraseña y no está en la página de cambio
+  if (isAuthenticated && mustChangePassword && location.pathname !== '/force-password-change') {
+    return <Navigate to="/force-password-change" replace />;
+  }
+
   const isLoginPage = location.pathname === '/login' || location.pathname === '/';
+  const isForcePasswordChangePage = location.pathname === '/force-password-change';
 
   return (
     <div className="min-h-screen w-full flex flex-col">
-      {!isLoginPage && (isAuthenticated ? <UserHeader userRole={userRole} /> : <Header />)}
+      {!isLoginPage && !isForcePasswordChangePage && (isAuthenticated ? <UserHeader userRole={userRole} /> : <Header />)}
 
       <Routes>
         {/* Rutas públicas */}
@@ -30,6 +37,7 @@ function AppContent() {
         <Route path="/forgot-password" element={<PasswordReset />} />
         <Route path="/PasswordReset2" element={<PasswordReset2 />} />
         <Route path="/PasswordReset3" element={<PasswordReset3 />} />
+        <Route path="/force-password-change" element={<ForcePasswordChange />} />
 
         {/* Rutas protegidas por rol */}
         {isAuthenticated && userRole === "Administrador" && (
@@ -100,7 +108,15 @@ function AppContent() {
         )}
 
         {/* Redirección por defecto */}
-        <Route path="*" element={<Navigate to={isAuthenticated ? "/users/manage" : "/login"} />} />
+        <Route path="*" element={<Navigate to={
+          isAuthenticated ? (
+            mustChangePassword ? "/force-password-change" : 
+            userRole === "Administrador" ? "/users/register" :
+            userRole === "Doctor" || userRole === "Asistente" ? "/patients" :
+            userRole === "Auditor" ? "/audit-logs" :
+            "/login"
+          ) : "/login"
+        } />} />
       </Routes>
     </div>
   );
@@ -108,11 +124,11 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
+    <Router>
+      <AuthProvider>
         <AppContent />
-      </Router>
-    </AuthProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 
