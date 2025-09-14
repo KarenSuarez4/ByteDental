@@ -29,7 +29,7 @@ def insert_basic_roles():
             'description': 'Patient management, appointments and medical treatments'
         },
         {
-            'name': 'Assistant',
+            'name': 'Asistente',
             'description': 'Operational support, appointment and patient management'
         }
     ]

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChange, getCurrentUser, logout } from '../Firebase/client';
 import { registerLogoutEvent } from '../services/authAuditService';
+import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext();
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -25,36 +26,31 @@ export function AuthProvider({ children }) {
   const [userRole, setUserRole] = useState(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChange(async (user) => {
       setCurrentUser(user);
       if (user) {
-        try {
-          const token = await user.getIdToken();
-          const uid = user.uid;
-          const response = await fetch(`${API_BASE_URL}/api/users/me`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          if (response.ok) {
-            const backendUser = await response.json();
-            // Mapea el rol del backend al nombre usado en el frontend
-            const mappedRole = ROLE_MAP[backendUser.role_name] || backendUser.role_name;
-            setUserRole(mappedRole);
-            setMustChangePassword(backendUser.must_change_password || false);
-          } else {
-            console.warn('No se pudo obtener información del backend del usuario:', response.status);
-            setUserRole(null);
-            setMustChangePassword(false);
-          }
-        } catch (error) {
-          console.error('Error obteniendo información del usuario del backend:', error);
+        const token = await user.getIdToken();
+        setToken(token);
+        const uid = user.uid;
+        const response = await fetch(`${API_BASE_URL}/api/users/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const backendUser = await response.json();
+          setMustChangePassword(backendUser.must_change_password);
+          setUserRole(ROLE_MAP[backendUser.role_name] || backendUser.role_name);
+        } else {
           setUserRole(null);
           setMustChangePassword(false);
         }
       } else {
         setUserRole(null);
         setMustChangePassword(false);
+        setToken(null);
       }
       setLoading(false);
     });
@@ -71,28 +67,25 @@ export function AuthProvider({ children }) {
       
       await logout();
       setCurrentUser(null);
+      setToken(null);
     } catch (error) {
       throw error;
     }
-  };
-
-  const updatePasswordChangeStatus = () => {
-    setMustChangePassword(false);
   };
 
   const value = {
     currentUser,
     userRole,
     mustChangePassword,
+    token,
     loading,
     signOut,
-    updatePasswordChangeStatus,
     isAuthenticated: !!currentUser
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {loading ? <div>Cargando autenticación...</div> : children}
     </AuthContext.Provider>
   );
 }

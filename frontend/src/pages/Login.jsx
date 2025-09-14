@@ -25,23 +25,20 @@ const Login = () => {
 
   // Redirigir si el usuario ya está autenticado
   useEffect(() => {
-    if (isAuthenticated && userRole) {
+    if (isAuthenticated && userRole && !mustChangePassword) {
       console.log('Login: Usuario ya autenticado, redirigiendo...', { userRole, mustChangePassword });
-      if (mustChangePassword) {
-        navigate('/force-password-change');
+      // Redirigir según el rol (solo si no debe cambiar contraseña)
+      if (userRole === "Administrador") {
+        navigate('/users/register');
+      } else if (userRole === "Doctor" || userRole === "Asistente") {
+        navigate('/patients');
+      } else if (userRole === "Auditor") {
+        navigate('/audit-logs');
       } else {
-        // Redirigir según el rol
-        if (userRole === "Administrador") {
-          navigate('/users/register');
-        } else if (userRole === "Doctor" || userRole === "Asistente") {
-          navigate('/patients');
-        } else if (userRole === "Auditor") {
-          navigate('/audit-logs');
-        } else {
-          navigate('/login');
-        }
+        navigate('/login');
       }
     }
+    // Si mustChangePassword es true, el App.jsx manejará la redirección automáticamente
   }, [isAuthenticated, userRole, mustChangePassword, navigate]);
 
   // --- Lógica de Manejo de Entradas y Validación  ---

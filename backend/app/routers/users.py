@@ -167,12 +167,23 @@ async def create_user(
         temporal_password = generate_temporary_password()
         
         # Crear usuario en Firebase
+        # Formatear teléfono a E.164 (para Colombia +57) si se proporciona
+        phone_for_firebase = None
+        if user_data.phone and user_data.phone.strip():
+            # Limpiar el número de teléfono (remover espacios y caracteres especiales)
+            clean_phone = ''.join(filter(str.isdigit, user_data.phone))
+            # Si no empieza con código de país, asumir Colombia (+57)
+            if len(clean_phone) == 10 and clean_phone.startswith('3'):
+                phone_for_firebase = f"+57{clean_phone}"
+            elif len(clean_phone) > 10:
+                phone_for_firebase = f"+{clean_phone}"
+        
         try:
             firebase_uid = FirebaseService.create_firebase_user(
                 email=user_data.email,
                 password=temporal_password,
                 display_name=f"{user_data.first_name} {user_data.last_name}",
-                phone_number=user_data.phone
+                phone_number=phone_for_firebase
             )
         except Exception as firebase_error:
             error_message = str(firebase_error)
@@ -222,18 +233,20 @@ async def create_user(
             ip_origen=ip_cliente
         )
         
-        # Enviar email de bienvenida con credenciales temporales
+        # Enviar email con credenciales temporales
         try:
             email_service = EmailService()
-            await email_service.send_welcome_email(
+            import asyncio
+            # Crear tarea asíncrona para el envío del email
+            asyncio.create_task(email_service.send_welcome_email(
                 to_email=user_data.email,
                 user_name=f"{user_data.first_name} {user_data.last_name}",
                 temporal_password=temporal_password,
                 role_name=str(role.name)
-            )
-        except Exception as e:
-            # Log el error pero no falla la creación del usuario
-            print(f"Error enviando email de bienvenida: {e}")
+            ))
+        except Exception as email_error:
+            # No fallar la creación si hay error en el email
+            print(f"Error enviando email con credenciales: {email_error}")
         
         # Agregar rol para la respuesta
         db_user.role = role
@@ -514,7 +527,9 @@ def activate_user(
                 "estado_nuevo": True,
                 "datos_usuario": datos_usuario
             },
-            ip_origen=ip_cliente
+            ip_origen=ip_cliente,
+            usuario_rol=current_user.role.name if current_user.role else None,
+            usuario_email=str(current_user.email)
         )
         
         return {"message": "Usuario reactivado exitosamente", "user_uid": user_uid, "is_active": True}
@@ -563,7 +578,9 @@ async def change_password(
             registro_afectado_tipo="users",
             descripcion_evento="Usuario cambió su contraseña",
             detalles_cambios={"message": "Contraseña actualizada", "must_change_password_updated": True},
-            ip_origen=ip_cliente
+            ip_origen=ip_cliente,
+            usuario_rol=current_user.role.name if current_user.role else None,
+            usuario_email=str(current_user.email)
         )
         
         return {"message": "Contraseña actualizada exitosamente", "must_change_password": current_user.must_change_password}
@@ -625,7 +642,9 @@ async def force_password_change(
             registro_afectado_tipo="users",
             descripcion_evento="Usuario completó cambio obligatorio de contraseña",
             detalles_cambios={"message": "Primer cambio de contraseña completado"},
-            ip_origen=ip_cliente
+            ip_origen=ip_cliente,
+            usuario_rol=current_user.role.name if current_user.role else None,
+            usuario_email=str(current_user.email)
         )
         
         return {
