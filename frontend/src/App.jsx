@@ -10,6 +10,7 @@ import PasswordReset2 from './pages/PasswordReset2.jsx';
 import PasswordReset3 from './pages/PasswordReset3.jsx';
 import ForcePasswordChange from './pages/ForcePasswordChange.jsx';
 import RegisterUser from './pages/Admin/RegisterUser';
+import AuditLog from './pages/Auditor/AuditLog.jsx';
 import DummyPage from './pages/DummyPage';
 
 function AppContent() {
@@ -96,7 +97,7 @@ function AppContent() {
           <>
             <Route path="/audit-logs" element={
               <ProtectedRoute>
-                <DummyPage title="Registros de Auditoría" />
+                <AuditLog />
               </ProtectedRoute>
             } />
             <Route path="/user-activity" element={
