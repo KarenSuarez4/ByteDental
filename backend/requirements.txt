@@ -63,4 +63,3 @@ pytz==2025.2
 
 # Testing
 pytest==8.3.3
-httpx==0.24.1
