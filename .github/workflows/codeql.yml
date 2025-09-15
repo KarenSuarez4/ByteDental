@@ -1,0 +1,157 @@
+# Pipeline de CodeQL optimizado para FastAPI (Python) + React con Vite
+# Incluye análisis de seguridad avanzado y configuración específica para el stack
+
+name: "CodeQL Security Analysis"
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+  schedule:
+    # Ejecutar todos los lunes a las 2:00 AM UTC
+    - cron: '0 2 * * 1'
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        # Análisis de Python (FastAPI backend)
+        - language: python
+          build-mode: none
+        # Análisis de JavaScript/TypeScript (React frontend)
+        - language: javascript
+          build-mode: none
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Configuración específica para Python
+    - name: Set up Python
+      if: matrix.language == 'python'
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    # Instalar dependencias de Python
+    - name: Install Python dependencies
+      if: matrix.language == 'python'
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f backend/requirements.txt ]; then 
+          pip install -r backend/requirements.txt
+        fi
+
+    # Configuración específica para Node.js/React
+    - name: Set up Node.js
+      if: matrix.language == 'javascript'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'frontend/package-lock.json'
+
+    # Instalar dependencias de Node.js
+    - name: Install Node.js dependencies
+      if: matrix.language == 'javascript'
+      run: |
+        cd frontend
+        npm ci
+
+    # Inicializar CodeQL
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        build-mode: ${{ matrix.build-mode }}
+        queries: security-extended,security-and-quality
+        config: |
+          paths-ignore:
+            - "**/*.md"
+            - "**/docs/**"
+            - "**/tests/fixtures/**"
+            - "**/node_modules/**"
+            - "**/venv/**"
+            - "**/__pycache__/**"
+            - "**/dist/**"
+            - "**/build/**"
+            - "**/.vite/**"
+
+    # Ejecutar análisis de CodeQL
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
+
+  # Job adicional para análisis de dependencias
+  dependency-check:
+    name: Dependency Security Check
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    # Análisis de vulnerabilidades en dependencias de Python
+    - name: Python Security Check
+      run: |
+        pip install safety bandit
+        if [ -f backend/requirements.txt ]; then
+          safety check -r backend/requirements.txt --json > safety-report.json || true
+        fi
+        bandit -r backend/ -f json -o bandit-report.json || true
+
+    # Análisis de vulnerabilidades en dependencias de Node.js
+    - name: Node.js Security Audit
+      run: |
+        cd frontend
+        npm ci
+        npm audit --json > ../npm-audit-report.json || true
+
+    # Subir reportes como artefactos
+    - name: Upload security reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+          npm-audit-report.json
+        retention-days: 30
+
+  # Job para análisis de secretos
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: TruffleHog OSS
+      uses: trufflesecurity/trufflehog@main
+      with:
+          path: ./
+          extra_args: --debug --only-verified
