@@ -10,6 +10,7 @@ import PasswordReset2 from './pages/PasswordReset2.jsx';
 import PasswordReset3 from './pages/PasswordReset3.jsx';
 import ForcePasswordChange from './pages/ForcePasswordChange.jsx';
 import RegisterUser from './pages/Admin/RegisterUser';
+import UserManagement from './pages/Admin/UserManagement.jsx';
 import AuditLog from './pages/Auditor/AuditLog.jsx';
 import DummyPage from './pages/DummyPage';
 
@@ -50,7 +51,7 @@ function AppContent() {
             } />
             <Route path="/users/manage" element={
               <ProtectedRoute>
-                <DummyPage title="Gestión de usuarios" />
+                <UserManagement />
               </ProtectedRoute>
             } />
             <Route path="/reports" element={

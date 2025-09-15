@@ -50,21 +50,17 @@ export const getAllUsers = async (token) => {
     if (!token) {
       throw new Error("Se requiere un token de autenticación");
     }
-
-    // Añadir el prefijo '/api' a la URL
-    const response = await fetch(`${API_BASE_URL}/api/users`, {
+    const response = await fetch(`${API_BASE_URL}/api/users?include_inactive=true`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
     });
-
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.detail || "Error obteniendo lista de usuarios");
     }
-
     return await response.json();
   } catch (error) {
     console.error("Error obteniendo lista de usuarios:", error);
@@ -111,4 +107,72 @@ export const getRoles = async (token) => {
   }
   const data = await response.json();
   return data;
+};
+
+/**
+ * Desactivar usuario (soft delete)
+ * @param {string} userUid - UID del usuario a desactivar
+ * @param {string} token - Token de autenticación Firebase
+ * @returns {Promise<Object>} - Respuesta del backend
+ */
+export const deactivateUser = async (userUid, token) => {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userUid}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || "Error al desactivar usuario");
+  }
+  return await response.json();
+};
+
+/**
+ * Actualizar usuario
+ * @param {string} userUid - UID del usuario
+ * @param {Object} userData - Datos a actualizar
+ * @param {string} token - Token de autenticación Firebase
+ * @returns {Promise<Object>} - Usuario actualizado
+ */
+export const updateUser = async (userUid, userData, token) => {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userUid}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(userData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || "Error al actualizar usuario");
+  }
+  return await response.json();
+};
+
+/**
+ * Activar usuario
+ * @param {string} userUid - UID del usuario a activar
+ * @param {string} token - Token de autenticación Firebase
+ * @returns {Promise<Object>} - Respuesta del backend
+ */
+export const activateUser = async (userUid, token) => {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userUid}/activate`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || "Error al activar usuario");
+  }
+  return await response.json();
 };

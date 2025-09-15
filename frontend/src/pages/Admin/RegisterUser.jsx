@@ -156,7 +156,7 @@ const RegisterUser = () => {
   if (!token) return <p>Cargando autenticación...</p>;
   
   if (!rolesList || rolesList.length === 0) {
-    return <p>Cargando roles...</p>;
+    return <p className="font-poppins text-center mt-20 text-xl">Cargando...</p>;
   }
 
   return (

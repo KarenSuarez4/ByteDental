@@ -158,7 +158,7 @@ function AuditLog() {
         <div className="w-full max-w-[1500px] bg-white rounded-[12px] shadow-md overflow-x-auto max-h-[calc(100vh-220px)] overflow-y-auto">
           {activeTab === "login" && (
             <table className="w-full border-collapse">
-              <thead>
+              <thead className="sticky top-0 z-10 h-15">
                 <tr>
                   <th className={tableHeaderClass}>Fecha</th>
                   <th className={tableHeaderClass}>Usuario</th>
