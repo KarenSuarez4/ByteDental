@@ -20,6 +20,7 @@ function UserManagement() {
   const [editError, setEditError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [confirmDialog, setConfirmDialog] = useState({ open: false, user: null });
+  const [phoneEditError, setPhoneEditError] = useState("");
 
   // Filtros y búsqueda
   const [searchDoc, setSearchDoc] = useState("");
@@ -68,6 +69,31 @@ function UserManagement() {
     setSuccessMsg("");
   };
 
+  const handleEditFormChange = (e) => {
+    const { name, value } = e.target;
+    if (name === "phone") {
+      if (!/^\d*$/.test(value)) return;
+      setEditForm(prev => ({ ...prev, [name]: value }));
+      if (value && value.length !== 10) {
+        setPhoneEditError("Ingrese un número válido.");
+      } else {
+        setPhoneEditError("");
+      }
+      return;
+    }
+    setEditForm(prev => {
+      // Si cambia el rol y no es Doctor, borra la especialidad
+      if (name === "role_id") {
+        const selectedRole = roles.find(role => role.id === parseInt(value));
+        if (selectedRole?.name !== "Doctor") {
+          return { ...prev, role_id: parseInt(value), specialty: "" };
+        }
+        return { ...prev, role_id: parseInt(value) };
+      }
+      return { ...prev, [name]: value };
+    });
+  };
+
   const validateEditForm = () => {
     const errors = {};
     if (!editForm.document_type) errors.document_type = "El tipo de documento es obligatorio.";
@@ -79,8 +105,12 @@ function UserManagement() {
     if (!editForm.role_id) errors.role_id = "El rol es obligatorio.";
     if (roles.find(r => r.id === editForm.role_id)?.name === "Doctor" && !editForm.specialty)
       errors.specialty = "La especialidad es obligatoria para el rol Doctor.";
+    if (editForm.phone && editForm.phone.length !== 10) {
+      errors.phone = "Ingrese un número válido.";
+    }
 
     setEditFormErrors(errors);
+    setPhoneEditError(errors.phone || "");
     return Object.keys(errors).length === 0;
   };
 
@@ -138,21 +168,6 @@ function UserManagement() {
   ];
 
   const isDoctor = roles.find(r => r.id === editForm.role_id)?.name === "Doctor";
-
-  const handleEditFormChange = (e) => {
-    const { name, value } = e.target;
-    setEditForm(prev => {
-      // Si cambia el rol y no es Doctor, borra la especialidad
-      if (name === "role_id") {
-        const selectedRole = roles.find(role => role.id === parseInt(value));
-        if (selectedRole?.name !== "Doctor") {
-          return { ...prev, role_id: parseInt(value), specialty: "" };
-        }
-        return { ...prev, role_id: parseInt(value) };
-      }
-      return { ...prev, [name]: value };
-    });
-  };
 
   if (userRole !== "Administrador") return <div className="font-poppins text-center mt-20 text-xl">No autorizado</div>;
   if (loading) return <div className="font-poppins text-center mt-20 text-xl">Cargando usuarios...</div>;
@@ -373,9 +388,14 @@ function UserManagement() {
                   <Input
                     name="phone"
                     value={editForm.phone}
-                    onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
+                    onChange={handleEditFormChange}
                     className="w-[320px]"
+                    error={!!editFormErrors.phone || !!phoneEditError}
+                    maxLength={10}
                   />
+                  {(editFormErrors.phone || phoneEditError) && (
+                    <p className="text-red-500 text-xs font-poppins mt-2">{editFormErrors.phone || phoneEditError}</p>
+                  )}
                 </div>
                 <div className="flex flex-col items-center w-full">
                   <label className="block font-poppins mb-2 text-center">Rol</label>

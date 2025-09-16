@@ -29,6 +29,7 @@ const RegisterUser = () => {
   const [emailError, setEmailError] = useState('');
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const { currentUser, token } = useAuth();
 
   const specialties = [
@@ -53,10 +54,21 @@ const RegisterUser = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === "phoneNumber") {
+      if (!/^\d*$/.test(value)) return;
+      setFormData((prev) => ({ ...prev, [name]: value }));
+      if (value && value.length !== 10) {
+        setPhoneError("Ingrese un número válido.");
+      } else {
+        setPhoneError("");
+      }
+      return;
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
 
     if (name === "role") {
-      // Find the role object to check if it's a doctor
       const selectedRole = rolesList.find(role => role.id === parseInt(value));
       setIsDoctor(selectedRole?.name === "Doctor");
     }
@@ -77,8 +89,8 @@ const RegisterUser = () => {
     if (
       !formData.documentType ||
       !formData.documentNumber ||
-      !formData.firstName ||      // <-- ahora valida nombre
-      !formData.lastName ||       // <-- ahora valida apellido
+      !formData.firstName ||
+      !formData.lastName ||
       !formData.email ||
       !formData.role ||
       (isDoctor && !formData.specialty)
@@ -90,7 +102,13 @@ const RegisterUser = () => {
       setFormError("Por favor, corrige los errores del formulario.");
       return false;
     }
+    if (formData.phoneNumber && formData.phoneNumber.length !== 10) {
+      setPhoneError("Ingrese un número válido.");
+      setFormError("Por favor, corrige los errores del formulario.");
+      return false;
+    }
     setFormError("");
+    setPhoneError("");
     return true;
   };
 
@@ -110,14 +128,12 @@ const RegisterUser = () => {
       email: formData.email,
       role_id: parseInt(formData.role),
       specialty: formData.specialty
-      // El backend generará la contraseña temporal automáticamente
     };
 
     try {
       await createUser(userData, token);
       setSuccessMessage("Usuario creado exitosamente. Se han enviado las credenciales por correo electrónico.");
       setFormError('');
-      // Limpiar el formulario después del éxito
       setFormData({
         documentType: "",
         documentNumber: "",
@@ -234,7 +250,12 @@ const RegisterUser = () => {
             placeholder="Ingrese el número de teléfono"
             value={formData.phoneNumber}
             onChange={handleChange}
+            error={!!phoneError}
+            maxLength={10}
           />
+          {phoneError && (
+            <p className="text-red-500 text-sm mt-2 font-poppins">{phoneError}</p>
+          )}
         </div>
         {/* Columna Derecha */}
         <div className="flex flex-col items-start">

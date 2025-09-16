@@ -24,7 +24,6 @@ function AuditLog() {
   const [userFilter, setUserFilter] = useState("ALL");
   const [serviceFilter, setServiceFilter] = useState("ALL");
 
-  // llamar auditoría filtrada con fetch
   const fetchAuditEvents = async (params) => {
     const url = new URL(`${API_BASE_URL}/api/auditoria/`);
     Object.entries({ ...params, limit: 10, skip: 0 }).forEach(([key, value]) => {
@@ -70,10 +69,31 @@ function AuditLog() {
     setLoading(false);
   }, [token, userRole, loginFilter, userFilter, serviceFilter]);
 
+  function getCamposModificados(ev) {
+    if (
+      ev.event_type !== "UPDATE" ||
+      !ev.change_details ||
+      !ev.change_details.datos_anteriores ||
+      !ev.change_details.datos_nuevos
+    ) return null;
+
+    const { datos_anteriores, datos_nuevos } = ev.change_details;
+    const campos = [];
+    for (const key in datos_nuevos) {
+      if (
+        key !== "updated_at" && 
+        datos_anteriores[key] !== datos_nuevos[key]
+      ) {
+        campos.push(key);
+      }
+    }
+    return campos.length ? campos.join(", ") : null;
+  }
+
   if (userRole !== "Auditor") return <div className="font-poppins text-center mt-20 text-xl">No autorizado</div>;
   if (loading) return <div className="font-poppins text-center mt-20 text-xl">Cargando auditoría...</div>;
 
-  // Estilos para el header de la tabla
+  //header de la tabla
   const tableHeaderClass = "bg-header-blue text-white font-semibold text-center font-poppins text-[18px]";
   const tableCellClass = "text-center font-poppins text-[18px] py-2";
 
@@ -183,12 +203,12 @@ function AuditLog() {
 
           {activeTab === "users" && (
             <table className="w-full border-collapse">
-              <thead>
+              <thead className="sticky top-0 z-10 h-15">
                 <tr>
                   <th className={tableHeaderClass}>Fecha</th>
                   <th className={tableHeaderClass}>Usuario</th>
                   <th className={tableHeaderClass}>Tipo Evento</th>
-                  <th className={tableHeaderClass}>Registro afectado</th>
+                  <th className={tableHeaderClass}>Campos modificados</th>
                   <th className={tableHeaderClass}>Descripción</th>
                 </tr>
               </thead>
@@ -198,7 +218,11 @@ function AuditLog() {
                     <td className={tableCellClass}>{new Date(ev.event_timestamp_colombia || ev.event_timestamp).toLocaleString()}</td>
                     <td className={tableCellClass}>{ev.user_email || ev.user_id}</td>
                     <td className={tableCellClass}>{ev.event_type}</td>
-                    <td className={tableCellClass}>{ev.affected_record_id}</td>
+                    <td className={tableCellClass}>
+                      {ev.event_type === "UPDATE"
+                        ? getCamposModificados(ev) || "-"
+                        : "-"}
+                    </td>
                     <td className={tableCellClass}>{ev.event_description}</td>
                   </tr>
                 ))}
@@ -208,7 +232,7 @@ function AuditLog() {
 
           {activeTab === "services" && (
             <table className="w-full border-collapse">
-              <thead>
+              <thead className="sticky top-0 z-10 h-15">
                 <tr>
                   <th className={tableHeaderClass}>Fecha</th>
                   <th className={tableHeaderClass}>Usuario</th>
