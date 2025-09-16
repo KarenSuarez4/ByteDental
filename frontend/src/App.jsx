@@ -36,7 +36,7 @@ function AppContent() {
         {/* Rutas públicas */}
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password" element={<PasswordReset />} />
+        <Route path="/PasswordReset" element={<PasswordReset />} />
         <Route path="/PasswordReset2" element={<PasswordReset2 />} />
         <Route path="/PasswordReset3" element={<PasswordReset3 />} />
         <Route path="/force-password-change" element={<ForcePasswordChange />} />

@@ -158,31 +158,31 @@ const PasswordReset2 = () => {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col">
-      <Header />
-      <main className="flex-1 flex flex-col items-center justify-center bg-gray-50">
+    <div className="max-h-[calc(100vh-94px)] w-full flex flex-col">
+      <main className="flex-1 flex flex-col items-center bg-gray-50 mt-10">
         <ProgressIndicator step={2} />
-        <h1 className="text-header-blue text-46 font-bold font-poppins mb-2">
+        <h1 className="text-header-blue text-46 font-bold font-poppins mb-6">
           Restablecer contraseña
         </h1>
         
         {/* Mostrar contenido diferente según si el OTP fue validado */}
         {!otpValidated ? (
           <>
-            <p className="text-center w-[338px] mb-3 font-poppins">
+            <p className="text-center w-[338px] font-poppins text-18">
               Se acaba de enviar un código de verificación de cuatro dígitos a su correo electrónico. Ingréselo a continuación
             </p>
 
             <div className="mb-8">
-              <OtpInput onComplete={handleOtpComplete} />
+              <OtpInput onComplete={setOtpCode} />
               {showError && errorMessage && (
-                <p className="text-red-500 text-xs font-poppins mt-2 text-center">
+                <p className="text-red-500 text-18 font-poppins mt-2 text-center">
                   {errorMessage}
                 </p>
               )}
             </div>
 
             <Button 
+              className='text-18'
               onClick={handleVerify} 
               disabled={otpCode.length !== 4 || loading}
             >
@@ -192,7 +192,7 @@ const PasswordReset2 = () => {
             <button 
               onClick={handleResendCode}
               disabled={resendLoading}
-              className="text-primary-blue hover:underline mt-4 disabled:opacity-50"
+              className="text-primary-blue hover:underline mt-4 disabled:opacity-50 text-18 "
             >
               {resendLoading ? 'Reenviando...' : 'Reenviar código'}
             </button>
@@ -205,8 +205,12 @@ const PasswordReset2 = () => {
                 <h2 className="text-green-800 text-xl font-semibold font-poppins mb-2">
                   ¡Código validado exitosamente!
                 </h2>
-                <p className="text-green-700 text-sm font-poppins">
-                  {errorMessage}
+                <p className="text-green-700 text-base font-poppins mb-2">
+                  Se ha enviado un enlace de restablecimiento a tu correo electrónico (<strong>{email}</strong>).<br />
+                  <span className="text-blue-700">Revisa tu bandeja de entrada y la carpeta de spam.</span>
+                </p>
+                <p className="text-gray-600 text-xs font-poppins">
+                  Haz clic en el enlace recibido para crear tu nueva contraseña.
                 </p>
                 {redirectCountdown !== null && (
                   <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -226,7 +230,7 @@ const PasswordReset2 = () => {
             {errorMessage}
           </p>
         )}
-        <a onClick={() => navigate('/')} className="mt-8 text-header-blue hover:underline font-bold cursor-pointer">
+        <a onClick={() => navigate('/')} className="mt-6 text-header-blue hover:underline font-bold cursor-pointer text-18">
           Volver a Inicio de sesión
         </a>
       </main>
