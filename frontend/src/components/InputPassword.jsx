@@ -14,13 +14,13 @@ const InputPassword = ({ placeholder, className = '', error,...props }) => {
   };
 
   return (
-    <div className={cn('relative w-[338px]', className)}>
+    <div className={cn('relative w-[310px] flex flex-col justify-center items-center', className)}>
       <input
         type={showPassword? 'text' : 'password'}
         placeholder={placeholder}
         className={cn(
-          'w-full',
-          'h-[74px]',
+          'w-[310px]',
+          'h-[48px]',
           'rounded-[40px]',
           'border',
           'bg-white',
@@ -28,7 +28,7 @@ const InputPassword = ({ placeholder, className = '', error,...props }) => {
           'text-18',
           'font-poppins',
           '!placeholder-gray-400',
-          'pl-8 pr-16',
+          'pl-8 pr-2',
           'shadow-sm',
           'focus:outline-none',
           {
@@ -41,12 +41,12 @@ const InputPassword = ({ placeholder, className = '', error,...props }) => {
       <button
         type="button" // Es importante que sea tipo "button" para no enviar formularios
         onClick={togglePasswordVisibility}
-        className="absolute inset-y-0 right-0 pr-6 flex items-center text-sm leading-5 focus:outline-none"
+        className="absolute inset-y-0 right-0 pr-8 flex items-center text-sm leading-5 focus:outline-none"
       >
         <img
           src={showPassword? './images/eye-closed.svg' : './images/open-eye.svg'}
           alt={showPassword? 'Ocultar contraseña' : 'Mostrar contraseña'}
-          className="size-8" 
+          className="size-6" 
         />
       </button>
     </div>

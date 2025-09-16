@@ -87,11 +87,10 @@ const PasswordReset = () => {
   }
 
   return (
-    <div className="min-h-screen w-full flex flex-col">
-      <Header />
-      <main className="flex-1 flex flex-col items-center justify-center bg-gray-50 mb-11">
+    <div className=" max-h-[calc(100vh-94px)] w-full flex flex-col">
+      <main className="flex-1 flex flex-col items-center bg-gray-50 mt-10">
         <ProgressIndicator step={1} />
-        <h1 className="text-header-blue text-46 font-bold font-poppins mb-15">
+        <h1 className="text-header-blue text-46 font-bold font-poppins mb-12">
           Restablecer contraseña
         </h1>
         
@@ -111,7 +110,7 @@ const PasswordReset = () => {
 
         <Input 
           placeholder="Ingrese su correo electrónico"
-          className="w-150 mb-4"
+          className="w-150 mb-2 text-18"
           value={email}
           onChange={handleEmailChange}
           onKeyPress={handleKeyPress}
@@ -119,16 +118,16 @@ const PasswordReset = () => {
           disabled={resetSuccess} // Deshabilitar si ya se envió exitosamente
         />
         {emailError && (
-          <p className="text-red-500 text-xs font-poppins mb-5">{emailError}</p>
+          <p className="text-red-500 text-18 font-poppins mb-5">{emailError}</p>
         )}
         <Button 
           onClick={handleButtonClick} 
-          className="shadow-md mb-4 mt-9" 
+          className="shadow-md mb-2 mt-9 text-18" 
           disabled={!isEmailValid || resetSuccess || loading}
         >
           {resetSuccess ? 'Código enviado' : 'Enviar código'}
         </Button>
-        <a onClick={() => navigate('/')} className="mt-15 text-header-blue hover:underline font-bold cursor-pointer">
+        <a onClick={() => navigate('/')} className="mt-13 text-header-blue hover:underline font-bold cursor-pointer text-18">
           Volver a Inicio de sesión
         </a>
       </main>

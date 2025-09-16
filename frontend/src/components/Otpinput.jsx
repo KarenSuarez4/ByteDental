@@ -61,7 +61,7 @@ const OtpInput = ({ length = 4, onComplete }) => {
             'w-16 h-16', 
             'border-b-2', 
             'text-center',
-            'text-4xl', 
+            'text-46', 
             'font-poppins',
             'focus:outline-none',
             'bg-transparent', 

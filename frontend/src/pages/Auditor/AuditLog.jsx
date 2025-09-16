@@ -94,19 +94,18 @@ function AuditLog() {
   if (loading) return <div className="font-poppins text-center mt-20 text-xl">Cargando auditoría...</div>;
 
   //header de la tabla
-  const tableHeaderClass = "bg-header-blue text-white font-semibold text-center font-poppins text-[18px]";
-  const tableCellClass = "text-center font-poppins text-[18px] py-2";
+  const tableHeaderClass = "bg-header-blue text-white font-semibold text-center font-poppins text-18";
+  const tableCellClass = "text-center font-poppins text-18 py-2";
 
   return (
-    <main className="flex min-h-[calc(100vh-145px)] bg-gray-50 overflow-hidden">
-      {/* Aside centrado */}
-      <aside className="w-100 bg-gray-0 flex flex-col justify-center items-center p-6 border-r border-gray-300 ">
-        <div className="flex flex-col gap-30 items-center w-full">
+    <main className="flex min-h-[calc(100vh-94px)] bg-gray-50 overflow-hidden">
+      <aside className="w-60 bg-gray-0 flex flex-col justify-center items-center p-6 border-r border-gray-300 text-18">
+        <div className="flex flex-col gap-20 items-center w-full">
           {TABS.map(tab => (
             <Button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`w-full py-3 px-4 rounded-[40px] font-poppins text-[18px] font-bold shadow-md
+              className={`w-full py-3 px-4 rounded-[40px] font-poppins text-18 font-italic shadow-md
                 ${activeTab === tab.key
                   ? "bg-primary-blue text-white"
                   : "bg-header-blue text-primary-blue border border-primary-blue hover:bg-primary-blue-hover hover:text-white"}`}
@@ -117,21 +116,19 @@ function AuditLog() {
         </div>
       </aside>
 
-      {/* Contenido principal centrado */}
       <section className="flex-1 flex flex-col items-center justify-center px-3">
-        <h1 className="text-header-blue text-[46px] font-bold font-poppins mb-8 text-center pb-15">
+        <h1 className="text-header-blue text-46 font-bold font-poppins pt-8 text-center pb-6">
           Auditoría del Sistema
         </h1>
 
-        {/* Filtro usando Select */}
-        <div className="mb-6 w-full max-w-[1500px] flex items-center justify-start  pb-8">
+        <div className=" w-full max-w-[900px] flex items-center justify-start  pb-2">
           {activeTab === "login" && (
             <>
-              <label className="mr-3 font-poppins text-[18px] font-semibold">Filtrar por tipo:</label>
+              <label className="mr-3 font-poppins text-16 font-semibold">Filtrar por tipo:</label>
               <Select
                 value={loginFilter}
                 onChange={e => setLoginFilter(e.target.value)}
-                className="w-[250px] h-[50px] rounded-[40px] font-poppins text-[16px] px-6"
+                className="w-[250px] h-[35px] rounded-[40px] font-poppins text-16 px-6"
               >
                 <option value="ALL">Todos</option>
                 <option value="LOGIN_SUCCESS">Ingresos exitosos</option>
@@ -142,11 +139,11 @@ function AuditLog() {
           )}
           {activeTab === "users" && (
             <>
-              <label className="mr-3 font-poppins text-[18px] font-semibold">Filtrar por tipo:</label>
+              <label className="mr-3 font-poppins text-18 font-semibold">Filtrar por tipo:</label>
               <Select
                 value={userFilter}
                 onChange={e => setUserFilter(e.target.value)}
-                className="w-[250px] h-[50px] rounded-[40px] font-poppins text-[16px] px-6"
+                className="w-[250px] h-[35px] rounded-[40px] font-poppins text-16 px-6"
               >
                 <option value="ALL">Todos</option>
                 <option value="CREATE">Creaciones</option>
@@ -159,11 +156,11 @@ function AuditLog() {
           )}
           {activeTab === "services" && (
             <>
-              <label className="mr-3 font-poppins text-[18px] font-semibold">Filtrar por tipo:</label>
+              <label className="mr-3 font-poppins text-18 font-semibold">Filtrar por tipo:</label>
               <Select
                 value={serviceFilter}
                 onChange={e => setServiceFilter(e.target.value)}
-                className="w-[250px] h-[50px] rounded-[40px] font-poppins text-[16px] px-6"
+                className="w-[250px] h-[35px] rounded-[40px] font-poppins text-16 px-6"
               >
                 <option value="ALL">Todos</option>
                 <option value="CREATE">Creaciones</option>
@@ -173,12 +170,10 @@ function AuditLog() {
             </>
           )}
         </div>
-
-        {/* Tabla con altura máxima */}
-        <div className="w-full max-w-[1500px] bg-white rounded-[12px] shadow-md overflow-x-auto max-h-[calc(100vh-220px)] overflow-y-auto">
+        <div className="w-full max-w-[900px] bg-white rounded-[12px] shadow-md overflow-x-auto max-h-[calc(100vh-230px)] overflow-y-auto">
           {activeTab === "login" && (
             <table className="w-full border-collapse">
-              <thead className="sticky top-0 z-10 h-15">
+              <thead className="sticky top-0 z-10 h-10">
                 <tr>
                   <th className={tableHeaderClass}>Fecha</th>
                   <th className={tableHeaderClass}>Usuario</th>
@@ -187,7 +182,7 @@ function AuditLog() {
                   <th className={tableHeaderClass}>Descripción</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-200">
                 {loginEvents.map(ev => (
                   <tr key={ev.id}>
                     <td className={tableCellClass}>{new Date(ev.event_timestamp_colombia || ev.event_timestamp).toLocaleString()}</td>
@@ -203,7 +198,7 @@ function AuditLog() {
 
           {activeTab === "users" && (
             <table className="w-full border-collapse">
-              <thead className="sticky top-0 z-10 h-15">
+              <thead className="sticky top-0 z-10 h-10">
                 <tr>
                   <th className={tableHeaderClass}>Fecha</th>
                   <th className={tableHeaderClass}>Usuario</th>
@@ -212,7 +207,7 @@ function AuditLog() {
                   <th className={tableHeaderClass}>Descripción</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-200">
                 {userEvents.map(ev => (
                   <tr key={ev.id}>
                     <td className={tableCellClass}>{new Date(ev.event_timestamp_colombia || ev.event_timestamp).toLocaleString()}</td>
@@ -232,7 +227,7 @@ function AuditLog() {
 
           {activeTab === "services" && (
             <table className="w-full border-collapse">
-              <thead className="sticky top-0 z-10 h-15">
+              <thead className="sticky top-0 z-10 h-10">
                 <tr>
                   <th className={tableHeaderClass}>Fecha</th>
                   <th className={tableHeaderClass}>Usuario</th>
@@ -241,7 +236,7 @@ function AuditLog() {
                   <th className={tableHeaderClass}>Descripción</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-200">
                 {serviceEvents.map(ev => (
                   <tr key={ev.id}>
                     <td className={tableCellClass}>{new Date(ev.event_timestamp_colombia || ev.event_timestamp).toLocaleString()}</td>

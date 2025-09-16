@@ -6,8 +6,8 @@ import Select from "../../components/Select";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { getAllUsers as getUsers, updateUser, deactivateUser, activateUser, getRoles } from "../../services/userService";
 
-const tableHeaderClass = "bg-header-blue text-white font-semibold text-center font-poppins text-[18px]";
-const tableCellClass = "text-center font-poppins text-[16px] py-2";
+const tableHeaderClass = "bg-header-blue text-white font-semibold text-center font-poppins text-18";
+const tableCellClass = "text-center font-poppins text-16 py-2";
 
 function UserManagement() {
   const { token, userRole } = useAuth();
@@ -71,6 +71,13 @@ function UserManagement() {
 
   const handleEditFormChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === "document_number") {
+      if (!/^\d*$/.test(value)) return;
+      setEditForm(prev => ({ ...prev, [name]: value }));
+      return;
+    }
+
     if (name === "phone") {
       if (!/^\d*$/.test(value)) return;
       setEditForm(prev => ({ ...prev, [name]: value }));
@@ -81,6 +88,7 @@ function UserManagement() {
       }
       return;
     }
+
     setEditForm(prev => {
       // Si cambia el rol y no es Doctor, borra la especialidad
       if (name === "role_id") {
@@ -170,36 +178,36 @@ function UserManagement() {
   const isDoctor = roles.find(r => r.id === editForm.role_id)?.name === "Doctor";
 
   if (userRole !== "Administrador") return <div className="font-poppins text-center mt-20 text-xl">No autorizado</div>;
-  if (loading) return <div className="font-poppins text-center mt-20 text-xl">Cargando usuarios...</div>;
+  if (loading) return <div className="font-poppins text-center mt-10 text-18">Cargando usuarios...</div>;
 
   return (
-    <main className="flex min-h-[calc(100vh-145px)] bg-gray-50 overflow-hidden">
+    <main className="flex min-h-[calc(100vh-94px)] bg-gray-50 overflow-hidden">
       <section className="flex-1 flex flex-col items-center px-3">
-        <h1 className="text-header-blue text-[46px] font-bold font-poppins mb-1 pt-5 text-center pb-10">
-          Gestión de Usuarios
+        <h1 className="text-header-blue text-46 font-bold font-poppins mb-1 pt-6 text-center pb-6">
+          GESTIÓN DE USUARIOS
         </h1>
         {editError && (
-          <div className="mb-2 w-full max-w-[900px] p-3 bg-red-100 border border-red-400 text-red-700 rounded text-center">
+          <div className="mb-2 w-full max-w-[900px] p-3 bg-red-100 border border-red-400 text-red-700 rounded text-center text-18">
             {editError}
           </div>
         )}
         {successMsg && (
-          <div className="mb-2 w-full max-w-[900px] p-3 bg-green-100 border border-green-400 text-green-700 rounded text-center transition-opacity duration-500">
+          <div className="mb-2 w-full max-w-[900px] p-3 bg-green-100 border border-green-400 text-green-700 rounded text-center transition-opacity duration-500 text-18">
             {successMsg}
           </div>
         )}
 
         {/* Filtros y búsqueda */}
-        <div className="w-full max-w-[1500px] flex flex-wrap items-center justify-between mb-3 gap-4">
-          <div className="flex items-center gap-3">
+        <div className="w-full max-w-[1000px] flex flex-wrap items-center justify-between mb-3 gap-4">
+          <div className="flex items-center gap-4">
             <Input
-              className="w-[280px] font-poppins"
+              className="w-[280px] h-[35px] font-poppins"
               placeholder="Buscar por documento"
               value={searchDoc}
               onChange={e => setSearchDoc(e.target.value)}
             />
             <Select
-              className="w-[210px] font-poppins"
+              className="w-[210px] h-[35px]  font-poppins"
               value={filterRole}
               onChange={e => setFilterRole(e.target.value)}
             >
@@ -209,7 +217,7 @@ function UserManagement() {
               ))}
             </Select>
             <Select
-              className="w-[180px] font-poppins"
+              className="w-[180px] h-[35px] font-poppins"
               value={filterStatus}
               onChange={e => setFilterStatus(e.target.value)}
             >
@@ -221,10 +229,10 @@ function UserManagement() {
         </div>
 
         {/* Tabla de usuarios con scroll vertical */}
-        <div className="w-full max-w-[1500px] bg-white rounded-[12px] shadow-md overflow-x-auto"
-             style={{ maxHeight: "calc(100vh - 400px)", overflowY: "auto" }}>
+        <div className="w-full max-w-[1000px] bg-white rounded-[12px] shadow-md overflow-x-auto"
+             style={{ maxHeight: "calc(100vh - 226px)", overflowY: "auto" }}>
           <table className="w-full border-collapse">
-            <thead className="sticky top-0 z-10 h-15">
+            <thead className="sticky top-0 z-10 h-10">
               <tr>
                 <th className={tableHeaderClass}>Documento</th>
                 <th className={tableHeaderClass}>Tipo</th>
@@ -238,7 +246,7 @@ function UserManagement() {
                 <th className={tableHeaderClass}>Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 divide-x">
+            <tbody className="divide-y divide-gray-200">
               {filteredUsers.map(user => (
                 <tr key={user.uid}>
                   <td className={tableCellClass}>{user.document_number}</td>
@@ -261,13 +269,13 @@ function UserManagement() {
                       {user.is_active ? (
                         <>
                           <Button
-                            className="bg-primary-blue hover:bg-primary-blue-hover text-white px-4 py-2 rounded-[40px] font-poppins text-[16px] font-bold w-[200px]"
+                            className="bg-primary-blue hover:bg-primary-blue-hover text-white px-4 py-2 rounded-[40px] font-poppins text-16 font-bold w-[130px] h-[35px]"
                             onClick={() => handleEdit(user)}
                           >
                             Modificar
                           </Button>
                           <Button
-                            className="bg-header-blue hover:bg-header-blue-hover text-white px-4 py-2 rounded-[40px] font-poppins text-[16px] font-bold w-[200px]"
+                            className="bg-header-blue hover:bg-header-blue-hover text-white px-4 py-2 rounded-[40px] font-poppins text-16 font-bold w-[130px] h-[35px]"
                             onClick={() => setConfirmDialog({ open: true, user })}
                           >
                             Desactivar
@@ -275,7 +283,7 @@ function UserManagement() {
                         </>
                       ) : (
                         <Button
-                          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-[40px] font-poppins text-[16px] font-bold w-[200px]"
+                          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-[40px] font-poppins text-16 font-bold w-[130px] h-[35px]"
                           onClick={async () => {
                             try {
                               await activateUser(user.uid, token);
@@ -304,7 +312,7 @@ function UserManagement() {
         {editUser && (
           <div className="fixed inset-0 bg-header-blue bg-opacity-40 flex items-center justify-center z-50">
             <div className="bg-white rounded-[12px] shadow-lg p-8 w-full max-w-[1200px] flex flex-col items-center justify-center">
-              <h2 className="text-header-blue text-[28px] font-bold font-poppins mb-6 text-center">
+              <h2 className="text-header-blue text-24 font-bold font-poppins mb-6 text-center">
                 Editar Usuario
               </h2>
               {editFormErrors.general && (

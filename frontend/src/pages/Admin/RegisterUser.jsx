@@ -55,6 +55,12 @@ const RegisterUser = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
+    if (name === "documentNumber") {
+      if (!/^\d*$/.test(value)) return;
+      setFormData((prev) => ({ ...prev, [name]: value }));
+      return;
+    }
+
     if (name === "phoneNumber") {
       if (!/^\d*$/.test(value)) return;
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -172,12 +178,12 @@ const RegisterUser = () => {
   if (!token) return <p>Cargando autenticación...</p>;
   
   if (!rolesList || rolesList.length === 0) {
-    return <p className="font-poppins text-center mt-20 text-xl">Cargando...</p>;
+    return <p className="font-poppins text-center mt-10 text-18">Cargando...</p>;
   }
 
   return (
-    <main className="flex-1 flex flex-col items-center bg-gray-50 pt-16 pb-20 px-8">
-      <h1 className="text-header-blue text-[46px] font-bold font-poppins mb-15">
+    <main className="flex-1 flex flex-col items-center bg-gray-50 pt-8 pb-10 px-2">
+      <h1 className="text-header-blue text-46 font-bold font-poppins mb-8 text-center">
         REGISTRO DE USUARIOS
       </h1>
       {formError && (
@@ -190,10 +196,13 @@ const RegisterUser = () => {
           {successMessage}
         </div>
       )}
-      <form onSubmit={handleSubmit} className="w-full max-w-[700px] grid grid-cols-1 md:grid-cols-2 gap-x-[75px] gap-y-6">
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-[700px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-x-[80px] gap-y-4 justify-center"
+      >
         {/* Columna Izquierda */}
-        <div className="flex flex-col items-start">
-          <label className="block text-gray-700 font-poppins font-semibold mb-2">Tipo de documento *</label>
+        <div className="flex flex-col items-center md:items-start w-full">
+          <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">Tipo de documento *</label>
           <Select
             name="documentType"
             value={formData.documentType}
@@ -208,8 +217,8 @@ const RegisterUser = () => {
           </Select>
         </div>
         {/* Columna Derecha */}
-        <div className="flex flex-col items-start">
-          <label className="block text-gray-700 font-poppins font-semibold mb-2">Número de documento *</label>
+        <div className="flex flex-col items-center md:items-start w-full">
+          <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">Número de documento *</label>
           <Input
             name="documentNumber"
             placeholder="Ingrese el número de documento"
@@ -220,8 +229,10 @@ const RegisterUser = () => {
         </div>
 
         {/* Columna Izquierda */}
-        <div className="flex flex-col items-start">
-          <label className="block text-gray-700 font-poppins font-semibold mb-2">Nombre *</label>
+        <div className="flex flex-col items-center md:items-start w-full">
+          <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">
+            Nombre *
+          </label>
           <Input
             name="firstName"
             placeholder="Ingrese el nombre"
@@ -231,8 +242,8 @@ const RegisterUser = () => {
           />
         </div>
         {/* Columna Derecha */}
-        <div className="flex flex-col items-start">
-          <label className="block text-gray-700 font-poppins font-semibold mb-2">Apellido *</label>
+        <div className="flex flex-col items-center md:items-start w-full">
+          <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">Apellido *</label>
           <Input
             name="lastName"
             placeholder="Ingrese el apellido"
@@ -243,8 +254,8 @@ const RegisterUser = () => {
         </div>
 
         {/* Columna Izquierda */}
-        <div className="flex flex-col items-start">
-          <label className="block text-gray-700 font-poppins font-semibold mb-2">Teléfono</label>
+        <div className="flex flex-col items-center md:items-start w-full">
+          <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">Teléfono</label>
           <Input
             name="phoneNumber"
             placeholder="Ingrese el número de teléfono"
@@ -258,8 +269,8 @@ const RegisterUser = () => {
           )}
         </div>
         {/* Columna Derecha */}
-        <div className="flex flex-col items-start">
-          <label className="block text-gray-700 font-poppins font-semibold mb-2">Correo Electrónico *</label>
+        <div className="flex flex-col items-center md:items-start w-full">
+          <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">Correo Electrónico *</label>
           <Input
             name="email"
             placeholder="Ingrese el correo electrónico"
@@ -273,8 +284,8 @@ const RegisterUser = () => {
         </div>
 
         {/* Columna Izquierda */}
-        <div className="flex flex-col items-start">
-          <label className="block text-gray-700 font-poppins font-semibold mb-2">Rol *</label>
+        <div className="flex flex-col items-center md:items-start w-full">
+          <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">Rol *</label>
           <Select
             name="role"
             value={formData.role}
@@ -290,8 +301,8 @@ const RegisterUser = () => {
           </Select>
         </div>
         {/* Columna Derecha */}
-        <div className="flex flex-col items-start">
-          <label className={cn("block text-gray-700 font-poppins font-semibold mb-2", !isDoctor && 'text-gray-400')}>
+        <div className="flex flex-col items-center md:items-start w-full">
+          <label className={cn("block text-gray-700 font-poppins font-semibold mb-2 !text-18", !isDoctor && 'text-gray-400')}>
             Especialidad del doctor {isDoctor && '*'}
           </label>
           <Select
@@ -308,12 +319,17 @@ const RegisterUser = () => {
           </Select>
         </div>
       </form>
-
-      <div className="flex justify-center space-x-6 mt-10">
-        <Button onClick={handleSubmit} className="bg-primary-blue hover:bg-primary-blue-hover text-white px-10 py-4 font-bold rounded-[40px] text-2xl shadow-md">
+      <div className="flex flex-col md:flex-row justify-center items-center md:space-x-6 space-y-4 md:space-y-0 mt-10 w-full max-w-[700px] mx-auto">
+        <Button
+          onClick={handleSubmit}
+          className="bg-primary-blue hover:bg-primary-blue-hover text-white w-full md:w-auto px-10 py-4 font-bold rounded-[40px] text-18 shadow-md"
+        >
           Guardar
         </Button>
-        <Button onClick={handleCancel} className="bg-header-blue hover:bg-header-blue-hover text-white px-10 py-4 font-bold rounded-[40px] text-2xl shadow-md">
+        <Button
+          onClick={handleCancel}
+          className="bg-header-blue hover:bg-header-blue-hover text-white w-full md:w-auto px-10 py-4 font-bold rounded-[40px] text-18 shadow-md"
+        >
           Cancelar
         </Button>
       </div>
