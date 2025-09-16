@@ -6,26 +6,28 @@ on:
       - develop
 
 jobs:
-  build:
+  test-frontend:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 20
-          cache: 'npm'
-
-      - name: Verify Node version
-        run: node -v
 
       - name: Install frontend dependencies
         run: npm install --prefix frontend
 
       - name: Run frontend tests
         run: npm test --prefix frontend -- --watchAll=false
+
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -40,7 +42,7 @@ jobs:
 
   deploy-staging:
     runs-on: ubuntu-latest
-    needs: build
+    needs: [test-frontend, test-backend]
     steps:
       - name: Deploy Backend Staging
         run: curl -X POST "${{ secrets.RENDER_STAGING_BACK }}"
