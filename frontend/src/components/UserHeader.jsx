@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useAuth } from '../contexts/AuthContext';
-import StyledLogoutButton from './StyledLogoutButton'; // Renombra tu botón a StyledLogoutButton.jsx
+import StyledLogoutButton from './StyledLogoutButton'; 
 
 function cn(...args) {
   return twMerge(clsx(args));
@@ -50,19 +50,17 @@ const UserHeader = ({ userRole }) => {
   };
 
   return (
-    <header className="bg-header-blue w-full h-[145px] flex items-center justify-between px-10 relative">
-      <div className="flex items-center">
-        <Link to="/">
-          <img src="/images/bytedental-logo.png" alt="ByteDental Logo" className="w-[100px] h-auto mr-8" />
-        </Link>
-        <nav className="flex items-center space-x-8 text-white font-poppins text-lg">
-          {currentNavLinks.map((link) => (
-            <Link key={link.path} to={link.path} className={getNavLinkClass(link.path)}>
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-      </div>
+    <header className="bg-header-blue w-full h-[145px] flex items-center px-10 relative">
+      <Link to="/">
+        <img src="/images/bytedental-logo.png" alt="ByteDental Logo" className="w-[180px] h-auto mr-15" />
+      </Link>
+      <nav className="flex flex-1 justify-center items-center space-x-15 text-white font-poppins font-semibold text-lg mx-auto">
+        {currentNavLinks.map((link) => (
+          <Link key={link.path} to={link.path} className={getNavLinkClass(link.path)}>
+            {link.label}
+          </Link>
+        ))}
+      </nav>
       <div className="flex items-center space-x-3 text-white font-poppins">
         <svg
           width="40"
@@ -74,7 +72,7 @@ const UserHeader = ({ userRole }) => {
           <circle cx="12" cy="7" r="3.5" stroke="white" strokeWidth="2" />
           <path d="M12 17c-2.76 0-5 2.24-5 5h10c0-2.76-2.24-5-5-5z" stroke="white" strokeWidth="2" />
         </svg>
-        <span className="font-semibold">{userRole}</span>
+        <span className="font-semibold text-[20px]">{userRole}</span>
         <StyledLogoutButton onClick={handleSignOut} />
       </div>
     </header>

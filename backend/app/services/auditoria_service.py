@@ -231,17 +231,18 @@ class AuditoriaService:
         db: Session,
         usuario_id: str,
         exitoso: bool,
-        ip_origen: Optional[str] = None
+        ip_origen: Optional[str] = None,
+        usuario_email: Optional[str] = None 
     ) -> Audit:
         """Registrar intento de login"""
         tipo_evento = "LOGIN_SUCCESS" if exitoso else "LOGIN_FAILED"
         descripcion = "Inicio de sesión exitoso" if exitoso else "Intento de inicio de sesión fallido"
-        
-        # Obtener datos del usuario solo si el login fue exitoso
         role_name, email = (None, None)
         if exitoso:
             role_name, email = AuditoriaService._obtener_datos_usuario(db, usuario_id)
-        
+        else:
+            email = usuario_email  # <-- usa el email ingresado si el login falló
+
         return AuditoriaService.registrar_evento(
             db=db,
             usuario_id=usuario_id,
