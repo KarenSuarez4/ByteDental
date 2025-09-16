@@ -12,10 +12,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
+      - name: Setup Node.js 20
         uses: actions/setup-node@v3
         with:
           node-version: 20
+          cache: 'npm'
+
+      - name: Verify Node version
+        run: node -v
 
       - name: Install frontend dependencies
         run: npm install --prefix frontend
