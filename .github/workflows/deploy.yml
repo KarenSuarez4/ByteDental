@@ -6,60 +6,50 @@ on:
       - develop
 
 jobs:
-  test:
-    name: Run Tests
+  build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: [frontend, backend]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Node (for frontend)
-        if: matrix.service == 'frontend'
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: 20
 
-      - name: Install deps & test frontend
-        if: matrix.service == 'frontend'
-        run: |
-          cd frontend
-          npm install
-          npm run test
+      - name: Install frontend dependencies
+        run: npm install --prefix frontend
 
-      - name: Set up Python (for backend)
-        if: matrix.service == 'backend'
+      - name: Run frontend tests
+        run: npm test --prefix frontend -- --watchAll=false
+
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Install deps & test backend
-        if: matrix.service == 'backend'
-        run: |
-          cd backend
-          pip install -r requirements.txt
-          pytest
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run backend tests
+        run: pytest backend/tests
 
   deploy-staging:
-    name: Deploy to Staging
     runs-on: ubuntu-latest
-    needs: test
+    needs: build
     steps:
-      - name: Deploy frontend staging
-        run: curl -X POST ${{ secrets.RENDER_STAGING_FRONT }}
+      - name: Deploy Backend Staging
+        run: curl -X POST "${{ secrets.RENDER_STAGING_BACK }}"
 
-      - name: Deploy backend staging
-        run: curl -X POST ${{ secrets.RENDER_STAGING_BACK }}
+      - name: Deploy Frontend Staging
+        run: curl -X POST "${{ secrets.RENDER_STAGING_FRONT }}"
 
-  deploy-dev:
-    name: Deploy to Dev
+  deploy-develop:
     runs-on: ubuntu-latest
     needs: deploy-staging
     steps:
-      - name: Deploy frontend dev
-        run: curl -X POST ${{ secrets.RENDER_DEV_FRONT }}
+      - name: Deploy Backend Develop
+        run: curl -X POST "${{ secrets.RENDER_DEV_BACK }}"
 
-      - name: Deploy backend dev
-        run: curl -X POST ${{ secrets.RENDER_DEV_BACK }}
+      - name: Deploy Frontend Develop
+        run: curl -X POST "${{ secrets.RENDER_DEV_FRONT }}"
