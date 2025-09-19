@@ -1,7 +1,7 @@
 import uuid
 import hashlib
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
 
 from ..models.auditoria_models import Audit
@@ -282,3 +282,61 @@ class AuditoriaService:
             usuario_rol=role_name,
             usuario_email=email
         )
+
+    @staticmethod
+    def obtener_eventos_por_registro(
+        db: Session,
+        registro_id: str,
+        tipo_registro: str,
+        skip: int = 0,
+        limit: int = 50
+    ) -> List[Audit]:
+        """
+        Obtener registros de auditoría para un registro específico
+        
+        Args:
+            db: Sesión de base de datos
+            registro_id: ID del registro a consultar
+            tipo_registro: Tipo de registro (patients, guardians, users, etc.)
+            skip: Número de registros a omitir
+            limit: Número máximo de registros a retornar
+            
+        Returns:
+            Lista de registros de auditoría
+        """
+        try:
+            query = db.query(Audit).filter(
+                Audit.affected_record_id == registro_id,
+                Audit.affected_record_type == tipo_registro
+            ).order_by(Audit.event_timestamp.desc())
+            
+            return query.offset(skip).limit(limit).all()
+        except Exception as e:
+            print(f"Error al obtener eventos de auditoría: {str(e)}")
+            return []
+
+    @staticmethod
+    def obtener_conteo_eventos_por_registro(
+        db: Session,
+        registro_id: str,
+        tipo_registro: str
+    ) -> int:
+        """
+        Obtener el conteo total de eventos de auditoría para un registro
+        
+        Args:
+            db: Sesión de base de datos
+            registro_id: ID del registro a consultar
+            tipo_registro: Tipo de registro (patients, guardians, users, etc.)
+            
+        Returns:
+            Número total de eventos de auditoría
+        """
+        try:
+            return db.query(Audit).filter(
+                Audit.affected_record_id == registro_id,
+                Audit.affected_record_type == tipo_registro
+            ).count()
+        except Exception as e:
+            print(f"Error al contar eventos de auditoría: {str(e)}")
+            return 0

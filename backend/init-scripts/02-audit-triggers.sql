@@ -161,6 +161,18 @@ CREATE TRIGGER audit_audits_trigger
     AFTER INSERT OR UPDATE OR DELETE ON audits
     FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
 
+-- 5. TABLA PATIENTS
+DROP TRIGGER IF EXISTS audit_patients_trigger ON patients;
+CREATE TRIGGER audit_patients_trigger
+    AFTER INSERT OR UPDATE OR DELETE ON patients
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
+
+-- 6. TABLA GUARDIANS
+DROP TRIGGER IF EXISTS audit_guardians_trigger ON guardians;
+CREATE TRIGGER audit_guardians_trigger
+    AFTER INSERT OR UPDATE OR DELETE ON guardians
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
+
 -- 4. Agregar triggers para otras tablas del sistema cuando existan
 -- Ejemplo para tablas futuras:
 -- DROP TRIGGER IF EXISTS audit_patients_trigger ON patients;
