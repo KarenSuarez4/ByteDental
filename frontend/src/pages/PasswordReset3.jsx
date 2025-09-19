@@ -170,7 +170,6 @@ const PasswordReset3 = () => {
   if (generalError && !isValidCode) {
     return (
       <div className="min-h-screen w-full flex flex-col">
-        <Header />
         <main className="flex-1 flex flex-col items-center justify-center bg-gray-50 mt-2">
           <div className="w-[338px] text-center">
             <h1 className="text-header-blue text-46 font-bold font-poppins mb-4">
@@ -179,7 +178,7 @@ const PasswordReset3 = () => {
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
               <p className="text-red-600 font-poppins">{generalError}</p>
             </div>
-            <Button onClick={() => navigate("/login")} className="w-full">
+            <Button onClick={() => navigate("/login")} className="w-full text-18">
               Volver al Login
             </Button>
           </div>
@@ -192,7 +191,6 @@ const PasswordReset3 = () => {
   if (!isValidCode && !generalError) {
     return (
       <div className="min-h-screen w-full flex flex-col">
-        <Header />
         <main className="flex-1 flex flex-col items-center justify-center bg-gray-50 mt-2">
           <div className="w-[338px] text-center">
             <h1 className="text-header-blue text-46 font-bold font-poppins mb-4">
@@ -211,7 +209,6 @@ const PasswordReset3 = () => {
   if (passwordResetSuccess) {
     return (
       <div className="min-h-screen w-full flex flex-col">
-        <Header />
         <main className="flex-1 flex flex-col items-center justify-center bg-gray-50 mt-2">
           <div className="w-[400px] text-center">
             <div className="bg-green-50 border border-green-200 rounded-lg p-8 mb-6">
@@ -241,7 +238,6 @@ const PasswordReset3 = () => {
 
   return (
     <div className="min-h-screen w-full flex flex-col">
-      <Header />
       <main className="flex-1 flex flex-col items-center justify-center bg-gray-50 mt-2">
         <ProgressIndicator step={3} />
         <h1 className="text-header-blue text-46 font-bold font-poppins mb-4">
@@ -250,7 +246,7 @@ const PasswordReset3 = () => {
         
         {/* Mostrar email para el que se está restableciendo */}
         {email && (
-          <p className="text-gray-600 font-poppins mb-4 text-center">
+          <p className="text-gray-600 font-poppins mb-4 text-center text-16">
             Estableciendo nueva contraseña para: <strong>{email}</strong>
           </p>
         )}
@@ -267,7 +263,7 @@ const PasswordReset3 = () => {
           <div className="mb-4">
             <label
               htmlFor="newPassword"
-              className="block text-gray-700 text-sm font-poppins mb-1 font-semibold"
+              className="block text-gray-700 text-18 font-poppins mb-1 font-semibold"
             >
               Nueva Contraseña *
             </label>
@@ -279,7 +275,7 @@ const PasswordReset3 = () => {
               error={!!newPasswordError}
             />
             {newPasswordError && (
-              <p className="text-red-500 text-xs mt-2 font-poppins">
+              <p className="text-red-500 text-16 mt-2 font-poppins">
                 {newPasswordError}
               </p>
             )}
@@ -290,7 +286,7 @@ const PasswordReset3 = () => {
           <div className="mb-6">
             <label
               htmlFor="confirmPassword"
-              className="block text-gray-700 text-sm font-poppins mb-1 font-semibold"
+              className="block text-gray-700 text-18 font-poppins mb-1 font-semibold"
             >
               Confirmar Contraseña *
             </label>
@@ -302,20 +298,20 @@ const PasswordReset3 = () => {
               error={!!confirmPasswordError}
             />
             {confirmPasswordError && (
-              <p className="text-red-500 text-xs mt-1 font-poppins">
+              <p className="text-red-500 text-16 mt-1 font-poppins">
                 {confirmPasswordError}
               </p>
             )}
           </div>
 
           {/* Botón Guardar */}
-          <Button type="submit" className="w-full" disabled={!isFormValid}>
+          <Button type="submit" className="w-full text-18" disabled={!isFormValid}>
             {loading ? "Guardando..." : "Guardar"}
           </Button>
         </form>
         <a
           onClick={() => navigate("/login")}
-          className="mt-4 text-header-blue hover:underline font-bold cursor-pointer"
+          className="mt-4 text-header-blue hover:underline font-bold cursor-pointer text-18"
         >
           Volver a inicio de sesión
         </a>

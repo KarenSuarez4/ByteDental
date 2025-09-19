@@ -86,23 +86,23 @@ async def register_login_event(
             db=db,
             usuario_id=user_uid,
             exitoso=login_data.success,
-            ip_origen=get_client_ip(request)
+            ip_origen=get_client_ip(request),
+            usuario_email=login_data.email if not login_data.success else None
         )
         
-        # Agregar detalles adicionales del error si el login falló
+        # Si el login falló, guardar SIEMPRE el email ingresado
         if not login_data.success and login_data.error_message:
-            # Obtener datos del usuario para el registro detallado
             user_role = user.role.name if user and user.role else None
-            user_email = str(user.email) if user else str(login_data.email)
+            # SIEMPRE usar el email ingresado por el usuario
+            user_email = login_data.email
             
-            # Crear un nuevo registro con detalles adicionales
             audit_record_with_error = AuditoriaService.registrar_evento(
                 db=db,
                 usuario_id=user_uid,
                 tipo_evento="LOGIN_FAILED_DETAILED",
                 registro_afectado_id=user_uid,
                 registro_afectado_tipo="users",
-                descripcion_evento=f"Login fallido con detalles: {user_name if user else 'Usuario desconocido'}",
+                descripcion_evento=f"Login fallido: {user_name if user else 'Usuario desconocido'}",
                 detalles_cambios={
                     "accion": "login_failed",
                     "error_message": login_data.error_message,

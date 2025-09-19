@@ -3,7 +3,9 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useAuth } from '../contexts/AuthContext';
-import StyledLogoutButton from './StyledLogoutButton'; // Renombra tu botón a StyledLogoutButton.jsx
+import StyledLogoutButton from './StyledLogoutButton'; 
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUserCircle } from '@fortawesome/free-solid-svg-icons';
 
 function cn(...args) {
   return twMerge(clsx(args));
@@ -36,7 +38,7 @@ const UserHeader = ({ userRole }) => {
   };
 
   const getNavLinkClass = (path) => {
-    const baseClasses = "px-8 py-4 font-poppins text-lg rounded-[40px] transition-all duration-300";
+    const baseClasses = "px-8 py-4 font-poppins text-18 rounded-[40px] transition-all duration-300";
     const activeClasses = "bg-primary-blue text-white shadow-md";
     const inactiveClasses = "text-white hover:bg-white hover:bg-opacity-20";
     return cn(baseClasses, location.pathname.startsWith(path) ? activeClasses : inactiveClasses);
@@ -50,31 +52,34 @@ const UserHeader = ({ userRole }) => {
   };
 
   return (
-    <header className="bg-header-blue w-full h-[145px] flex items-center justify-between px-10 relative">
-      <div className="flex items-center">
+    <header className="bg-header-blue w-full min-h-[70px] flex flex-col md:flex-row md:items-center px-2 md:px-10 py-2 relative z-10">
+      <div className="flex items-center justify-between w-full md:w-auto">
         <Link to="/">
-          <img src="/images/bytedental-logo.png" alt="ByteDental Logo" className="w-[100px] h-auto mr-8" />
+          <img src="/images/bytedental-logo.png" alt="ByteDental Logo" className="w-[60px] md:w-[100px] h-auto mr-2 md:mr-6" />
         </Link>
-        <nav className="flex items-center space-x-8 text-white font-poppins text-lg">
-          {currentNavLinks.map((link) => (
-            <Link key={link.path} to={link.path} className={getNavLinkClass(link.path)}>
-              {link.label}
-            </Link>
-          ))}
-        </nav>
       </div>
-      <div className="flex items-center space-x-3 text-white font-poppins">
-        <svg
-          width="40"
-          height="40"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <circle cx="12" cy="7" r="3.5" stroke="white" strokeWidth="2" />
-          <path d="M12 17c-2.76 0-5 2.24-5 5h10c0-2.76-2.24-5-5-5z" stroke="white" strokeWidth="2" />
-        </svg>
-        <span className="font-semibold">{userRole}</span>
+      <nav
+        className="w-full min-w-0 max-w-full overflow-x-auto whitespace-nowrap flex items-center justify-center gap-2 md:gap-6 text-xs sm:text-sm md:text-16 font-poppins font-semibold mx-auto mt-2 md:mt-0 hide-scrollbar pl-12"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
+        {currentNavLinks.map((link) => (
+          <Link
+            key={link.path}
+            to={link.path}
+            className={cn(
+              "px-4 md:px-8 py-2 md:py-4 font-poppins text-xs sm:text-sm md:text-18 rounded-[40px] transition-all duration-300",
+              location.pathname.startsWith(link.path)
+                ? "bg-primary-blue text-white shadow-md"
+                : "text-white hover:bg-white hover:bg-opacity-20"
+            )}
+          >
+            {link.label}
+          </Link>
+        ))}
+      </nav>
+      <div className="flex items-center justify-center gap-1 md:gap-3 text-white font-poppins mt-2 md:mt-0 ml-0 md:ml-auto">
+        <FontAwesomeIcon icon={faUserCircle} className="text-white text-xl md:text-3xl" />
+        <span className="font-semibold text-[0.95rem] md:text-18">{userRole}</span>
         <StyledLogoutButton onClick={handleSignOut} />
       </div>
     </header>

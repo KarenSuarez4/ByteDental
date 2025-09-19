@@ -295,7 +295,7 @@ const Login = () => {
         <main className="flex-1 flex flex-col items-center justify-center bg-[#FBFCFB]">
           {/* Título "Inicio de Sesión" con icono arroba */}
           <div className="flex flex-col items-center mb-7">
-            <img src="./images/bytedental-logoAzul.png" alt="Icono arroba" className="size-20 w-37 mb-5 mt-3" />
+            <img src="./images/bytedental-logoAzul.png" alt="Icono arroba" className="size-14 w-26 mb-5 mt-3" />
             <h1 className="text-header-blue text-46 font-bold font-poppins">
               Inicio de Sesión
             </h1>
@@ -311,8 +311,8 @@ const Login = () => {
             )}
 
             {/* Campo de Usuario con validación de email */}
-            <div className="mb-5 w-[338px]">
-              <label htmlFor="username" className="block text-header-blue text-sm font-poppins mb-1 font-bold">
+            <div className="mb-5 w-[338px] pl-4">
+              <label htmlFor="username" className="block text-header-blue text-18 font-poppins mb-1 font-bold">
                 Usuario
               </label>
               <Input
@@ -329,11 +329,11 @@ const Login = () => {
             </div>
 
             {/* Campo de Contraseña */}
-            <div className="mb-8 w-[338px]">
-              <label htmlFor="password" className="block text-header-blue text-sm font-poppins mb-1 font-bold">
+            <div className="mb-4 w-[338px] pl-4 ">
+              <label htmlFor="password" className="block text-header-blue text-18 font-poppins mb-1 font-bold">
                 Contraseña
               </label>
-              <InputPassword
+              <InputPassword 
                 id="password"
                 placeholder="************"
                 value={password}
@@ -349,7 +349,7 @@ const Login = () => {
             {/* Enlace ¿Olvidó su contraseña? */}
             <a
               onClick={handleForgotPasswordClick}
-              className="text-header-blue hover:underline text-sm font-poppins mb-5 self-start ml-[calc(50%-169px)] font-bold cursor-pointer" 
+              className="text-header-blue hover:underline text-16 font-poppins mb-5 self-start ml-[calc(50%-169px)] font-bold text-decoration: underline cursor-pointer" 
             >
                 ¿Olvidó su contraseña?
             </a>
@@ -361,9 +361,9 @@ const Login = () => {
           </form>
 
           {/* Divisor "O inicia sesión con" */}
-          <div className="flex items-center w-[338px] mb-6">
+          <div className="flex items-center w-[338px] mb-4">
             <hr className="flex-grow border-t border-gray-line" />
-            <span className="px-4 text-gray-500 text-sm font-poppins">O</span>
+            <span className="px-4 text-gray-500 text-16 font-poppins">O</span>
             <hr className="flex-grow border-t border-gray-line" />
           </div>
 

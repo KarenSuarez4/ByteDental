@@ -10,6 +10,8 @@ import PasswordReset2 from './pages/PasswordReset2.jsx';
 import PasswordReset3 from './pages/PasswordReset3.jsx';
 import ForcePasswordChange from './pages/ForcePasswordChange.jsx';
 import RegisterUser from './pages/Admin/RegisterUser';
+import UserManagement from './pages/Admin/UserManagement.jsx';
+import AuditLog from './pages/Auditor/AuditLog.jsx';
 import DummyPage from './pages/DummyPage';
 
 function AppContent() {
@@ -34,7 +36,7 @@ function AppContent() {
         {/* Rutas públicas */}
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password" element={<PasswordReset />} />
+        <Route path="/PasswordReset" element={<PasswordReset />} />
         <Route path="/PasswordReset2" element={<PasswordReset2 />} />
         <Route path="/PasswordReset3" element={<PasswordReset3 />} />
         <Route path="/force-password-change" element={<ForcePasswordChange />} />
@@ -49,7 +51,7 @@ function AppContent() {
             } />
             <Route path="/users/manage" element={
               <ProtectedRoute>
-                <DummyPage title="Gestión de usuarios" />
+                <UserManagement />
               </ProtectedRoute>
             } />
             <Route path="/reports" element={
@@ -96,7 +98,7 @@ function AppContent() {
           <>
             <Route path="/audit-logs" element={
               <ProtectedRoute>
-                <DummyPage title="Registros de Auditoría" />
+                <AuditLog />
               </ProtectedRoute>
             } />
             <Route path="/user-activity" element={

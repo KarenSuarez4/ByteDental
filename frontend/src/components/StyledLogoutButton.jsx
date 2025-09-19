@@ -17,8 +17,8 @@ const StyledWrapper = styled.div`
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    width: 45px;
-    height: 45px;
+    width: 25px;
+    height: 27px;
     border: none;
     border-radius: 50%;
     cursor: pointer;
@@ -26,7 +26,7 @@ const StyledWrapper = styled.div`
     overflow: hidden;
     transition-duration: .3s;
     box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.199);
-    background-color: rgb(255, 65, 65);
+    background-color: rgb(211, 69, 69);
   }
   .sign {
     width: 100%;
@@ -47,8 +47,8 @@ const StyledWrapper = styled.div`
     width: 0%;
     opacity: 0;
     color: white;
-    font-size: 1.2em;
-    font-weight: 600;
+    font-size: 0.8em;
+    font-weight: 300;
     transition-duration: .3s;
   }
   .Btn:hover {

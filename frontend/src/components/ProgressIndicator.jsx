@@ -1,4 +1,3 @@
-// src/components/ProgressIndicator.jsx
 import React from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
