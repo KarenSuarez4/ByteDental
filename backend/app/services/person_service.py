@@ -56,6 +56,9 @@ class PersonService:
             if existing_phone:
                 raise ValueError(f"Ya existe una persona con el teléfono {person_data.phone}")
         
+        # VALIDACIÓN CRÍTICA: Verificar coherencia entre tipo de documento y edad
+        self.validate_document_type_by_age(person_data.document_type, person_data.birthdate)
+        
         try:
             person = Person(**person_data.model_dump())
             self.db.add(person)
@@ -93,6 +96,18 @@ class PersonService:
     def get_person_by_document(self, document_number: str) -> Optional[Person]:
         """Obtener persona por número de documento"""
         return self.db.query(Person).filter(Person.document_number == document_number).first()
+    
+    def get_person_by_email(self, email: str) -> Optional[Person]:
+        """Obtener persona por email"""
+        return self.db.query(Person).filter(
+            Person.email == email
+        ).first()
+    
+    def get_person_by_phone(self, phone: str) -> Optional[Person]:
+        """Obtener persona por teléfono"""
+        return self.db.query(Person).filter(
+            Person.phone == phone
+        ).first()
     
     def get_persons(
         self, 
@@ -175,6 +190,14 @@ class PersonService:
                 if existing_phone and existing_phone.id != person_id:
                     raise ValueError(f"Ya existe una persona con el teléfono {update_data['phone']}")
             
+            # VALIDACIÓN CRÍTICA: Verificar coherencia entre tipo de documento y edad cuando se actualice cualquiera de los dos
+            new_document_type = update_data.get('document_type', person.document_type)
+            new_birthdate = update_data.get('birthdate', person.birthdate)
+            
+            # Si se actualiza el tipo de documento o la fecha de nacimiento, validar coherencia
+            if 'document_type' in update_data or 'birthdate' in update_data:
+                self.validate_document_type_by_age(new_document_type, new_birthdate)
+            
             for field, value in update_data.items():
                 setattr(person, field, value)
             
@@ -219,6 +242,34 @@ class PersonService:
         """Calcular edad en años"""
         today = date.today()
         return today.year - birthdate.year - ((today.month, today.day) < (birthdate.month, birthdate.day))
+    
+    def validate_document_type_by_age(self, document_type: DocumentTypeEnum, birthdate: date) -> None:
+
+        age = self.calculate_age(birthdate)
+        
+        if document_type == DocumentTypeEnum.TI and age >= 18:
+            raise ValueError(
+                f"Una persona de {age} años no puede tener Tarjeta de Identidad (TI). "
+                "Las TI son solo para menores de 18 años. Use CC (Cédula de Ciudadanía)."
+            )
+        
+        if document_type == DocumentTypeEnum.CC and age < 18:
+            raise ValueError(
+                f"Una persona de {age} años no puede tener Cédula de Ciudadanía (CC). "
+                "Las CC son solo para mayores de 18 años. Use TI (Tarjeta de Identidad) o RC (Registro Civil)."
+            )
+        
+        if document_type == DocumentTypeEnum.CE and age < 18:
+            raise ValueError(
+                f"Una persona de {age} años no puede tener Cédula de Extranjería (CE). "
+                "Las CE son solo para extranjeros mayores de 18 años. Use PA (Pasaporte) para menores extranjeros."
+            )
+        
+        if document_type == DocumentTypeEnum.RC and age >= 7:
+            raise ValueError(
+                f"Una persona de {age} años no puede tener Registro Civil (RC). "
+                "El RC es solo para menores de 7 años. Use TI para menores de 18 años o CC para mayores de 18 años."
+            )
     
     def get_persons_by_age_range(self, min_age: int, max_age: int) -> List[Person]:
         """Obtener personas en un rango de edad específico"""
