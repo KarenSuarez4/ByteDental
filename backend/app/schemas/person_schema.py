@@ -31,21 +31,26 @@ class PersonCreate(PersonBase):
     pass
 
 class PersonUpdate(BaseModel):
-    """Schema para actualizar una persona"""
+    """Schema para actualizar una persona - solo campos permitidos"""
+    # Tipo de documento
     document_type: Optional[DocumentTypeEnum] = None
-    document_number: Optional[str] = Field(None, min_length=1, max_length=30)
-    first_surname: Optional[str] = Field(None, min_length=1, max_length=50)
-    second_surname: Optional[str] = Field(None, max_length=50)
-    first_name: Optional[str] = Field(None, min_length=1, max_length=50)
-    middle_name: Optional[str] = Field(None, max_length=50)
-    email: Optional[EmailStr] = None
-    phone: Optional[str] = Field(None, max_length=20)
-    birthdate: Optional[date] = None
     
-    @validator('birthdate')
-    def validate_birthdate(cls, v):
-        if v and v > date.today():
-            raise ValueError('La fecha de nacimiento no puede ser futura')
+    # Nombre completo
+    first_surname: Optional[str] = Field(None, min_length=1, max_length=50, description="Primer apellido")
+    second_surname: Optional[str] = Field(None, max_length=50, description="Segundo apellido")
+    first_name: Optional[str] = Field(None, min_length=1, max_length=50, description="Primer nombre")
+    middle_name: Optional[str] = Field(None, max_length=50, description="Segundo nombre")
+    
+    # Correo electrónico
+    email: Optional[EmailStr] = None
+    
+    # Número de teléfono
+    phone: Optional[str] = Field(None, max_length=20, description="Teléfono")
+    
+    @validator('phone')
+    def validate_phone(cls, v):
+        if v and not v.replace('+', '').replace('-', '').replace(' ', '').isdigit():
+            raise ValueError('El teléfono debe contener solo números, espacios, guiones y el símbolo +')
         return v
 
 class PersonResponse(PersonBase):

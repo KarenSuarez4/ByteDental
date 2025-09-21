@@ -19,49 +19,25 @@ class GuardianService:
     
     def create_guardian(self, guardian_data: GuardianCreate) -> Guardian:
         """Crear un nuevo guardian (incluye crear la persona)"""
-        # Verificar que el paciente existe
-        patient = self.db.query(Patient).filter(Patient.id == guardian_data.patient_id).first()
-        if not patient:
-            raise ValueError(f"El paciente con ID {guardian_data.patient_id} no existe")
-        
-        # Verificar que el paciente no tenga ya un guardián activo (solo un tutor por paciente)
-        existing_guardian = self.db.query(Guardian).filter(
-            and_(
-                Guardian.patient_id == guardian_data.patient_id,
-                Guardian.is_active == True
-            )
-        ).first()
-        if existing_guardian:
-            raise ValueError(f"El paciente ya tiene un guardián activo. Solo se permite un guardián por paciente.")
-        
-        # Verificar que el paciente requiera guardián (validación de negocio)
-        if not patient.requires_guardian:
-            # Calcular edad para el mensaje
-            from app.services.person_service import PersonService
-            person_service = PersonService(self.db)
-            person = person_service.get_person_by_id(patient.person_id)
-            age = person_service.calculate_age(person.birthdate) if person else "desconocida"
-            
-            raise ValueError(
-                f"El paciente no requiere guardián según su edad ({age} años). "
-                f"Los guardianes solo son obligatorios para menores de 18 años o mayores de 64 años. "
-                f"Si necesita asignar un guardián por circunstancias especiales, "
-                f"contacte al administrador para actualizar el campo requires_guardian."
-            )
         
         # Verificar que no exista otra persona con el mismo documento
         existing_person = self.person_service.get_person_by_document(
             guardian_data.person.document_number
         )
         if existing_person:
-            # Si ya existe la persona, verificar que no sea ya guardian del mismo paciente
-            existing_guardian = self.get_guardian_by_person_and_patient(
-                existing_person.id, guardian_data.patient_id
-            )
+            # Verificar si ya es guardian activo
+            existing_guardian = self.db.query(Guardian).filter(
+                and_(
+                    Guardian.person_id == existing_person.id,
+                    Guardian.is_active == True
+                )
+            ).first()
             if existing_guardian:
+                # Obtener información del guardian para el mensaje
+                guardian_person = existing_guardian.person
                 raise ValueError(
-                    f"La persona con documento {guardian_data.person.document_number} "
-                    f"ya es guardian de este paciente"
+                    f"La persona {guardian_person.first_name} {guardian_person.first_surname} "
+                    f"ya está registrada como guardian activo"
                 )
             
             # Usar la persona existente
@@ -79,7 +55,6 @@ class GuardianService:
             # Crear el guardian
             guardian = Guardian(
                 person_id=person.id,
-                patient_id=guardian_data.patient_id,
                 relationship_type=guardian_data.relationship_type
             )
             
@@ -94,11 +69,10 @@ class GuardianService:
                 tipo_evento="CREATE",
                 registro_afectado_id=str(guardian.id),
                 registro_afectado_tipo="guardians",
-                descripcion_evento=f"Nuevo guardian creado: {person.first_name} {person.first_surname} para paciente ID {guardian_data.patient_id}",
+                descripcion_evento=f"Nuevo guardian creado: {person.first_name} {person.first_surname}",
                 detalles_cambios={
                     "person_data": serialize_for_audit(guardian_data.person.model_dump()) if hasattr(guardian_data, 'person') else None,
                     "guardian_data": {
-                        "patient_id": guardian_data.patient_id,
                         "relationship_type": guardian_data.relationship_type.value
                     }
                 },
@@ -106,27 +80,18 @@ class GuardianService:
             )
             
             # Cargar las relaciones básicas para evitar problemas
-            try:
-                guardian = self.get_guardian_by_id(guardian.id, include_person=True, include_patient=False)
-                return guardian
-            except Exception as load_error:
-                print(f"Error al cargar guardian después de crearlo: {str(load_error)}")
-                # Si falla cargar las relaciones, devolver el guardian básico
-                return guardian
+            return self.get_guardian_by_id(guardian.id, include_person=True)
             
         except Exception as e:
             self.db.rollback()
             print(f"Error en create_guardian: {str(e)}")
-            print(f"Tipo de error: {type(e)}")
-            import traceback
-            traceback.print_exc()
             raise e
     
     def get_guardian_by_id(
         self, 
         guardian_id: int, 
         include_person: bool = True, 
-        include_patient: bool = False,
+        include_patients: bool = False,
         include_all: bool = False
     ) -> Optional[Guardian]:
         """Obtener guardian por ID"""
@@ -135,30 +100,10 @@ class GuardianService:
         if include_all or include_person:
             query = query.options(joinedload(Guardian.person))
         
-        if include_all or include_patient:
-            query = query.options(joinedload(Guardian.patient).joinedload(Patient.person))
+        if include_all or include_patients:
+            query = query.options(joinedload(Guardian.patients).joinedload(Patient.person))
         
         return query.filter(Guardian.id == guardian_id).first()
-    
-    def get_guardian_by_person_and_patient(self, person_id: int, patient_id: int) -> Optional[Guardian]:
-        """Obtener guardian por ID de persona y paciente"""
-        return self.db.query(Guardian).filter(
-            and_(
-                Guardian.person_id == person_id,
-                Guardian.patient_id == patient_id
-            )
-        ).first()
-    
-    def get_guardians_by_patient(self, patient_id: int, active_only: bool = True) -> List[Guardian]:
-        """Obtener todos los guardianes de un paciente"""
-        query = self.db.query(Guardian).options(joinedload(Guardian.person)).filter(
-            Guardian.patient_id == patient_id
-        )
-        
-        if active_only:
-            query = query.filter(Guardian.is_active == True)
-        
-        return query.all()
     
     def get_guardians(
         self,
@@ -166,19 +111,19 @@ class GuardianService:
         limit: int = 100,
         active_only: bool = True,
         search: Optional[str] = None,
-        relationship_type: Optional[PatientRelationshipEnum] = None
+        relationship: Optional[PatientRelationshipEnum] = None
     ) -> List[Guardian]:
         """Obtener lista de guardianes con filtros"""
         query = self.db.query(Guardian).join(Person).options(
             joinedload(Guardian.person),
-            joinedload(Guardian.patient).joinedload(Patient.person)
+            joinedload(Guardian.patients).joinedload(Patient.person)
         )
         
         if active_only:
             query = query.filter(Guardian.is_active == True)
         
-        if relationship_type:
-            query = query.filter(Guardian.relationship_type == relationship_type)
+        if relationship:
+            query = query.filter(Guardian.relationship_type == relationship)
         
         if search:
             search_filter = or_(
@@ -226,39 +171,36 @@ class GuardianService:
     
     def delete_guardian(self, guardian_id: int) -> bool:
         """Eliminar guardian (soft delete)"""
-        guardian = self.get_guardian_by_id(guardian_id, include_person=True, include_patient=True)
+        guardian = self.get_guardian_by_id(guardian_id, include_person=True, include_patients=True)
         if not guardian:
             return False
         
-        # Verificar si es el último guardián activo del paciente
-        if guardian.patient and guardian.patient.requires_guardian:
-            active_guardians_count = self.db.query(Guardian).filter(
-                and_(
-                    Guardian.patient_id == guardian.patient_id,
-                    Guardian.is_active == True,
-                    Guardian.id != guardian_id  # Excluir el que se va a desactivar
-                )
-            ).count()
-            
-            if active_guardians_count == 0:
-                # Calcular edad para el mensaje
-                from app.services.person_service import PersonService
-                person_service = PersonService(self.db)
-                person = person_service.get_person_by_id(guardian.patient.person_id)
-                age = person_service.calculate_age(person.birthdate) if person else "desconocida"
-                
-                raise ValueError(
-                    f"No se puede desactivar este guardián porque es el único guardián activo "
-                    f"de un paciente que requiere supervisión (edad: {age} años). "
-                    f"Para proceder, primero asigne otro guardián al paciente o "
-                    f"actualice el campo requires_guardian si corresponde."
-                )
+        # Verificar si tiene pacientes asignados que requieren guardian
+        patients_requiring_guardian = self.db.query(Patient).filter(
+            and_(
+                Patient.guardian_id == guardian_id,
+                Patient.requires_guardian == True,
+                Patient.is_active == True
+            )
+        ).all()
+        
+        if patients_requiring_guardian:
+            patient_names = [f"{p.person.first_name} {p.person.first_surname}" for p in patients_requiring_guardian]
+            raise ValueError(
+                f"No se puede desactivar este guardián porque tiene pacientes que requieren supervisión: "
+                f"{', '.join(patient_names)}. Primero asigne otro guardián a estos pacientes."
+            )
         
         # Guardar datos para auditoría antes del cambio
         person_info = f"{guardian.person.first_name} {guardian.person.first_surname}" if guardian.person else "N/A"
-        patient_info = f"{guardian.patient.person.first_name} {guardian.patient.person.first_surname}" if guardian.patient and guardian.patient.person else "N/A"
         
         guardian.is_active = False
+        
+        # Desasignar de todos los pacientes
+        patients_to_unassign = self.db.query(Patient).filter(Patient.guardian_id == guardian_id).all()
+        for patient in patients_to_unassign:
+            patient.guardian_id = None
+        
         self.db.commit()
         
         # Registrar evento de auditoría
@@ -268,7 +210,7 @@ class GuardianService:
             tipo_evento="DELETE",
             registro_afectado_id=str(guardian.id),
             registro_afectado_tipo="guardians",
-            descripcion_evento=f"Guardian desactivado: {person_info} (paciente: {patient_info})",
+            descripcion_evento=f"Guardian desactivado: {person_info}",
             detalles_cambios={"is_active": {"antes": True, "despues": False}},
             ip_origen=self.user_ip
         )
@@ -277,32 +219,15 @@ class GuardianService:
     
     def activate_guardian(self, guardian_id: int) -> bool:
         """Reactivar guardian (cambiar is_active a True)"""
-        guardian = self.get_guardian_by_id(guardian_id, include_person=True, include_patient=True)
+        guardian = self.get_guardian_by_id(guardian_id, include_person=True)
         if not guardian:
             return False
         
         if guardian.is_active:
             raise ValueError("El guardián ya está activo")
         
-        # Verificar que el paciente no tenga ya otro guardián activo (regla de un guardián por paciente)
-        if guardian.patient:
-            existing_active = self.db.query(Guardian).filter(
-                and_(
-                    Guardian.patient_id == guardian.patient_id,
-                    Guardian.is_active == True,
-                    Guardian.id != guardian_id
-                )
-            ).first()
-            
-            if existing_active:
-                raise ValueError(
-                    f"No se puede reactivar este guardián porque el paciente ya tiene "
-                    f"otro guardián activo. Solo se permite un guardián activo por paciente."
-                )
-        
         # Guardar datos para auditoría antes del cambio
         person_info = f"{guardian.person.first_name} {guardian.person.first_surname}" if guardian.person else "N/A"
-        patient_info = f"{guardian.patient.person.first_name} {guardian.patient.person.first_surname}" if guardian.patient and guardian.patient.person else "N/A"
         
         guardian.is_active = True
         self.db.commit()
@@ -314,13 +239,13 @@ class GuardianService:
             tipo_evento="UPDATE",
             registro_afectado_id=str(guardian.id),
             registro_afectado_tipo="guardians",
-            descripcion_evento=f"Guardian reactivado: {person_info} (paciente: {patient_info})",
+            descripcion_evento=f"Guardian reactivado: {person_info}",
             detalles_cambios={"is_active": {"antes": False, "despues": True}},
             ip_origen=self.user_ip
         )
         
         return True
-
+    
 def get_guardian_service(db: Session, user_id: Optional[str] = None, user_ip: Optional[str] = None) -> GuardianService:
     """Factory para obtener instancia del servicio"""
     return GuardianService(db, user_id, user_ip)

@@ -13,7 +13,7 @@ from app.schemas.guardian_schema import (
     GuardianCreate, 
     GuardianUpdate, 
     GuardianResponse, 
-    GuardianWithPatient
+    GuardianWithPatients
 )
 
 router = APIRouter(
@@ -46,8 +46,9 @@ def get_guardians(
     limit: int = Query(100, ge=1, le=1000, description="Número máximo de registros"),
     active_only: bool = Query(True, description="Solo guardianes activos"),
     search: Optional[str] = Query(None, description="Buscar en nombre, apellido, documento o email"),
-    relationship_type: Optional[PatientRelationshipEnum] = Query(None, description="Filtrar por tipo de relación"),
-    db: Session = Depends(get_db)
+    relationship: Optional[PatientRelationshipEnum] = Query(None, description="Filtrar por tipo de relación"),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_guardian_read)  # ASSISTANT y DENTIST
 ):
     """Obtener lista de guardianes con filtros"""
     service = get_guardian_service(db)
@@ -56,28 +57,22 @@ def get_guardians(
         limit=limit,
         active_only=active_only,
         search=search,
-        relationship_type=relationship_type
+        relationship=relationship
     )
 
-@router.get("/patient/{patient_id}", response_model=List[GuardianResponse])
-def get_guardians_by_patient(
-    patient_id: int,
-    active_only: bool = Query(True, description="Solo guardianes activos"),
-    db: Session = Depends(get_db)
-):
-    """Obtener todos los guardianes de un paciente"""
-    service = get_guardian_service(db)
-    return service.get_guardians_by_patient(patient_id, active_only=active_only)
-
-@router.get("/{guardian_id}", response_model=GuardianWithPatient)
+@router.get("/{guardian_id}", response_model=GuardianWithPatients)
 def get_guardian(
     guardian_id: int,
-    include_all: bool = Query(True, description="Incluir información completa (persona y paciente)"),
-    db: Session = Depends(get_db)
+    include_all: bool = Query(True, description="Incluir información completa (persona y pacientes)"),
+    db: Session = Depends(get_db),
+    current_user = Depends(require_guardian_read)  # ASSISTANT y DENTIST
 ):
     """Obtener guardian por ID"""
     service = get_guardian_service(db)
     guardian = service.get_guardian_by_id(guardian_id, include_all=include_all)
+    if not guardian:
+        raise HTTPException(status_code=404, detail="Guardian no encontrado")
+    return guardian
     
     if not guardian:
         raise HTTPException(status_code=404, detail="Guardian no encontrado")
@@ -89,7 +84,8 @@ def update_guardian(
     guardian_id: int,
     guardian_data: GuardianUpdate,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_guardian_write)  # Solo ASSISTANT
 ):
     """Actualizar guardian (puede incluir datos de persona)"""
     user_id, user_ip = get_user_context(request, db)
@@ -111,7 +107,8 @@ def update_guardian(
 def delete_guardian(
     guardian_id: int,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_guardian_write)  # Solo ASSISTANT
 ):
     """Eliminar guardian (eliminación lógica - soft delete)"""
     user_id, user_ip = get_user_context(request, db)
@@ -130,10 +127,12 @@ def delete_guardian(
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.patch("/{guardian_id}/activate")
+
 def activate_guardian(
     guardian_id: int,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_guardian_write)  # Solo ASSISTANT
 ):
     """Reactivar guardian (activar un guardian previamente desactivado)"""
     user_id, user_ip = get_user_context(request, db)

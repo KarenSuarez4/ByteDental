@@ -35,10 +35,21 @@ class PatientService:
             age = self.person_service.calculate_age(person.birthdate)
             requires_guardian = age < 18 or age > 64
             
+            # Verificar que el guardian existe si se proporciona
+            guardian_id = None
+            if hasattr(patient_data, 'guardian_id') and patient_data.guardian_id:
+                guardian = self.db.query(Guardian).filter(
+                    and_(Guardian.id == patient_data.guardian_id, Guardian.is_active == True)
+                ).first()
+                if not guardian:
+                    raise ValueError(f"El guardian con ID {patient_data.guardian_id} no existe o no está activo")
+                guardian_id = patient_data.guardian_id
+            
             # Crear el paciente
             patient = Patient(
                 person_id=person.id,
                 occupation=patient_data.occupation,
+                guardian_id=guardian_id,
                 requires_guardian=requires_guardian
             )
             
@@ -58,29 +69,30 @@ class PatientService:
                     "person_data": serialize_for_audit(patient_data.person.model_dump()),
                     "patient_data": {
                         "occupation": patient_data.occupation,
+                        "guardian_id": guardian_id,
                         "requires_guardian": requires_guardian
                     }
                 },
                 ip_origen=self.user_ip
             )
             
-            # Cargar la relación con person
-            patient = self.get_patient_by_id(patient.id, include_person=True)
+            # Cargar la relación con person y guardian
+            patient = self.get_patient_by_id(patient.id, include_person=True, include_guardian=True)
             return patient
             
         except Exception as e:
             self.db.rollback()
             raise e
     
-    def get_patient_by_id(self, patient_id: int, include_person: bool = True, include_guardians: bool = False) -> Optional[Patient]:
+    def get_patient_by_id(self, patient_id: int, include_person: bool = True, include_guardian: bool = False) -> Optional[Patient]:
         """Obtener paciente por ID"""
         query = self.db.query(Patient)
         
         if include_person:
             query = query.options(joinedload(Patient.person))
         
-        if include_guardians:
-            query = query.options(joinedload(Patient.guardians).joinedload(Guardian.person))
+        if include_guardian:
+            query = query.options(joinedload(Patient.guardian).joinedload(Guardian.person))
         
         return query.filter(Patient.id == patient_id).first()
     
@@ -96,16 +108,26 @@ class PatientService:
         limit: int = 100,
         active_only: bool = True,
         search: Optional[str] = None,
-        requires_guardian: Optional[bool] = None
+        requires_guardian: Optional[bool] = None,
+        has_guardian: Optional[bool] = None
     ) -> List[Patient]:
         """Obtener lista de pacientes con filtros"""
-        query = self.db.query(Patient).join(Person).options(joinedload(Patient.person))
+        query = self.db.query(Patient).join(Person).options(
+            joinedload(Patient.person),
+            joinedload(Patient.guardian).joinedload(Guardian.person)
+        )
         
         if active_only:
             query = query.filter(Patient.is_active == True)
         
         if requires_guardian is not None:
             query = query.filter(Patient.requires_guardian == requires_guardian)
+        
+        if has_guardian is not None:
+            if has_guardian:
+                query = query.filter(Patient.guardian_id.isnot(None))
+            else:
+                query = query.filter(Patient.guardian_id.is_(None))
         
         if search:
             search_filter = or_(
@@ -131,7 +153,15 @@ class PatientService:
                 self.person_service.update_person(patient.person_id, patient_data.person)
             
             # Actualizar datos específicos del paciente
-            patient_fields = patient_data.dict(exclude_unset=True, exclude={'person'})
+            patient_fields = patient_data.model_dump(exclude_unset=True, exclude={'person'})
+            
+            # Validar guardian_id si se proporciona
+            if 'guardian_id' in patient_fields and patient_fields['guardian_id']:
+                guardian = self.db.query(Guardian).filter(
+                    and_(Guardian.id == patient_fields['guardian_id'], Guardian.is_active == True)
+                ).first()
+                if not guardian:
+                    raise ValueError(f"El guardian con ID {patient_fields['guardian_id']} no existe o no está activo")
             
             # Recalcular requires_guardian si se actualiza la fecha de nacimiento
             if patient_data.person and patient_data.person.birthdate:
@@ -144,7 +174,7 @@ class PatientService:
             self.db.commit()
             self.db.refresh(patient)
             
-            return self.get_patient_by_id(patient.id, include_person=True)
+            return self.get_patient_by_id(patient.id, include_person=True, include_guardian=True)
             
         except Exception as e:
             self.db.rollback()
@@ -289,6 +319,67 @@ class PatientService:
         except Exception as e:
             self.db.rollback()
             raise e
+    
+    def assign_guardian(self, patient_id: int, guardian_id: int) -> bool:
+        """Asignar un guardian a un paciente"""
+        # Verificar que el paciente existe
+        patient = self.get_patient_by_id(patient_id, include_person=True)
+        if not patient:
+            raise ValueError(f"El paciente con ID {patient_id} no existe")
+        
+        # Verificar que el guardian existe y está activo
+        guardian = self.db.query(Guardian).filter(
+            and_(Guardian.id == guardian_id, Guardian.is_active == True)
+        ).first()
+        if not guardian:
+            raise ValueError(f"El guardian con ID {guardian_id} no existe o no está activo")
+        
+        old_guardian_id = patient.guardian_id
+        patient.guardian_id = guardian_id
+        self.db.commit()
+        
+        # Registrar evento de auditoría
+        self.auditoria_service.registrar_evento(
+            db=self.db,
+            usuario_id=self.user_id,
+            tipo_evento="UPDATE",
+            registro_afectado_id=str(patient_id),
+            registro_afectado_tipo="patients",
+            descripcion_evento=f"Guardian asignado al paciente {patient.person.first_name} {patient.person.first_surname}",
+            detalles_cambios={"guardian_id": {"antes": old_guardian_id, "despues": guardian_id}},
+            ip_origen=self.user_ip
+        )
+        
+        return True
+    
+    def unassign_guardian(self, patient_id: int) -> bool:
+        """Desasignar guardian de un paciente"""
+        # Verificar que el paciente existe
+        patient = self.get_patient_by_id(patient_id, include_person=True)
+        if not patient:
+            raise ValueError(f"El paciente con ID {patient_id} no existe")
+        
+        # Verificar que el paciente no requiera guardian
+        if patient.requires_guardian:
+            raise ValueError("No se puede desasignar el guardian de un paciente que requiere supervisión")
+        
+        old_guardian_id = patient.guardian_id
+        patient.guardian_id = None
+        self.db.commit()
+        
+        # Registrar evento de auditoría
+        self.auditoria_service.registrar_evento(
+            db=self.db,
+            usuario_id=self.user_id,
+            tipo_evento="UPDATE",
+            registro_afectado_id=str(patient_id),
+            registro_afectado_tipo="patients",
+            descripcion_evento=f"Guardian desasignado del paciente {patient.person.first_name} {patient.person.first_surname}",
+            detalles_cambios={"guardian_id": {"antes": old_guardian_id, "despues": None}},
+            ip_origen=self.user_ip
+        )
+        
+        return True
 
 def get_patient_service(db: Session, user_id: Optional[str] = None, user_ip: Optional[str] = None) -> PatientService:
     """Factory para obtener instancia del servicio"""

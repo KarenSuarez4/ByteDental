@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from app.models.guardian_models import PatientRelationshipEnum
 from app.schemas.person_schema import PersonResponse, PersonCreate, PersonUpdate
@@ -12,7 +12,6 @@ class GuardianCreate(BaseModel):
     # Datos de la persona
     person: PersonCreate
     # Datos específicos del guardian
-    patient_id: int = Field(..., description="ID del paciente")
     relationship_type: PatientRelationshipEnum = Field(..., description="Relación con el paciente")
 
 class GuardianUpdate(BaseModel):
@@ -27,7 +26,6 @@ class GuardianResponse(GuardianBase):
     """Schema para respuesta de guardian"""
     id: int
     person_id: int
-    patient_id: int
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -38,13 +36,24 @@ class GuardianResponse(GuardianBase):
     class Config:
         from_attributes = True
 
-class GuardianWithPatient(GuardianResponse):
-    """Schema para guardian con información del paciente"""
-    patient: 'PatientResponse'
+class GuardianWithPatients(GuardianResponse):
+    """Schema para guardian con información de los pacientes que cuida"""
+    patients: List['PatientBasicInfo'] = Field(default_factory=list, description="Lista de pacientes bajo su cuidado")
+    
+    class Config:
+        from_attributes = True
+
+class PatientBasicInfo(BaseModel):
+    """Información básica del paciente para el guardian"""
+    id: int
+    person_id: int
+    occupation: Optional[str]
+    requires_guardian: bool
+    is_active: bool
     
     class Config:
         from_attributes = True
 
 # Importación diferida para evitar circular imports
 from app.schemas.patient_schema import PatientResponse
-GuardianWithPatient.model_rebuild()
+GuardianWithPatients.model_rebuild()

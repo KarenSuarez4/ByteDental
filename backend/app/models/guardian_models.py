@@ -22,7 +22,6 @@ class Guardian(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     person_id = Column(Integer, ForeignKey("persons.id", ondelete="CASCADE"), nullable=False)
-    patient_id = Column(Integer, ForeignKey("patients.id", ondelete="CASCADE"), nullable=False, unique=True)
     relationship_type = Column(Enum(PatientRelationshipEnum, name='patient_relationship_enum', create_type=False), nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
@@ -30,10 +29,9 @@ class Guardian(Base):
 
     # Relaciones
     person = relationship("Person", back_populates="guardians")
-    patient = relationship("Patient", back_populates="guardians")
+    patients = relationship("Patient", back_populates="guardian")  # Un guardian puede tener múltiples pacientes
 
 # Índices para optimización
 Index('idx_guardian_active', Guardian.is_active)
 Index('idx_guardian_person', Guardian.person_id)
-Index('idx_guardian_patient', Guardian.patient_id)
 Index('idx_guardian_relationship_type', Guardian.relationship_type)

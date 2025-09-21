@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from pydantic import Field, validator
+import re
 from app.database import get_db
 from app.services.patient_service import get_patient_service
 from app.utils.audit_context import get_user_context
@@ -12,9 +14,8 @@ from app.schemas.patient_schema import (
     PatientCreate, 
     PatientUpdate, 
     PatientResponse, 
-    PatientWithGuardians,
-    PatientStatusChange,
-    PatientStatusEnum
+    PatientWithGuardian,
+    PatientStatusChange
 )
 
 router = APIRouter(
@@ -50,31 +51,39 @@ def get_patients(
     skip: int = Query(0, ge=0, description="Número de registros a omitir"),
     limit: int = Query(100, ge=1, le=1000, description="Número máximo de registros"),
     active_only: bool = Query(True, description="Solo pacientes activos"),
-    search: Optional[str] = Query(None, description="Buscar en nombre, apellido, documento o email"),
+    search: Optional[str] = Query(None, min_length=1, max_length=100, description="Buscar en nombre, apellido, documento o email"),
     requires_guardian: Optional[bool] = Query(None, description="Filtrar por requerimiento de guardian"),
+    has_guardian: Optional[bool] = Query(None, description="Filtrar por tener guardian asignado"),
     db: Session = Depends(get_db),
-    current_user = Depends(require_patient_read)  # ASSISTANT y DENTIST
+    _current_user = Depends(require_patient_read)  # ASSISTANT y DENTIST
 ):
     """Obtener lista de pacientes con filtros"""
     service = get_patient_service(db)
+    
+    # Sanitizar búsqueda si se proporciona
+    if search:
+        # Remover caracteres especiales que podrían ser problemáticos
+        search = re.sub(r'[<>"\';\\]', '', search.strip())
+    
     return service.get_patients(
         skip=skip, 
         limit=limit, 
         active_only=active_only, 
         search=search,
-        requires_guardian=requires_guardian
+        requires_guardian=requires_guardian,
+        has_guardian=has_guardian
     )
 
-@router.get("/{patient_id}", response_model=PatientWithGuardians)
+@router.get("/{patient_id}", response_model=PatientWithGuardian)
 def get_patient(
     patient_id: int,
-    include_guardians: bool = Query(True, description="Incluir información de guardianes"),
+    include_guardian: bool = Query(True, description="Incluir información del guardian"),
     db: Session = Depends(get_db),
-    current_user = Depends(require_patient_read)  # ASSISTANT y DENTIST
+    _current_user = Depends(require_patient_read)  # ASSISTANT y DENTIST
 ):
     """Obtener paciente por ID"""
     service = get_patient_service(db)
-    patient = service.get_patient_by_id(patient_id, include_person=True, include_guardians=include_guardians)
+    patient = service.get_patient_by_id(patient_id, include_person=True, include_guardian=include_guardian)
     
     if not patient:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
@@ -85,9 +94,24 @@ def get_patient(
 def get_patient_by_document(
     document_number: str,
     db: Session = Depends(get_db),
-    current_user = Depends(require_patient_read)  # ASSISTANT y DENTIST
+    _current_user = Depends(require_patient_read)  # ASSISTANT y DENTIST
 ):
     """Obtener paciente por número de documento"""
+    # Validar formato del documento
+    if not document_number or len(document_number.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Número de documento requerido")
+    
+    # Sanitizar documento
+    document_number = document_number.strip()
+    
+    # Validar longitud y caracteres permitidos
+    if len(document_number) < 5 or len(document_number) > 30:
+        raise HTTPException(status_code=400, detail="Número de documento debe tener entre 5 y 30 caracteres")
+    
+    # Solo permitir números, letras y algunos caracteres especiales
+    if not re.match(r'^[A-Za-z0-9\-\.]+$', document_number):
+        raise HTTPException(status_code=400, detail="Número de documento contiene caracteres no válidos")
+    
     service = get_patient_service(db)
     patient = service.get_patient_by_document(document_number)
     
@@ -141,44 +165,80 @@ def delete_patient(
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
-@router.patch("/{patient_id}/status")
-def change_patient_status(
+# Endpoints para gestión de guardians de pacientes
+@router.post("/{patient_id}/assign-guardian/{guardian_id}")
+def assign_guardian_to_patient(
     patient_id: int,
-    status_change: PatientStatusChange,
+    guardian_id: int,
     request: Request,
     db: Session = Depends(get_db),
     current_user = Depends(require_patient_write)  # Solo ASSISTANT
 ):
-    """
-    Cambiar estado de paciente (activo/inactivo) con validación de motivo
-    
-    Para desactivar:
-    {
-        "estado": "inactive",
-        "motivo": "fallecimiento"
-    }
-    
-    Para reactivar:
-    {
-        "estado": "active"
-    }
-    """
+    """Asignar un guardian a un paciente"""
     user_id, user_ip = get_user_context(request, db)
     service = get_patient_service(db, user_id, user_ip)
     
     try:
-        # Convertir enum a boolean
-        new_status = status_change.estado == PatientStatusEnum.ACTIVE
-        reason = status_change.motivo.value if status_change.motivo else None
+        success = service.assign_guardian(patient_id, guardian_id)
         
+        if success:
+            return {"message": f"Guardian {guardian_id} asignado correctamente al paciente {patient_id}"}
+        else:
+            raise HTTPException(status_code=400, detail="No se pudo realizar la asignación")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+@router.delete("/{patient_id}/unassign-guardian")
+def unassign_guardian_from_patient(
+    patient_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_write)  # Solo ASSISTANT
+):
+    """Desasignar el guardian de un paciente"""
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
+    
+    try:
+        success = service.unassign_guardian(patient_id)
+        
+        if success:
+            return {"message": f"Guardian desasignado correctamente del paciente {patient_id}"}
+        else:
+            raise HTTPException(status_code=400, detail="No se pudo realizar la desasignación")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+@router.patch("/{patient_id}/status")
+def change_patient_status(
+    patient_id: int,
+    status_data: PatientStatusChange,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_write)  # Solo ASSISTANT
+):
+    """Cambiar el estado de un paciente (activo/inactivo) con validación de motivo"""
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
+    
+    try:
         result = service.change_patient_status(
             patient_id=patient_id,
-            new_status=new_status,
-            reason=reason
+            new_status=status_data.is_active,
+            reason=status_data.reason
         )
         
-        return result
-        
+        action = "activado" if status_data.is_active else "desactivado"
+        return {
+            "message": f"Paciente {action} correctamente",
+            "patient_id": patient_id,
+            "new_status": status_data.is_active,
+            **result
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
