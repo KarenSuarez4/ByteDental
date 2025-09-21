@@ -56,43 +56,6 @@ def get_persons(
         max_age=max_age
     )
 
-@router.get("/count")
-def get_person_count(db: Session = Depends(get_db)):
-    """Obtener conteo total de personas"""
-    service = get_person_service(db)
-    count = service.get_person_count()
-    return {"count": count}
-
-@router.get("/search")
-def search_persons(
-    query: str = Query(..., min_length=2, description="Término de búsqueda"),
-    limit: int = Query(10, ge=1, le=50, description="Número máximo de resultados"),
-    db: Session = Depends(get_db)
-):
-    """Búsqueda rápida de personas"""
-    service = get_person_service(db)
-    return service.search_persons(query=query, limit=limit)
-
-@router.get("/adults", response_model=List[PersonResponse])
-def get_adults(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    db: Session = Depends(get_db)
-):
-    """Obtener solo personas mayores de edad"""
-    service = get_person_service(db)
-    return service.get_adults(skip=skip, limit=limit)
-
-@router.get("/minors", response_model=List[PersonResponse])
-def get_minors(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    db: Session = Depends(get_db)
-):
-    """Obtener solo personas menores de edad"""
-    service = get_person_service(db)
-    return service.get_minors(skip=skip, limit=limit)
-
 @router.get("/{person_id}", response_model=PersonResponse)
 def get_person(
     person_id: int,
@@ -101,20 +64,6 @@ def get_person(
     """Obtener persona por ID"""
     service = get_person_service(db)
     person = service.get_person_by_id(person_id)
-    
-    if not person:
-        raise HTTPException(status_code=404, detail="Persona no encontrada")
-    
-    return person
-
-@router.get("/document/{document_number}", response_model=PersonResponse)
-def get_person_by_document(
-    document_number: str,
-    db: Session = Depends(get_db)
-):
-    """Obtener persona por número de documento"""
-    service = get_person_service(db)
-    person = service.get_person_by_document(document_number)
     
     if not person:
         raise HTTPException(status_code=404, detail="Persona no encontrada")
@@ -168,41 +117,3 @@ def update_person(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error interno del servidor")
-
-@router.delete("/{person_id}")
-def delete_person(
-    person_id: int,
-    db: Session = Depends(get_db)
-):
-    """Eliminar persona (no permitido si tiene roles activos como paciente o guardian)"""
-    service = get_person_service(db)
-    
-    try:
-        # Verificar que no tenga roles activos antes de permitir eliminación
-        # Esto podría expandirse para verificar en las tablas de patients y guardians
-        person = service.get_person_by_id(person_id)
-        if not person:
-            raise HTTPException(status_code=404, detail="Persona no encontrada")
-        
-        # Por seguridad, no permitir eliminación directa de personas
-        # Solo permitir desactivación de pacientes/guardianes
-        raise HTTPException(
-            status_code=400, 
-            detail="No se puede eliminar una persona directamente. Use los endpoints de pacientes o guardianes."
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
-
-@router.get("/by-document-type/{document_type}", response_model=List[PersonResponse])
-def get_persons_by_document_type(
-    document_type: DocumentTypeEnum,
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    db: Session = Depends(get_db)
-):
-    """Obtener personas por tipo de documento"""
-    service = get_person_service(db)
-    return service.get_persons_by_document_type(document_type, skip=skip, limit=limit)

@@ -99,15 +99,11 @@ class PersonService:
     
     def get_person_by_email(self, email: str) -> Optional[Person]:
         """Obtener persona por email"""
-        return self.db.query(Person).filter(
-            Person.email == email
-        ).first()
+        return self.db.query(Person).filter(Person.email == email).first()
     
     def get_person_by_phone(self, phone: str) -> Optional[Person]:
         """Obtener persona por teléfono"""
-        return self.db.query(Person).filter(
-            Person.phone == phone
-        ).first()
+        return self.db.query(Person).filter(Person.phone == phone).first()
     
     def get_persons(
         self, 
@@ -224,20 +220,6 @@ class PersonService:
             self.db.rollback()
             raise e
     
-    def delete_person(self, person_id: int) -> bool:
-        """Eliminar persona (hard delete - cuidado con cascadas)"""
-        person = self.get_person_by_id(person_id)
-        if not person:
-            return False
-        
-        self.db.delete(person)
-        self.db.commit()
-        return True
-    
-    def get_person_count(self) -> int:
-        """Obtener conteo total de personas"""
-        return self.db.query(Person).count()
-    
     def calculate_age(self, birthdate: date) -> int:
         """Calcular edad en años"""
         today = date.today()
@@ -270,57 +252,6 @@ class PersonService:
                 f"Una persona de {age} años no puede tener Registro Civil (RC). "
                 "El RC es solo para menores de 7 años. Use TI para menores de 18 años o CC para mayores de 18 años."
             )
-    
-    def get_persons_by_age_range(self, min_age: int, max_age: int) -> List[Person]:
-        """Obtener personas en un rango de edad específico"""
-        today = date.today()
-        min_birth_date = date(today.year - max_age - 1, today.month, today.day)
-        max_birth_date = date(today.year - min_age, today.month, today.day)
-        
-        return self.db.query(Person).filter(
-            and_(
-                Person.birthdate >= min_birth_date,
-                Person.birthdate <= max_birth_date
-            )
-        ).all()
-
-    def search_persons(self, query: str, limit: int = 10) -> List[Person]:
-        """Búsqueda rápida de personas"""
-        search_filter = or_(
-            Person.first_name.ilike(f"%{query}%"),
-            Person.first_surname.ilike(f"%{query}%"),
-            Person.second_surname.ilike(f"%{query}%"),
-            Person.middle_name.ilike(f"%{query}%"),
-            Person.document_number.ilike(f"%{query}%"),
-            Person.email.ilike(f"%{query}%")
-        )
-        return self.db.query(Person).filter(search_filter).limit(limit).all()
-
-    def get_adults(self, skip: int = 0, limit: int = 100) -> List[Person]:
-        """Obtener solo personas mayores de edad (18+)"""
-        today = date.today()
-        # Fecha de nacimiento máxima para ser mayor de edad
-        max_birth_date = date(today.year - 18, today.month, today.day)
-        
-        return self.db.query(Person).filter(
-            Person.birthdate <= max_birth_date
-        ).offset(skip).limit(limit).all()
-
-    def get_minors(self, skip: int = 0, limit: int = 100) -> List[Person]:
-        """Obtener solo personas menores de edad (<18)"""
-        today = date.today()
-        # Fecha de nacimiento mínima para ser menor de edad
-        min_birth_date = date(today.year - 18, today.month, today.day)
-        
-        return self.db.query(Person).filter(
-            Person.birthdate > min_birth_date
-        ).offset(skip).limit(limit).all()
-
-    def get_persons_by_document_type(self, document_type: DocumentTypeEnum, skip: int = 0, limit: int = 100) -> List[Person]:
-        """Obtener personas por tipo de documento"""
-        return self.db.query(Person).filter(
-            Person.document_type == document_type
-        ).offset(skip).limit(limit).all()
 
 def get_person_service(db: Session, user_id: Optional[str] = None, user_ip: Optional[str] = None) -> PersonService:
     """Factory para obtener instancia del servicio"""

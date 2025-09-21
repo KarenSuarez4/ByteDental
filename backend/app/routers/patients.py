@@ -4,11 +4,17 @@ from typing import List, Optional
 from app.database import get_db
 from app.services.patient_service import get_patient_service
 from app.utils.audit_context import get_user_context
+from app.middleware.auth_middleware import (
+    require_patient_read, 
+    require_patient_write
+)
 from app.schemas.patient_schema import (
     PatientCreate, 
     PatientUpdate, 
     PatientResponse, 
-    PatientWithGuardians
+    PatientWithGuardians,
+    PatientStatusChange,
+    PatientStatusEnum
 )
 
 router = APIRouter(
@@ -21,10 +27,11 @@ router = APIRouter(
 def create_patient(
     patient_data: PatientCreate,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_write)  # Solo ASSISTANT
 ):
     """Crear un nuevo paciente (incluye crear la persona)"""
-    user_id, user_ip = get_user_context(request)
+    user_id, user_ip = get_user_context(request, db)
     service = get_patient_service(db, user_id, user_ip)
     
     try:
@@ -45,7 +52,8 @@ def get_patients(
     active_only: bool = Query(True, description="Solo pacientes activos"),
     search: Optional[str] = Query(None, description="Buscar en nombre, apellido, documento o email"),
     requires_guardian: Optional[bool] = Query(None, description="Filtrar por requerimiento de guardian"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_read)  # ASSISTANT y DENTIST
 ):
     """Obtener lista de pacientes con filtros"""
     service = get_patient_service(db)
@@ -57,33 +65,12 @@ def get_patients(
         requires_guardian=requires_guardian
     )
 
-@router.get("/count")
-def get_patient_count(
-    active_only: bool = Query(True, description="Solo pacientes activos"),
-    db: Session = Depends(get_db)
-):
-    """Obtener conteo total de pacientes"""
-    service = get_patient_service(db)
-    count = service.get_patient_count(active_only=active_only)
-    return {"count": count}
-
-@router.get("/requiring-guardians", response_model=List[PatientResponse])
-def get_patients_requiring_guardians(db: Session = Depends(get_db)):
-    """Obtener pacientes que requieren guardian"""
-    service = get_patient_service(db)
-    return service.get_patients_requiring_guardians()
-
-@router.get("/without-guardians", response_model=List[PatientResponse])
-def get_patients_without_guardians(db: Session = Depends(get_db)):
-    """Obtener pacientes que requieren guardian pero no tienen ninguno"""
-    service = get_patient_service(db)
-    return service.get_patients_without_guardians()
-
 @router.get("/{patient_id}", response_model=PatientWithGuardians)
 def get_patient(
     patient_id: int,
     include_guardians: bool = Query(True, description="Incluir información de guardianes"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_read)  # ASSISTANT y DENTIST
 ):
     """Obtener paciente por ID"""
     service = get_patient_service(db)
@@ -97,7 +84,8 @@ def get_patient(
 @router.get("/document/{document_number}", response_model=PatientResponse)
 def get_patient_by_document(
     document_number: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_read)  # ASSISTANT y DENTIST
 ):
     """Obtener paciente por número de documento"""
     service = get_patient_service(db)
@@ -113,10 +101,11 @@ def update_patient(
     patient_id: int,
     patient_data: PatientUpdate,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_write)  # Solo ASSISTANT
 ):
     """Actualizar paciente (puede incluir datos de persona)"""
-    user_id, user_ip = get_user_context(request)
+    user_id, user_ip = get_user_context(request, db)
     service = get_patient_service(db, user_id, user_ip)
     
     try:
@@ -135,10 +124,11 @@ def update_patient(
 def delete_patient(
     patient_id: int,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_write)  # Solo ASSISTANT
 ):
     """Eliminar paciente (eliminación lógica - soft delete)"""
-    user_id, user_ip = get_user_context(request)
+    user_id, user_ip = get_user_context(request, db)
     service = get_patient_service(db, user_id, user_ip)
     
     try:
@@ -151,68 +141,58 @@ def delete_patient(
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
-@router.patch("/{patient_id}/activate")
-def activate_patient(
+@router.patch("/{patient_id}/status")
+def change_patient_status(
     patient_id: int,
-    db: Session = Depends(get_db)
+    status_change: PatientStatusChange,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_write)  # Solo ASSISTANT
 ):
-    """Reactivar paciente"""
-    service = get_patient_service(db)
-    patient_data = PatientUpdate(is_active=True)
-    updated_patient = service.update_patient(patient_id, patient_data)
+    """
+    Cambiar estado de paciente (activo/inactivo) con validación de motivo
     
-    if not updated_patient:
-        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    Para desactivar:
+    {
+        "estado": "inactive",
+        "motivo": "fallecimiento"
+    }
     
-    return {"message": "Paciente activado correctamente"}
+    Para reactivar:
+    {
+        "estado": "active"
+    }
+    """
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
+    
+    try:
+        # Convertir enum a boolean
+        new_status = status_change.estado == PatientStatusEnum.ACTIVE
+        reason = status_change.motivo.value if status_change.motivo else None
+        
+        result = service.change_patient_status(
+            patient_id=patient_id,
+            new_status=new_status,
+            reason=reason
+        )
+        
+        return result
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.patch("/update-guardian-requirements")
-def update_guardian_requirements_by_age(db: Session = Depends(get_db)):
-    """Actualizar requirements de guardian basado en edad actual"""
+def update_guardian_requirements_by_age(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_write)  # Solo ASSISTANT
+):
+    """Calcula la edad actual de todos los pacientes en la base de datos y actualiza automáticamente el campo requires_guardian basándose en la edad"""
     service = get_patient_service(db)
     result = service.update_guardian_requirements_by_age()
     return {
         "message": "Requirements de guardian actualizados",
         **result
-    }
-
-@router.get("/{patient_id}/audit")
-def get_patient_audit_trail(
-    patient_id: int,
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
-):
-    """Obtener historial de auditoría de un paciente específico"""
-    from app.services.auditoria_service import AuditoriaService
-    
-    auditoria_service = AuditoriaService()
-    
-    # Verificar que el paciente existe
-    service = get_patient_service(db)
-    patient = service.get_patient_by_id(patient_id)
-    if not patient:
-        raise HTTPException(status_code=404, detail="Paciente no encontrado")
-    
-    # Obtener registros de auditoría
-    audit_records = auditoria_service.obtener_eventos_por_registro(
-        db=db,
-        registro_id=str(patient_id),
-        tipo_registro="patients",
-        skip=skip,
-        limit=limit
-    )
-    
-    # Obtener conteo total
-    total_records = auditoria_service.obtener_conteo_eventos_por_registro(
-        db=db,
-        registro_id=str(patient_id),
-        tipo_registro="patients"
-    )
-    
-    return {
-        "patient_id": patient_id,
-        "audit_trail": audit_records,
-        "total_records": total_records,
-        "returned_records": len(audit_records)
     }

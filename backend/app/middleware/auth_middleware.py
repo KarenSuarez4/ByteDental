@@ -32,6 +32,19 @@ class RolePermissions:
     
     # Permisos básicos (todos los roles autenticados)
     BASIC_ACCESS = [ADMIN, AUDITOR, DENTIST, ASSISTANT, RECEPTIONIST]
+    
+    # Permisos para pacientes, guardianes y personas
+    # CRUD completo: Solo ASSISTANT
+    # Solo lectura: DENTIST
+    # ADMIN NO tiene acceso a información clínica
+    PATIENT_WRITE = [ASSISTANT]  # Solo ASSISTANT puede crear, actualizar, eliminar pacientes
+    PATIENT_READ = [ASSISTANT, DENTIST]  # ASSISTANT y DENTIST pueden leer información de pacientes
+    
+    GUARDIAN_WRITE = [ASSISTANT]  # Solo ASSISTANT puede crear, actualizar, eliminar guardianes
+    GUARDIAN_READ = [ASSISTANT, DENTIST]  # ASSISTANT y DENTIST pueden leer información de guardianes
+    
+    PERSON_WRITE = [ASSISTANT]  # Solo ASSISTANT puede crear, actualizar, eliminar personas
+    PERSON_READ = [ASSISTANT, DENTIST]  # ASSISTANT y DENTIST pueden leer información de personas
 
 def get_current_user_from_header(request: Request, db: Session = Depends(get_db)) -> Optional[User]:
     """
@@ -107,3 +120,66 @@ async def get_current_auditor_user(request: Request, db: Session = Depends(get_d
         )
     
     return user
+
+def require_roles(allowed_roles: List[str]):
+    """
+    Dependency factory para validar que el usuario tenga uno de los roles permitidos
+    """
+    async def role_checker(request: Request, db: Session = Depends(get_db)) -> User:
+        user = await get_current_user(request, db)
+        
+        if not user.role or user.role.name not in allowed_roles:
+            roles_str = ", ".join(allowed_roles)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Acceso denegado. Se requiere uno de los siguientes roles: {roles_str}"
+            )
+        
+        return user
+    return role_checker
+
+# Dependencies específicas para pacientes
+async def require_patient_read(request: Request, db: Session = Depends(get_db)) -> User:
+    """Require permissions to read patient data"""
+    return await require_roles(RolePermissions.PATIENT_READ)(request, db)
+
+async def require_patient_write(request: Request, db: Session = Depends(get_db)) -> User:
+    """Require permissions to write patient data"""
+    return await require_roles(RolePermissions.PATIENT_WRITE)(request, db)
+
+# Dependencies específicas para guardianes
+async def require_guardian_read(request: Request, db: Session = Depends(get_db)) -> User:
+    """Require permissions to read guardian data"""
+    return await require_roles(RolePermissions.GUARDIAN_READ)(request, db)
+
+async def require_guardian_write(request: Request, db: Session = Depends(get_db)) -> User:
+    """Require permissions to write guardian data"""
+    return await require_roles(RolePermissions.GUARDIAN_WRITE)(request, db)
+
+# Dependencies específicas para personas
+async def require_person_read(request: Request, db: Session = Depends(get_db)) -> User:
+    """Require permissions to read person data"""
+    return await require_roles(RolePermissions.PERSON_READ)(request, db)
+
+async def require_person_write(request: Request, db: Session = Depends(get_db)) -> User:
+    """Require permissions to write person data"""
+    return await require_roles(RolePermissions.PERSON_WRITE)(request, db)
+
+def get_user_context(request: Request, db: Session = Depends(get_db)) -> tuple[Optional[int], str]:
+    """
+    Obtener contexto del usuario actual para auditoría
+    Retorna (user_id, user_ip)
+    """
+    try:
+        # Obtener IP del request
+        user_ip = request.client.host if request.client else "unknown"
+        
+        # Intentar obtener usuario actual
+        user = get_current_user_from_header(request, db)
+        user_id = user.id if user else None
+        
+        return user_id, user_ip
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo contexto de usuario: {e}")
+        return None, request.client.host if request.client else "unknown"

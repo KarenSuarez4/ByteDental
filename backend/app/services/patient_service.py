@@ -84,10 +84,6 @@ class PatientService:
         
         return query.filter(Patient.id == patient_id).first()
     
-    def get_patient_by_person_id(self, person_id: int) -> Optional[Patient]:
-        """Obtener paciente por ID de persona"""
-        return self.db.query(Patient).filter(Patient.person_id == person_id).first()
-    
     def get_patient_by_document(self, document_number: str) -> Optional[Patient]:
         """Obtener paciente por número de documento"""
         return self.db.query(Patient).join(Person).filter(
@@ -180,47 +176,6 @@ class PatientService:
         
         return True
     
-    def hard_delete_patient(self, patient_id: int) -> bool:
-        """Eliminar paciente permanentemente (incluye persona)"""
-        patient = self.get_patient_by_id(patient_id, include_person=True)
-        if not patient:
-            return False
-        
-        try:
-            # Eliminar el paciente (la persona se elimina por CASCADE)
-            self.db.delete(patient)
-            self.db.commit()
-            return True
-        except Exception as e:
-            self.db.rollback()
-            raise e
-    
-    def get_patients_requiring_guardians(self) -> List[Patient]:
-        """Obtener pacientes que requieren guardian"""
-        return self.db.query(Patient).join(Person).filter(
-            and_(
-                Patient.requires_guardian == True,
-                Patient.is_active == True
-            )
-        ).options(joinedload(Patient.person)).all()
-    
-    def get_patients_without_guardians(self) -> List[Patient]:
-        """Obtener pacientes que requieren guardian pero no tienen ninguno"""
-        return self.db.query(Patient).join(Person).filter(
-            and_(
-                Patient.requires_guardian == True,
-                Patient.is_active == True,
-                ~Patient.guardians.any(Guardian.is_active == True)
-            )
-        ).options(joinedload(Patient.person)).all()
-    
-    def get_patient_count(self, active_only: bool = True) -> int:
-        """Obtener conteo total de pacientes"""
-        query = self.db.query(Patient)
-        if active_only:
-            query = query.filter(Patient.is_active == True)
-        return query.count()
-    
     def update_guardian_requirements_by_age(self) -> dict:
         """
         Actualizar requirements de guardian basado en edad actual de todos los pacientes.
@@ -250,6 +205,90 @@ class PatientService:
             "updated_count": len(updated_patients),
             "updated_patients": updated_patients
         }
+    
+    def change_patient_status(self, patient_id: int, new_status: bool, reason: Optional[str] = None) -> dict:
+        """
+        Cambiar estado de paciente con validación y auditoría completa
+        
+        Args:
+            patient_id: ID del paciente
+            new_status: True para activo, False para inactivo
+            reason: Motivo de desactivación (requerido si new_status=False)
+        
+        Returns:
+            dict con información del cambio realizado
+        
+        Raises:
+            ValueError: Si las validaciones fallan
+        """
+        patient = self.get_patient_by_id(patient_id, include_person=True)
+        if not patient:
+            raise ValueError("Paciente no encontrado")
+        
+        # Guardar estado anterior para auditoría
+        previous_status = patient.is_active
+        person_info = f"{patient.person.first_name} {patient.person.first_surname}" if patient.person else "N/A"
+        
+        # Validar transición de estado
+        if previous_status == new_status:
+            status_text = "activo" if new_status else "inactivo"
+            raise ValueError(f"El paciente ya está {status_text}")
+        
+        # Validar motivo para desactivación
+        if not new_status and not reason:
+            raise ValueError("El motivo es requerido para desactivar un paciente")
+        
+        if new_status and reason:
+            raise ValueError("No se debe proporcionar motivo al activar un paciente")
+        
+        try:
+            # Actualizar estado
+            patient.is_active = new_status
+            self.db.commit()
+            
+            # Preparar detalles para auditoría
+            change_details = {
+                "is_active": {
+                    "antes": previous_status,
+                    "despues": new_status
+                }
+            }
+            
+            if reason:
+                change_details["motivo_desactivacion"] = reason
+            
+            # Preparar descripción del evento
+            if new_status:
+                event_description = f"Paciente reactivado: {person_info}"
+                event_type = "REACTIVATE"
+            else:
+                event_description = f"Paciente desactivado: {person_info} - Motivo: {reason}"
+                event_type = "DEACTIVATE"
+            
+            # Registrar evento de auditoría
+            self.auditoria_service.registrar_evento(
+                db=self.db,
+                usuario_id=self.user_id,
+                tipo_evento=event_type,
+                registro_afectado_id=str(patient.id),
+                registro_afectado_tipo="patients",
+                descripcion_evento=event_description,
+                detalles_cambios=change_details,
+                ip_origen=self.user_ip
+            )
+            
+            return {
+                "patient_id": patient_id,
+                "patient_name": person_info,
+                "previous_status": "activo" if previous_status else "inactivo",
+                "new_status": "activo" if new_status else "inactivo",
+                "reason": reason,
+                "message": f"Paciente {'activado' if new_status else 'desactivado'} correctamente"
+            }
+            
+        except Exception as e:
+            self.db.rollback()
+            raise e
 
 def get_patient_service(db: Session, user_id: Optional[str] = None, user_ip: Optional[str] = None) -> PatientService:
     """Factory para obtener instancia del servicio"""

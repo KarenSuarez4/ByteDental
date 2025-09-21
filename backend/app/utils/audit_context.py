@@ -1,23 +1,28 @@
-from fastapi import Request
+from fastapi import Request, Depends
+from sqlalchemy.orm import Session
 from typing import Optional, Tuple
+from app.database import get_db
+from app.middleware.auth_middleware import get_current_user_from_header
 
-def get_user_context(request: Request) -> Tuple[Optional[str], Optional[str]]:
+def get_user_context(request: Request, db: Session = Depends(get_db)) -> Tuple[Optional[int], str]:
     """
     Extraer información del usuario para auditoría desde la request
     
     Args:
         request: FastAPI Request object
+        db: Database session
         
     Returns:
         Tuple (user_id, user_ip)
     """
-    # Extraer user_id desde headers o auth context
-    # Por ahora retornamos valores por defecto, se puede expandir según la autenticación
+    # Intentar obtener usuario autenticado
     user_id = None
-    
-    # Intentar obtener user_id desde headers
-    if hasattr(request, 'headers'):
-        user_id = request.headers.get('X-User-ID') or request.headers.get('Authorization')
+    try:
+        user = get_current_user_from_header(request, db)
+        user_id = user.id if user else None
+    except Exception:
+        # Si no se puede obtener el usuario, continuar con None
+        pass
     
     # Extraer IP del cliente
     user_ip = None
@@ -33,16 +38,16 @@ def get_user_context(request: Request) -> Tuple[Optional[str], Optional[str]]:
             'unknown'
         )
     
-    return user_id or "anonymous", user_ip or "unknown"
+    return user_id, user_ip or "unknown"
 
-def get_audit_context(request: Request) -> dict:
+def get_audit_context(request: Request, db: Session = Depends(get_db)) -> dict:
     """
     Obtener contexto completo para auditoría
     
     Returns:
         Dict con user_id, user_ip y metadata adicional
     """
-    user_id, user_ip = get_user_context(request)
+    user_id, user_ip = get_user_context(request, db)
     
     return {
         'user_id': user_id,
