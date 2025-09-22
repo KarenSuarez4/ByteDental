@@ -27,23 +27,33 @@ class PatientService:
         if existing_person:
             raise ValueError(f"Ya existe una persona con el documento {patient_data.person.document_number}")
         
-        try:
-            # Crear la persona primero
-            person = self.person_service.create_person(patient_data.person)
-            
-            # Calcular si requiere guardian basado en la edad (menores de 18 o mayores de 64)
-            age = self.person_service.calculate_age(person.birthdate)
-            requires_guardian = age < 18 or age > 64
-            
+        # Calcular si requiere guardian basado en la edad ANTES de crear la persona
+        age = self.person_service.calculate_age(patient_data.person.birthdate)
+        requires_guardian = age < 18 or age > 64
+        
+        # VALIDACIONES PREVIAS - antes de crear cualquier registro
+        guardian_id = None
+        if hasattr(patient_data, 'guardian_id') and patient_data.guardian_id:
             # Verificar que el guardian existe si se proporciona
-            guardian_id = None
-            if hasattr(patient_data, 'guardian_id') and patient_data.guardian_id:
-                guardian = self.db.query(Guardian).filter(
-                    and_(Guardian.id == patient_data.guardian_id, Guardian.is_active == True)
-                ).first()
-                if not guardian:
-                    raise ValueError(f"El guardian con ID {patient_data.guardian_id} no existe o no está activo")
-                guardian_id = patient_data.guardian_id
+            guardian = self.db.query(Guardian).filter(
+                and_(Guardian.id == patient_data.guardian_id, Guardian.is_active == True)
+            ).first()
+            if not guardian:
+                raise ValueError(f"El guardian con ID {patient_data.guardian_id} no existe o no está activo")
+            guardian_id = patient_data.guardian_id
+        
+        # VALIDACIÓN: Si el paciente requiere guardián, debe proporcionarse uno válido
+        if requires_guardian and not guardian_id:
+            age_reason = "menor de 18 años" if age < 18 else "mayor de 64 años"
+            raise ValueError(f"El paciente es {age_reason} (edad: {age}) y requiere un guardián. Debe proporcionar un guardian_id válido")
+        
+        # VALIDACIÓN: Si no requiere guardián, no debe asignarse uno
+        if not requires_guardian and guardian_id:
+            raise ValueError(f"El paciente tiene {age} años y no requiere guardián. No debe proporcionar guardian_id")
+
+        try:
+            # Crear la persona (ya validamos todo previamente)
+            person = self.person_service.create_person(patient_data.person)
             
             # Crear el paciente
             patient = Patient(
@@ -92,7 +102,10 @@ class PatientService:
             query = query.options(joinedload(Patient.person))
         
         if include_guardian:
-            query = query.options(joinedload(Patient.guardian).joinedload(Guardian.person))
+            # Usar outerjoin para manejar casos donde guardian es NULL
+            query = query.options(
+                joinedload(Patient.guardian, innerjoin=False).joinedload(Guardian.person, innerjoin=False)
+            )
         
         return query.filter(Patient.id == patient_id).first()
     
@@ -114,7 +127,7 @@ class PatientService:
         """Obtener lista de pacientes con filtros"""
         query = self.db.query(Patient).join(Person).options(
             joinedload(Patient.person),
-            joinedload(Patient.guardian).joinedload(Guardian.person)
+            joinedload(Patient.guardian, innerjoin=False).joinedload(Guardian.person, innerjoin=False)
         )
         
         if active_only:
@@ -154,6 +167,7 @@ class PatientService:
             
             # Actualizar datos específicos del paciente
             patient_fields = patient_data.model_dump(exclude_unset=True, exclude={'person'})
+            print(f"DEBUG: patient_fields = {patient_fields}")
             
             # Validar guardian_id si se proporciona
             if 'guardian_id' in patient_fields and patient_fields['guardian_id']:
@@ -164,11 +178,33 @@ class PatientService:
                     raise ValueError(f"El guardian con ID {patient_fields['guardian_id']} no existe o no está activo")
             
             # Recalcular requires_guardian si se actualiza la fecha de nacimiento
-            if patient_data.person and patient_data.person.birthdate:
-                age = self.person_service.calculate_age(patient_data.person.birthdate)
+            # Nota: PersonUpdate no incluye birthdate, por lo que esta validación no se ejecutará
+            # Solo se recalcula si el campo está presente en el modelo
+            person_data_dict = patient_data.person.model_dump(exclude_unset=True) if patient_data.person else {}
+            if person_data_dict.get('birthdate'):
+                age = self.person_service.calculate_age(person_data_dict['birthdate'])
                 patient_fields['requires_guardian'] = age < 18 or age > 64
             
+            # VALIDACIÓN: Verificar consistencia entre requires_guardian y guardian_id
+            # Obtener los valores actuales o los que se van a actualizar
+            current_requires_guardian = patient_fields.get('requires_guardian', patient.requires_guardian)
+            current_guardian_id = patient_fields.get('guardian_id', patient.guardian_id)
+            
+            # Si se está actualizando requires_guardian o guardian_id, validar consistencia
+            if 'requires_guardian' in patient_fields or 'guardian_id' in patient_fields:
+                if current_requires_guardian and not current_guardian_id:
+                    # Calcular edad actual para el mensaje
+                    age = self.person_service.calculate_age(patient.person.birthdate)
+                    age_reason = "menor de 18 años" if age < 18 else "mayor de 64 años"
+                    raise ValueError(f"El paciente es {age_reason} (edad: {age}) y requiere un guardián. Debe proporcionar un guardian_id válido")
+                
+                if not current_requires_guardian and current_guardian_id:
+                    age = self.person_service.calculate_age(patient.person.birthdate)
+                    raise ValueError(f"El paciente tiene {age} años y no requiere guardián. No debe tener guardian_id asignado")
+            
+            print(f"DEBUG: Actualizando paciente con campos: {patient_fields}")
             for field, value in patient_fields.items():
+                print(f"DEBUG: Estableciendo {field} = {value}")
                 setattr(patient, field, value)
             
             self.db.commit()
@@ -333,6 +369,16 @@ class PatientService:
         ).first()
         if not guardian:
             raise ValueError(f"El guardian con ID {guardian_id} no existe o no está activo")
+        
+        # VALIDACIÓN DE EDAD: Solo pacientes menores de 18 o mayores de 64 pueden tener guardián
+        if patient.person and patient.person.birthdate:
+            age = self.person_service.calculate_age(patient.person.birthdate)
+            if 18 <= age <= 64:
+                raise ValueError(f"El paciente tiene {age} años. Solo se puede asignar guardián a menores de 18 años o mayores de 64 años")
+        
+        # Verificar que el paciente requiere guardián según el sistema
+        if not patient.requires_guardian:
+            raise ValueError("Este paciente no requiere guardián según su perfil")
         
         old_guardian_id = patient.guardian_id
         patient.guardian_id = guardian_id

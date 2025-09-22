@@ -120,7 +120,7 @@ def get_patient_by_document(
     
     return patient
 
-@router.put("/{patient_id}", response_model=PatientResponse)
+@router.put("/{patient_id}", response_model=PatientWithGuardian)
 def update_patient(
     patient_id: int,
     patient_data: PatientUpdate,
@@ -142,7 +142,11 @@ def update_patient(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
+        print(f"Error detallado en update_patient: {str(e)}")
+        print(f"Tipo de error: {type(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
 
 @router.delete("/{patient_id}")
 def delete_patient(
@@ -166,7 +170,7 @@ def delete_patient(
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 # Endpoints para gestión de guardians de pacientes
-@router.post("/{patient_id}/assign-guardian/{guardian_id}")
+@router.patch("/{patient_id}/assign-guardian/{guardian_id}")
 def assign_guardian_to_patient(
     patient_id: int,
     guardian_id: int,
@@ -174,7 +178,15 @@ def assign_guardian_to_patient(
     db: Session = Depends(get_db),
     current_user = Depends(require_patient_write)  # Solo ASSISTANT
 ):
-    """Asignar un guardian a un paciente"""
+    """
+    Asignar un guardian a un paciente.
+    
+    Validaciones:
+    - El paciente debe existir y estar activo
+    - El guardian debe existir y estar activo  
+    - El paciente debe ser menor de 18 años o mayor de 64 años
+    - El paciente debe requerir guardián según su perfil
+    """
     user_id, user_ip = get_user_context(request, db)
     service = get_patient_service(db, user_id, user_ip)
     
