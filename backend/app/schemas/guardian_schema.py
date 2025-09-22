@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import datetime
 from app.models.guardian_models import PatientRelationshipEnum
 from app.schemas.person_schema import PersonResponse, PersonCreate, PersonUpdate
 
@@ -27,8 +26,6 @@ class GuardianResponse(GuardianBase):
     id: int
     person_id: int
     is_active: bool
-    created_at: datetime
-    updated_at: datetime
     
     # Datos de la persona incluidos
     person: PersonResponse

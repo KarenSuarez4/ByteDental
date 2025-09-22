@@ -1,6 +1,5 @@
-from sqlalchemy import Column, Integer, TIMESTAMP, ForeignKey, Enum, Index, Boolean
+from sqlalchemy import Column, Integer, ForeignKey, Enum, Index, Boolean
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 from app.database import Base
 import enum
 
@@ -24,8 +23,6 @@ class Guardian(Base):
     person_id = Column(Integer, ForeignKey("persons.id", ondelete="CASCADE"), nullable=False)
     relationship_type = Column(Enum(PatientRelationshipEnum, name='patient_relationship_enum', create_type=False), nullable=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
-    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relaciones
     person = relationship("Person", back_populates="guardians")

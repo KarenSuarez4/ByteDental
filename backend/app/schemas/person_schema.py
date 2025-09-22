@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, validator, Field
 from typing import Optional
-from datetime import date, datetime
+from datetime import date
 from app.models.person_models import DocumentTypeEnum
 
 class PersonBase(BaseModel):
@@ -56,8 +56,6 @@ class PersonUpdate(BaseModel):
 class PersonResponse(PersonBase):
     """Schema para respuesta de persona"""
     id: int
-    created_at: datetime
-    updated_at: datetime
     
     class Config:
         from_attributes = True

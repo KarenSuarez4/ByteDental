@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field, validator
 from typing import Optional
-from datetime import datetime
 from app.schemas.person_schema import PersonResponse, PersonCreate, PersonUpdate
 
 class PatientBase(BaseModel):
@@ -46,8 +45,6 @@ class PatientResponse(PatientBase):
     id: int
     person_id: int
     is_active: bool
-    created_at: datetime
-    updated_at: datetime
     
     # Datos de la persona incluidos
     person: PersonResponse
