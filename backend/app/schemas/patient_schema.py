@@ -1,6 +1,12 @@
 from pydantic import BaseModel, Field, validator
 from typing import Optional
 from app.schemas.person_schema import PersonResponse, PersonCreate, PersonUpdate
+from app.models.guardian_models import PatientRelationshipEnum
+
+class GuardianCreateEmbedded(BaseModel):
+    """Schema para crear un guardian junto con un paciente"""
+    person: PersonCreate
+    relationship_type: PatientRelationshipEnum = Field(..., description="Tipo de relación con el paciente")
 
 class PatientBase(BaseModel):
     occupation: Optional[str] = Field(None, max_length=50, description="Ocupación")
@@ -13,7 +19,9 @@ class PatientCreate(BaseModel):
     person: PersonCreate
     # Datos específicos del paciente
     occupation: Optional[str] = Field(None, max_length=50, description="Ocupación")
-    guardian_id: Optional[int] = Field(None, description="ID del guardian asignado")
+    guardian_id: Optional[int] = Field(None, description="ID del guardian asignado (si ya existe)")
+    # Datos del guardian nuevo (si se va a crear)
+    guardian: Optional['GuardianCreateEmbedded'] = Field(None, description="Datos para crear un guardian nuevo")
 
 class PatientUpdate(BaseModel):
     """Schema para actualizar un paciente"""
@@ -66,13 +74,6 @@ class GuardianBasicInfo(BaseModel):
     relationship_type: str
     is_active: bool
     person: PersonResponse
-    
-    class Config:
-        from_attributes = True
-
-class PatientWithGuardian(PatientResponse):
-    """Schema para paciente con su guardian"""
-    guardian: Optional['GuardianBasicInfo'] = None
     
     class Config:
         from_attributes = True

@@ -41,14 +41,34 @@ class PatientService:
             if not guardian:
                 raise ValueError(f"El guardian con ID {patient_data.guardian_id} no existe o no está activo")
             guardian_id = patient_data.guardian_id
+        elif hasattr(patient_data, 'guardian') and patient_data.guardian:
+            # Crear un guardian nuevo
+            from app.services.guardian_service import GuardianService
+            guardian_service = GuardianService(self.db, self.user_id, self.user_ip)
+            
+            # Verificar que no exista otra persona con el mismo documento del guardian
+            existing_guardian_person = self.person_service.get_person_by_document(
+                patient_data.guardian.person.document_number
+            )
+            if existing_guardian_person:
+                raise ValueError(f"Ya existe una persona con el documento {patient_data.guardian.person.document_number}")
+            
+            # Crear el guardian
+            from app.schemas.guardian_schema import GuardianCreate
+            guardian_create_data = GuardianCreate(
+                person=patient_data.guardian.person,
+                relationship_type=patient_data.guardian.relationship_type
+            )
+            new_guardian = guardian_service.create_guardian(guardian_create_data)
+            guardian_id = new_guardian.id
         
         # VALIDACIÓN: Si el paciente requiere guardián, debe proporcionarse uno válido
-        if requires_guardian and not guardian_id:
+        if requires_guardian and guardian_id is None:
             age_reason = "menor de 18 años" if age < 18 else "mayor de 64 años"
             raise ValueError(f"El paciente es {age_reason} (edad: {age}) y requiere un guardián. Debe proporcionar un guardian_id válido")
         
         # VALIDACIÓN: Si no requiere guardián, no debe asignarse uno
-        if not requires_guardian and guardian_id:
+        if not requires_guardian and guardian_id is not None:
             raise ValueError(f"El paciente tiene {age} años y no requiere guardián. No debe proporcionar guardian_id")
 
         try:
@@ -87,7 +107,7 @@ class PatientService:
             )
             
             # Cargar la relación con person y guardian
-            patient = self.get_patient_by_id(patient.id, include_person=True, include_guardian=True)
+            patient = self.get_patient_by_id(getattr(patient, 'id'), include_person=True, include_guardian=True)
             return patient
             
         except Exception as e:
@@ -163,7 +183,7 @@ class PatientService:
         try:
             # Actualizar datos de la persona si se proporcionan
             if patient_data.person:
-                self.person_service.update_person(patient.person_id, patient_data.person)
+                updated_person = self.person_service.update_person(patient.person.id, patient_data.person)
             
             # Actualizar datos específicos del paciente
             patient_fields = patient_data.model_dump(exclude_unset=True, exclude={'person'})
@@ -187,18 +207,18 @@ class PatientService:
             
             # VALIDACIÓN: Verificar consistencia entre requires_guardian y guardian_id
             # Obtener los valores actuales o los que se van a actualizar
-            current_requires_guardian = patient_fields.get('requires_guardian', patient.requires_guardian)
-            current_guardian_id = patient_fields.get('guardian_id', patient.guardian_id)
+            current_requires_guardian = patient_fields.get('requires_guardian', getattr(patient, 'requires_guardian'))
+            current_guardian_id = patient_fields.get('guardian_id', getattr(patient, 'guardian_id'))
             
             # Si se está actualizando requires_guardian o guardian_id, validar consistencia
             if 'requires_guardian' in patient_fields or 'guardian_id' in patient_fields:
-                if current_requires_guardian and not current_guardian_id:
+                if current_requires_guardian and current_guardian_id is None:
                     # Calcular edad actual para el mensaje
                     age = self.person_service.calculate_age(patient.person.birthdate)
                     age_reason = "menor de 18 años" if age < 18 else "mayor de 64 años"
                     raise ValueError(f"El paciente es {age_reason} (edad: {age}) y requiere un guardián. Debe proporcionar un guardian_id válido")
                 
-                if not current_requires_guardian and current_guardian_id:
+                if not current_requires_guardian and current_guardian_id is not None:
                     age = self.person_service.calculate_age(patient.person.birthdate)
                     raise ValueError(f"El paciente tiene {age} años y no requiere guardián. No debe tener guardian_id asignado")
             
@@ -210,7 +230,7 @@ class PatientService:
             self.db.commit()
             self.db.refresh(patient)
             
-            return self.get_patient_by_id(patient.id, include_person=True, include_guardian=True)
+            return self.get_patient_by_id(getattr(patient, 'id'), include_person=True, include_guardian=True)
             
         except Exception as e:
             self.db.rollback()
@@ -225,7 +245,10 @@ class PatientService:
         # Guardar datos para auditoría antes del cambio
         person_info = f"{patient.person.first_name} {patient.person.first_surname}" if patient.person else "N/A"
         
-        patient.is_active = False
+        # Realizar soft delete
+        for field, value in {"is_active": False}.items():
+            setattr(patient, field, value)
+        
         self.db.commit()
         
         # Registrar evento de auditoría
@@ -255,8 +278,10 @@ class PatientService:
             current_age = self.person_service.calculate_age(patient.person.birthdate)
             should_require_guardian = current_age < 18 or current_age > 64
             
-            if patient.requires_guardian != should_require_guardian:
-                patient.requires_guardian = should_require_guardian
+            # Acceder al valor real de la propiedad
+            current_requires_guardian = getattr(patient, 'requires_guardian')
+            if current_requires_guardian != should_require_guardian:
+                setattr(patient, 'requires_guardian', should_require_guardian)
                 updated_patients.append({
                     "id": patient.id,
                     "name": f"{patient.person.first_name} {patient.person.first_surname}",
@@ -292,7 +317,7 @@ class PatientService:
             raise ValueError("Paciente no encontrado")
         
         # Guardar estado anterior para auditoría
-        previous_status = patient.is_active
+        previous_status = getattr(patient, 'is_active')
         person_info = f"{patient.person.first_name} {patient.person.first_surname}" if patient.person else "N/A"
         
         # Validar transición de estado
@@ -309,11 +334,11 @@ class PatientService:
         
         try:
             # Actualizar estado
-            patient.is_active = new_status
+            setattr(patient, 'is_active', new_status)
             self.db.commit()
             
             # Preparar detalles para auditoría
-            change_details = {
+            change_details: dict = {
                 "is_active": {
                     "antes": previous_status,
                     "despues": new_status
@@ -377,11 +402,12 @@ class PatientService:
                 raise ValueError(f"El paciente tiene {age} años. Solo se puede asignar guardián a menores de 18 años o mayores de 64 años")
         
         # Verificar que el paciente requiere guardián según el sistema
-        if not patient.requires_guardian:
+        current_requires_guardian = getattr(patient, 'requires_guardian')
+        if not current_requires_guardian:
             raise ValueError("Este paciente no requiere guardián según su perfil")
         
-        old_guardian_id = patient.guardian_id
-        patient.guardian_id = guardian_id
+        old_guardian_id = getattr(patient, 'guardian_id')
+        setattr(patient, 'guardian_id', guardian_id)
         self.db.commit()
         
         # Registrar evento de auditoría
@@ -406,11 +432,12 @@ class PatientService:
             raise ValueError(f"El paciente con ID {patient_id} no existe")
         
         # Verificar que el paciente no requiera guardian
-        if patient.requires_guardian:
+        current_requires_guardian = getattr(patient, 'requires_guardian')
+        if current_requires_guardian:
             raise ValueError("No se puede desasignar el guardian de un paciente que requiere supervisión")
         
-        old_guardian_id = patient.guardian_id
-        patient.guardian_id = None
+        old_guardian_id = getattr(patient, 'guardian_id')
+        setattr(patient, 'guardian_id', None)
         self.db.commit()
         
         # Registrar evento de auditoría

@@ -24,6 +24,7 @@ const UserHeader = ({ userRole }) => {
       { path: "/services", label: "Catálogo de servicios" },
     ],
     'Asistente': [
+      { path: "/patients/register", label: "Registrar paciente" },
       { path: "/patients", label: "Gestión de pacientes" },
     ],
     'Doctor': [
@@ -41,7 +42,21 @@ const UserHeader = ({ userRole }) => {
     const baseClasses = "px-8 py-4 font-poppins text-18 rounded-[40px] transition-all duration-300";
     const activeClasses = "bg-primary-blue text-white shadow-md";
     const inactiveClasses = "text-white hover:bg-white hover:bg-opacity-20";
-    return cn(baseClasses, location.pathname.startsWith(path) ? activeClasses : inactiveClasses);
+    
+    // Lógica mejorada para el match de rutas
+    const isActive = () => {
+      // Para rutas más específicas, hacer match exacto
+      if (path.includes('/register') || path.includes('/manage')) {
+        return location.pathname === path;
+      }
+      // Para rutas generales, usar startsWith pero evitar conflictos
+      return location.pathname === path || 
+             (location.pathname.startsWith(path) && 
+              !location.pathname.includes('/register') && 
+              !location.pathname.includes('/manage'));
+    };
+    
+    return cn(baseClasses, isActive() ? activeClasses : inactiveClasses);
   };
 
   const currentNavLinks = navLinks[userRole] || [];
@@ -66,12 +81,7 @@ const UserHeader = ({ userRole }) => {
           <Link
             key={link.path}
             to={link.path}
-            className={cn(
-              "px-4 md:px-8 py-2 md:py-4 font-poppins text-xs sm:text-sm md:text-18 rounded-[40px] transition-all duration-300",
-              location.pathname.startsWith(link.path)
-                ? "bg-primary-blue text-white shadow-md"
-                : "text-white hover:bg-white hover:bg-opacity-20"
-            )}
+            className={getNavLinkClass(link.path)}
           >
             {link.label}
           </Link>

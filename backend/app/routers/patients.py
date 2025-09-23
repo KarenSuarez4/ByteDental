@@ -46,7 +46,7 @@ def create_patient(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
 
-@router.get("/", response_model=List[PatientResponse])
+@router.get("/", response_model=List[PatientWithGuardian])
 def get_patients(
     skip: int = Query(0, ge=0, description="Número de registros a omitir"),
     limit: int = Query(100, ge=1, le=1000, description="Número máximo de registros"),

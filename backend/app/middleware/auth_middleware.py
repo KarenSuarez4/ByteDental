@@ -21,8 +21,7 @@ class RolePermissions:
     ADMIN = "Administrator"
     AUDITOR = "Auditor"
     DENTIST = "Doctor"
-    ASSISTANT = "Assistant"
-    RECEPTIONIST = "Receptionist"  # Por si se agrega después
+    ASSISTANT = "Asistente"
     
     # Permisos de gestión de usuarios (solo ADMIN)
     USER_MANAGEMENT = [ADMIN]
@@ -31,7 +30,7 @@ class RolePermissions:
     AUDIT_ACCESS = [AUDITOR]
     
     # Permisos básicos (todos los roles autenticados)
-    BASIC_ACCESS = [ADMIN, AUDITOR, DENTIST, ASSISTANT, RECEPTIONIST]
+    BASIC_ACCESS = [ADMIN, AUDITOR, DENTIST, ASSISTANT]
     
     # Permisos para pacientes, guardianes y personas
     # CRUD completo: Solo ASSISTANT
@@ -128,6 +127,10 @@ def require_roles(allowed_roles: List[str]):
     async def role_checker(request: Request, db: Session = Depends(get_db)) -> User:
         user = await get_current_user(request, db)
         
+        # Log para depuración del rol
+        user_role = user.role.name if user.role else "Sin rol asignado"
+        logger.info(f"--- DEBUG AUTH --- Usuario: {user.email}, Rol detectado: '{user_role}', Roles permitidos: {allowed_roles}")
+
         if not user.role or user.role.name not in allowed_roles:
             roles_str = ", ".join(allowed_roles)
             raise HTTPException(
