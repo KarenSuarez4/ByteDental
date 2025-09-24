@@ -35,6 +35,9 @@ class PersonUpdate(BaseModel):
     # Tipo de documento
     document_type: Optional[DocumentTypeEnum] = None
     
+    # Número de documento
+    document_number: Optional[str] = Field(None, min_length=1, max_length=30, description="Número de documento")
+    
     # Nombre completo
     first_surname: Optional[str] = Field(None, min_length=1, max_length=50, description="Primer apellido")
     second_surname: Optional[str] = Field(None, max_length=50, description="Segundo apellido")
@@ -47,10 +50,19 @@ class PersonUpdate(BaseModel):
     # Número de teléfono
     phone: Optional[str] = Field(None, max_length=20, description="Teléfono")
     
+    # Fecha de nacimiento
+    birthdate: Optional[date] = Field(None, description="Fecha de nacimiento")
+    
     @validator('phone')
     def validate_phone(cls, v):
         if v and not v.replace('+', '').replace('-', '').replace(' ', '').isdigit():
             raise ValueError('El teléfono debe contener solo números, espacios, guiones y el símbolo +')
+        return v
+    
+    @validator('birthdate')
+    def validate_birthdate(cls, v):
+        if v and v > date.today():
+            raise ValueError('La fecha de nacimiento no puede ser futura')
         return v
 
 class PersonResponse(PersonBase):

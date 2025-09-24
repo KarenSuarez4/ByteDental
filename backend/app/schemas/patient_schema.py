@@ -32,6 +32,8 @@ class PatientUpdate(BaseModel):
     guardian_id: Optional[int] = None
     requires_guardian: Optional[bool] = None
     is_active: Optional[bool] = None
+    # Datos del guardian nuevo (si se va a crear o actualizar)
+    guardian: Optional['GuardianCreateEmbedded'] = Field(None, description="Datos para crear o actualizar guardian")
 
 class PatientStatusChange(BaseModel):
     """Schema para cambiar el estado de un paciente"""

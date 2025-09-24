@@ -145,6 +145,29 @@ const RegisterPatient = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    
+    // Validaciones específicas para teléfono
+    if (name === 'phone' || name === 'guardian_phone') {
+      // Solo permitir números
+      if (!/^\d*$/.test(value)) return;
+      
+      setFormData((prev) => ({ ...prev, [name]: value }));
+      
+      // Validar longitud del teléfono
+      if (value && value.length !== 10) {
+        setFormErrors(prev => ({ ...prev, [name]: 'El teléfono debe tener exactamente 10 dígitos' }));
+      } else {
+        setFormErrors(prev => ({ ...prev, [name]: '' }));
+      }
+      return;
+    }
+
+    // Validaciones específicas para número de documento
+    if (name === 'document_number' || name === 'guardian_document_number') {
+      // Solo permitir números
+      if (!/^\d*$/.test(value)) return;
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
     
     // Limpiar error específico del campo
@@ -178,6 +201,16 @@ const RegisterPatient = () => {
     if (!formData.occupation) errors.occupation = 'Ocupación es obligatoria';
     if (!formData.birthdate) errors.birthdate = 'Fecha de nacimiento es obligatoria';
 
+    // Validar restricciones específicas del paciente
+    if (formData.document_type === 'TI' && age !== null && age <= 7) {
+      errors.document_type = 'La Tarjeta de Identidad es solo para mayores de 7 años';
+    }
+
+    // Validar teléfono siempre que se ingrese
+    if (formData.phone && formData.phone.length !== 10) {
+      errors.phone = 'El teléfono debe tener exactamente 10 dígitos';
+    }
+
     // Validar campos del tutor si es necesario
     if (needsGuardian) {
       if (!formData.guardian_document_type) errors.guardian_document_type = 'Tipo de documento del tutor es obligatorio';
@@ -187,6 +220,14 @@ const RegisterPatient = () => {
       if (!formData.guardian_email) errors.guardian_email = 'Correo del tutor es obligatorio';
       if (!formData.guardian_phone) errors.guardian_phone = 'Teléfono del tutor es obligatorio';
       if (!formData.guardian_relationship_type) errors.guardian_relationship_type = 'La relación con el paciente es obligatoria';
+
+      // Validar teléfono del tutor siempre que se ingrese
+      if (formData.guardian_phone && formData.guardian_phone.length !== 10) {
+        errors.guardian_phone = 'El teléfono del tutor debe tener exactamente 10 dígitos';
+      }
+
+      // Nota: En el registro de pacientes no tenemos la fecha de nacimiento del tutor
+      // La validación de edad del tutor se debe hacer en el backend o en el proceso de edición
     }
 
     // Verificar errores de email
@@ -459,6 +500,7 @@ const RegisterPatient = () => {
             value={formData.phone}
             onChange={handleChange}
             error={!!formErrors.phone}
+            maxLength={10}
           />
           {formErrors.phone && (
             <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.phone}</p>
@@ -639,6 +681,7 @@ const RegisterPatient = () => {
                 value={formData.guardian_phone}
                 onChange={handleChange}
                 error={!!formErrors.guardian_phone}
+                maxLength={10}
               />
               {formErrors.guardian_phone && (
                 <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.guardian_phone}</p>

@@ -93,22 +93,75 @@ function PatientManagement() {
     }
   }, [editError]);
 
+  // Estados para el tutor legal
+  const [needsGuardian, setNeedsGuardian] = useState(false);
+  const [guardianForm, setGuardianForm] = useState({
+    guardian_document_type: "",
+    guardian_document_number: "",
+    guardian_full_names: "",
+    guardian_full_surnames: "",
+    guardian_email: "",
+    guardian_phone: "",
+    guardian_birthdate: "",
+    guardian_relationship_type: "",
+  });
+  const [guardianFormErrors, setGuardianFormErrors] = useState({});
+
   // Abrir modal de edición
   const handleEdit = (patient) => {
     setEditPatient(patient);
+    // Combinar nombres y apellidos para mostrarlos en los campos
+    const fullNames = [patient.person.first_name, patient.person.middle_name].filter(Boolean).join(' ');
+    const fullSurnames = [patient.person.first_surname, patient.person.second_surname].filter(Boolean).join(' ');
+    
     setEditForm({
       document_type: patient.person.document_type,
       document_number: patient.person.document_number,
-      first_name: patient.person.first_name,
-      first_surname: patient.person.first_surname,
-      second_surname: patient.person.second_surname || "",
+      full_names: fullNames,
+      full_surnames: fullSurnames,
       email: patient.person.email || "",
       phone: patient.person.phone || "",
       birthdate: patient.person.birthdate,
       occupation: patient.occupation || "",
     });
+
+    // Calcular si necesita tutor basado en la edad actual
+    const age = calculateAge(patient.person.birthdate);
+    const requiresGuardian = age < 18 || age > 64;
+    setNeedsGuardian(requiresGuardian);
+
+    // Si tiene tutor, llenar los datos del tutor
+    if (patient.guardian) {
+      const guardianFullNames = [patient.guardian.person.first_name, patient.guardian.person.middle_name].filter(Boolean).join(' ');
+      const guardianFullSurnames = [patient.guardian.person.first_surname, patient.guardian.person.second_surname].filter(Boolean).join(' ');
+      
+      setGuardianForm({
+        guardian_document_type: patient.guardian.person.document_type,
+        guardian_document_number: patient.guardian.person.document_number,
+        guardian_full_names: guardianFullNames,
+        guardian_full_surnames: guardianFullSurnames,
+        guardian_email: patient.guardian.person.email || "",
+        guardian_phone: patient.guardian.person.phone || "",
+        guardian_birthdate: patient.guardian.person.birthdate,
+        guardian_relationship_type: patient.guardian.relationship_type,
+      });
+    } else {
+      // Limpiar formulario del tutor
+      setGuardianForm({
+        guardian_document_type: "",
+        guardian_document_number: "",
+        guardian_full_names: "",
+        guardian_full_surnames: "",
+        guardian_email: "",
+        guardian_phone: "",
+        guardian_birthdate: "",
+        guardian_relationship_type: "",
+      });
+    }
+
     setEditError("");
     setSuccessMsg("");
+    setGuardianFormErrors({});
   };
 
   const handleEditFormChange = (e) => {
@@ -124,14 +177,69 @@ function PatientManagement() {
       if (!/^\d*$/.test(value)) return;
       setEditForm(prev => ({ ...prev, [name]: value }));
       if (value && value.length !== 10) {
-        setPhoneEditError("Ingrese un número válido.");
+        setPhoneEditError("El teléfono debe tener exactamente 10 dígitos.");
       } else {
         setPhoneEditError("");
       }
       return;
     }
 
+    // Si se cambia la fecha de nacimiento, recalcular si necesita tutor
+    if (name === "birthdate") {
+      setEditForm(prev => ({ ...prev, [name]: value }));
+      if (value) {
+        const age = calculateAge(value);
+        const requiresGuardian = age < 18 || age > 64;
+        setNeedsGuardian(requiresGuardian);
+        
+        // Si ya no necesita tutor, limpiar datos del tutor
+        if (!requiresGuardian) {
+          setGuardianForm({
+            guardian_document_type: "",
+            guardian_document_number: "",
+            guardian_full_names: "",
+            guardian_full_surnames: "",
+            guardian_email: "",
+            guardian_phone: "",
+            guardian_birthdate: "",
+            guardian_relationship_type: "",
+          });
+          setGuardianFormErrors({});
+        }
+      }
+      return;
+    }
+
     setEditForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleGuardianFormChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === "guardian_document_number") {
+      if (!/^\d*$/.test(value)) return;
+      setGuardianForm(prev => ({ ...prev, [name]: value }));
+      return;
+    }
+
+    if (name === "guardian_phone") {
+      if (!/^\d*$/.test(value)) return;
+      setGuardianForm(prev => ({ ...prev, [name]: value }));
+      return;
+    }
+
+    setGuardianForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleGuardianEmailChange = (e) => {
+    const { name, value } = e.target;
+    setGuardianForm(prev => ({ ...prev, [name]: value }));
+
+    if (value && (!value.includes('@') || !value.includes('.'))) {
+      setGuardianFormErrors(prev => ({ ...prev, [name]: 'Ingrese un correo electrónico válido' }));
+    } else {
+      setGuardianFormErrors(prev => ({ ...prev, [name]: '' }));
+    }
   };
 
   const handleEmailChange = (e) => {
@@ -147,41 +255,121 @@ function PatientManagement() {
 
   const validateEditForm = () => {
     const errors = {};
+    const guardianErrors = {};
+
+    // Validar campos del paciente
     if (!editForm.document_type) errors.document_type = "El tipo de documento es obligatorio.";
     if (!editForm.document_number) errors.document_number = "El número de documento es obligatorio.";
-    if (!editForm.first_name) errors.first_name = "El nombre es obligatorio.";
-    if (!editForm.first_surname) errors.first_surname = "El apellido es obligatorio.";
+    if (!editForm.full_names) errors.full_names = "Los nombres son obligatorios.";
+    if (!editForm.full_surnames) errors.full_surnames = "Los apellidos son obligatorios.";
     if (!editForm.birthdate) errors.birthdate = "La fecha de nacimiento es obligatoria.";
+    
+    // Validar restricciones específicas del paciente
+    const patientAge = calculateAge(editForm.birthdate);
+    if (editForm.document_type === 'TI' && patientAge !== null && patientAge <= 7) {
+      errors.document_type = 'La Tarjeta de Identidad es solo para mayores de 7 años';
+    }
+
+    // Validar email del paciente
     if (editForm.email && (!editForm.email.includes('@') || !editForm.email.includes('.'))) {
       errors.email = "Ingrese un correo electrónico válido.";
     }
+    
+    // Validar teléfono del paciente siempre que se ingrese
     if (editForm.phone && editForm.phone.length !== 10) {
-      errors.phone = "Ingrese un número válido.";
+      errors.phone = "El teléfono debe tener exactamente 10 dígitos.";
+    }
+
+    // Validar campos del tutor si es necesario
+    if (needsGuardian) {
+      if (!guardianForm.guardian_document_type) guardianErrors.guardian_document_type = "El tipo de documento del tutor es obligatorio.";
+      if (!guardianForm.guardian_document_number) guardianErrors.guardian_document_number = "El número de documento del tutor es obligatorio.";
+      if (!guardianForm.guardian_full_names) guardianErrors.guardian_full_names = "Los nombres del tutor son obligatorios.";
+      if (!guardianForm.guardian_full_surnames) guardianErrors.guardian_full_surnames = "Los apellidos del tutor son obligatorios.";
+      if (!guardianForm.guardian_email) guardianErrors.guardian_email = "El correo del tutor es obligatorio.";
+      if (!guardianForm.guardian_phone) guardianErrors.guardian_phone = "El teléfono del tutor es obligatorio.";
+      if (!guardianForm.guardian_birthdate) guardianErrors.guardian_birthdate = "La fecha de nacimiento del tutor es obligatoria.";
+      if (!guardianForm.guardian_relationship_type) guardianErrors.guardian_relationship_type = "La relación con el paciente es obligatoria.";
+      
+      // Validar email del tutor
+      if (guardianForm.guardian_email && (!guardianForm.guardian_email.includes('@') || !guardianForm.guardian_email.includes('.'))) {
+        guardianErrors.guardian_email = "Ingrese un correo electrónico válido.";
+      }
+      
+      // Validar teléfono del tutor siempre que se ingrese
+      if (guardianForm.guardian_phone && guardianForm.guardian_phone.length !== 10) {
+        guardianErrors.guardian_phone = "El teléfono del tutor debe tener exactamente 10 dígitos.";
+      }
+
+      // Validar que el tutor sea mayor de 18 años
+      if (guardianForm.guardian_birthdate) {
+        const guardianAge = calculateAge(guardianForm.guardian_birthdate);
+        if (guardianAge !== null && guardianAge < 18) {
+          guardianErrors.guardian_birthdate = 'El tutor legal debe ser mayor de 18 años';
+        }
+      }
+
+      // Validar restricciones específicas del tutor
+      if (guardianForm.guardian_document_type === 'TI' && guardianForm.guardian_birthdate) {
+        const guardianAge = calculateAge(guardianForm.guardian_birthdate);
+        if (guardianAge !== null && guardianAge <= 7) {
+          guardianErrors.guardian_document_type = 'La Tarjeta de Identidad es solo para mayores de 7 años';
+        }
+      }
     }
 
     setEditFormErrors(errors);
+    setGuardianFormErrors(guardianErrors);
     setPhoneEditError(errors.phone || "");
-    return Object.keys(errors).length === 0;
+    
+    return Object.keys(errors).length === 0 && Object.keys(guardianErrors).length === 0;
   };
 
   // Guardar cambios
   const handleSaveEdit = async () => {
     if (!validateEditForm()) return;
     try {
-      // Preparar los datos para el backend
+      // Separar los nombres y apellidos del paciente
+      const namesArray = editForm.full_names.trim().split(/\s+/);
+      const surnamesArray = editForm.full_surnames.trim().split(/\s+/);
+      
+      // Preparar los datos del paciente para el backend
       const updateData = {
         person: {
           document_type: editForm.document_type,
           document_number: editForm.document_number,
-          first_name: editForm.first_name,
-          first_surname: editForm.first_surname,
-          second_surname: editForm.second_surname || null,
+          first_name: namesArray[0] || "",
+          middle_name: namesArray.length > 1 ? namesArray.slice(1).join(' ') : null,
+          first_surname: surnamesArray[0] || "",
+          second_surname: surnamesArray.length > 1 ? surnamesArray.slice(1).join(' ') : null,
           email: editForm.email || null,
           phone: editForm.phone || null,
           birthdate: editForm.birthdate,
         },
         occupation: editForm.occupation || null,
       };
+
+      // Si necesita tutor y se proporcionaron datos del tutor
+      if (needsGuardian && guardianForm.guardian_document_number) {
+        // Separar nombres y apellidos del tutor
+        const guardianNamesArray = guardianForm.guardian_full_names.trim().split(/\s+/);
+        const guardianSurnamesArray = guardianForm.guardian_full_surnames.trim().split(/\s+/);
+        
+        updateData.guardian = {
+          person: {
+            document_type: guardianForm.guardian_document_type,
+            document_number: guardianForm.guardian_document_number,
+            first_name: guardianNamesArray[0] || "",
+            middle_name: guardianNamesArray.length > 1 ? guardianNamesArray.slice(1).join(' ') : null,
+            first_surname: guardianSurnamesArray[0] || "",
+            second_surname: guardianSurnamesArray.length > 1 ? guardianSurnamesArray.slice(1).join(' ') : null,
+            email: guardianForm.guardian_email || null,
+            phone: guardianForm.guardian_phone || null,
+            birthdate: guardianForm.guardian_birthdate,
+          },
+          relationship_type: guardianForm.guardian_relationship_type,
+        };
+      }
 
       await updatePatient(editPatient.id, updateData, token);
       setSuccessMsg("Paciente actualizado correctamente");
@@ -191,6 +379,7 @@ function PatientManagement() {
       setPatients(updatedPatients);
       setLoading(false);
       setEditFormErrors({});
+      setGuardianFormErrors({});
     } catch (err) {
       setEditFormErrors({ general: err.message || "Error al actualizar paciente" });
     }
@@ -201,6 +390,18 @@ function PatientManagement() {
     setEditPatient(null);
     setEditError("");
     setSuccessMsg("");
+    setNeedsGuardian(false);
+    setGuardianForm({
+      guardian_document_type: "",
+      guardian_document_number: "",
+      guardian_full_names: "",
+      guardian_full_surnames: "",
+      guardian_email: "",
+      guardian_phone: "",
+      guardian_birthdate: "",
+      guardian_relationship_type: "",
+    });
+    setGuardianFormErrors({});
   };
 
   // Desactivar paciente
@@ -556,149 +757,314 @@ function PatientManagement() {
 
         {/* Modal de edición */}
         {editPatient && (
-          <div className="fixed inset-0 bg-header-blue bg-opacity-40 flex items-center justify-center z-50">
-            <div className="bg-white rounded-[12px] shadow-lg p-8 w-full max-w-[1200px] flex flex-col items-center justify-center">
-              <h2 className="text-header-blue text-24 font-bold font-poppins mb-6 text-center">
-                Editar Paciente
-              </h2>
-              {editFormErrors.general && (
-                <div className="mb-4 w-full max-w-[600px] p-3 bg-red-100 border border-red-400 text-red-700 rounded text-center">
-                  {editFormErrors.general}
-                </div>
-              )}
-              <form className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 justify-center items-center">
-                <div className="flex flex-col items-center w-full">
-                  <label className="block font-poppins mb-2 text-center">Tipo de documento</label>
-                  <Select
-                    name="document_type"
-                    value={editForm.document_type}
-                    onChange={handleEditFormChange}
-                    className="w-[320px]"
-                    error={!!editFormErrors.document_type}
+          <div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[900px] max-h-[90vh] overflow-y-auto">
+              {/* Header del modal */}
+              <div className="bg-gradient-to-br from-primary-blue to-header-blue text-white p-6 rounded-t-[24px] relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-16 -mt-16"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full -ml-12 -mb-12"></div>
+                <div className="relative z-10 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-white bg-opacity-20 p-2 rounded-full">
+                      ✏️
+                    </div>
+                    <div>
+                      <h2 className="text-24 font-bold font-poppins">Editar Paciente</h2>
+                      <p className="text-16 opacity-90 font-poppins">Actualizar información del paciente</p>
+                    </div>
+                  </div>
+                  <button
+                    className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-full transition-all duration-200"
+                    onClick={handleCancelEdit}
                   >
-                    <option value="CC">Cédula de Ciudadanía</option>
-                    <option value="TI">Tarjeta de Identidad</option>
-                    <option value="CE">Cédula de Extranjería</option>
-                    <option value="PA">Pasaporte</option>
-                    <option value="RC">Registro Civil</option>
-                  </Select>
-                  {editFormErrors.document_type && (
-                    <p className="text-red-500 text-xs font-poppins mt-2">{editFormErrors.document_type}</p>
+                    ✖️
+                  </button>
+                </div>
+              </div>
+
+              {/* Contenido del modal */}
+              <div className="p-6">
+                {editFormErrors.general && (
+                  <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-400 rounded-r-lg">
+                    <div className="flex items-center">
+                      <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-red-700 font-poppins">{editFormErrors.general}</p>
+                    </div>
+                  </div>
+                )}
+
+                <form className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block font-poppins font-medium text-gray-700 mb-2">Tipo de documento</label>
+                      <Select
+                        name="document_type"
+                        value={editForm.document_type}
+                        onChange={handleEditFormChange}
+                        className="w-full"
+                        error={!!editFormErrors.document_type}
+                      >
+                        <option value="CC">Cédula de Ciudadanía</option>
+                        <option value="TI">Tarjeta de Identidad</option>
+                        <option value="CE">Cédula de Extranjería</option>
+                        <option value="PA">Pasaporte</option>
+                      </Select>
+                      {editFormErrors.document_type && (
+                        <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.document_type}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block font-poppins font-medium text-gray-700 mb-2">Número de documento</label>
+                      <Input
+                        name="document_number"
+                        value={editForm.document_number}
+                        onChange={handleEditFormChange}
+                        className="w-full"
+                        error={!!editFormErrors.document_number}
+                      />
+                      {editFormErrors.document_number && (
+                        <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.document_number}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block font-poppins font-medium text-gray-700 mb-2">Nombres</label>
+                      <Input
+                        name="full_names"
+                        value={editForm.full_names}
+                        onChange={handleEditFormChange}
+                        className="w-full"
+                        error={!!editFormErrors.full_names}
+                        placeholder="Primer nombre segundo nombre"
+                      />
+                      {editFormErrors.full_names && (
+                        <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.full_names}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block font-poppins font-medium text-gray-700 mb-2">Apellidos</label>
+                      <Input
+                        name="full_surnames"
+                        value={editForm.full_surnames}
+                        onChange={handleEditFormChange}
+                        className="w-full"
+                        error={!!editFormErrors.full_surnames}
+                        placeholder="Primer apellido segundo apellido"
+                      />
+                      {editFormErrors.full_surnames && (
+                        <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.full_surnames}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block font-poppins font-medium text-gray-700 mb-2">Fecha de nacimiento</label>
+                      <DateInput
+                        name="birthdate"
+                        value={editForm.birthdate}
+                        onChange={handleEditFormChange}
+                        className="w-full"
+                        error={!!editFormErrors.birthdate}
+                      />
+                      {editFormErrors.birthdate && (
+                        <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.birthdate}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block font-poppins font-medium text-gray-700 mb-2">Correo electrónico</label>
+                      <Input
+                        name="email"
+                        value={editForm.email}
+                        onChange={handleEmailChange}
+                        className="w-full"
+                        error={!!editFormErrors.email}
+                      />
+                      {editFormErrors.email && (
+                        <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.email}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block font-poppins font-medium text-gray-700 mb-2">Teléfono</label>
+                      <Input
+                        name="phone"
+                        value={editForm.phone}
+                        onChange={handleEditFormChange}
+                        className="w-full"
+                        error={!!editFormErrors.phone || !!phoneEditError}
+                        maxLength={10}
+                      />
+                      {(editFormErrors.phone || phoneEditError) && (
+                        <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.phone || phoneEditError}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block font-poppins font-medium text-gray-700 mb-2">Ocupación</label>
+                      <Input
+                        name="occupation"
+                        value={editForm.occupation}
+                        onChange={handleEditFormChange}
+                        className="w-full"
+                        error={!!editFormErrors.occupation}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Sección del tutor legal */}
+                  {needsGuardian && (
+                    <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-[16px] border border-blue-200">
+                      <div className="flex items-center mb-4">
+                        <div className="bg-blue-100 p-2 rounded-full mr-3">
+                          🛡️
+                        </div>
+                        <div>
+                          <h3 className="text-20 font-semibold font-poppins text-gray-800">Información del Tutor Legal</h3>
+                          <p className="text-14 text-gray-600 font-poppins">El paciente requiere un tutor legal debido a su edad</p>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block font-poppins font-medium text-gray-700 mb-2">Tipo de documento</label>
+                          <Select
+                            name="guardian_document_type"
+                            value={guardianForm.guardian_document_type}
+                            onChange={handleGuardianFormChange}
+                            className="w-full"
+                            error={!!guardianFormErrors.guardian_document_type}
+                          >
+                            <option value="">Seleccionar tipo</option>
+                            <option value="CC">Cédula de Ciudadanía</option>
+                            <option value="TI">Tarjeta de Identidad</option>
+                            <option value="CE">Cédula de Extranjería</option>
+                            <option value="PA">Pasaporte</option>
+                          </Select>
+                          {guardianFormErrors.guardian_document_type && (
+                            <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_document_type}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block font-poppins font-medium text-gray-700 mb-2">Número de documento</label>
+                          <Input
+                            name="guardian_document_number"
+                            value={guardianForm.guardian_document_number}
+                            onChange={handleGuardianFormChange}
+                            className="w-full"
+                            error={!!guardianFormErrors.guardian_document_number}
+                          />
+                          {guardianFormErrors.guardian_document_number && (
+                            <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_document_number}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block font-poppins font-medium text-gray-700 mb-2">Nombres</label>
+                          <Input
+                            name="guardian_full_names"
+                            value={guardianForm.guardian_full_names}
+                            onChange={handleGuardianFormChange}
+                            className="w-full"
+                            error={!!guardianFormErrors.guardian_full_names}
+                            placeholder="Primer nombre segundo nombre"
+                          />
+                          {guardianFormErrors.guardian_full_names && (
+                            <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_full_names}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block font-poppins font-medium text-gray-700 mb-2">Apellidos</label>
+                          <Input
+                            name="guardian_full_surnames"
+                            value={guardianForm.guardian_full_surnames}
+                            onChange={handleGuardianFormChange}
+                            className="w-full"
+                            error={!!guardianFormErrors.guardian_full_surnames}
+                            placeholder="Primer apellido segundo apellido"
+                          />
+                          {guardianFormErrors.guardian_full_surnames && (
+                            <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_full_surnames}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block font-poppins font-medium text-gray-700 mb-2">Fecha de nacimiento</label>
+                          <DateInput
+                            name="guardian_birthdate"
+                            value={guardianForm.guardian_birthdate}
+                            onChange={handleGuardianFormChange}
+                            className="w-full"
+                            error={!!guardianFormErrors.guardian_birthdate}
+                          />
+                          {guardianFormErrors.guardian_birthdate && (
+                            <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_birthdate}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block font-poppins font-medium text-gray-700 mb-2">Relación con el paciente</label>
+                          <Select
+                            name="guardian_relationship_type"
+                            value={guardianForm.guardian_relationship_type}
+                            onChange={handleGuardianFormChange}
+                            className="w-full"
+                            error={!!guardianFormErrors.guardian_relationship_type}
+                          >
+                            <option value="">Seleccionar relación</option>
+                            <option value="Father">Padre</option>
+                            <option value="Mother">Madre</option>
+                            <option value="Grandfather">Abuelo</option>
+                            <option value="Grandmother">Abuela</option>
+                            <option value="Brother">Hermano</option>
+                            <option value="Sister">Hermana</option>
+                            <option value="Legal_Guardian">Tutor Legal</option>
+                            <option value="Other">Otro</option>
+                          </Select>
+                          {guardianFormErrors.guardian_relationship_type && (
+                            <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_relationship_type}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block font-poppins font-medium text-gray-700 mb-2">Correo electrónico</label>
+                          <Input
+                            name="guardian_email"
+                            value={guardianForm.guardian_email}
+                            onChange={handleGuardianEmailChange}
+                            className="w-full"
+                            error={!!guardianFormErrors.guardian_email}
+                          />
+                          {guardianFormErrors.guardian_email && (
+                            <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_email}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block font-poppins font-medium text-gray-700 mb-2">Teléfono</label>
+                          <Input
+                            name="guardian_phone"
+                            value={guardianForm.guardian_phone}
+                            onChange={handleGuardianFormChange}
+                            className="w-full"
+                            error={!!guardianFormErrors.guardian_phone}
+                            maxLength={10}
+                          />
+                          {guardianFormErrors.guardian_phone && (
+                            <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_phone}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   )}
+                </form>
+
+                {/* Botones de acción */}
+                <div className="flex justify-center space-x-6 mt-8 pt-6 border-t border-gray-200">
+                  <Button
+                    className="bg-header-blue hover:bg-header-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-16 shadow-md"
+                    onClick={handleCancelEdit}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="bg-primary-blue hover:bg-primary-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-16 shadow-md"
+                    onClick={handleSaveEdit}
+                  >
+                    Guardar cambios
+                  </Button>
                 </div>
-                <div className="flex flex-col items-center w-full">
-                  <label className="block font-poppins mb-2 text-center">Número de documento</label>
-                  <Input
-                    name="document_number"
-                    value={editForm.document_number}
-                    onChange={handleEditFormChange}
-                    className="w-[320px]"
-                    error={!!editFormErrors.document_number}
-                  />
-                  {editFormErrors.document_number && (
-                    <p className="text-red-500 text-xs font-poppins mt-2">{editFormErrors.document_number}</p>
-                  )}
-                </div>
-                <div className="flex flex-col items-center w-full">
-                  <label className="block font-poppins mb-2 text-center">Primer nombre</label>
-                  <Input
-                    name="first_name"
-                    value={editForm.first_name}
-                    onChange={handleEditFormChange}
-                    className="w-[320px]"
-                    error={!!editFormErrors.first_name}
-                  />
-                  {editFormErrors.first_name && (
-                    <p className="text-red-500 text-xs font-poppins mt-2">{editFormErrors.first_name}</p>
-                  )}
-                </div>
-                <div className="flex flex-col items-center w-full">
-                  <label className="block font-poppins mb-2 text-center">Primer apellido</label>
-                  <Input
-                    name="first_surname"
-                    value={editForm.first_surname}
-                    onChange={handleEditFormChange}
-                    className="w-[320px]"
-                    error={!!editFormErrors.first_surname}
-                  />
-                  {editFormErrors.first_surname && (
-                    <p className="text-red-500 text-xs font-poppins mt-2">{editFormErrors.first_surname}</p>
-                  )}
-                </div>
-                <div className="flex flex-col items-center w-full">
-                  <label className="block font-poppins mb-2 text-center">Segundo apellido</label>
-                  <Input
-                    name="second_surname"
-                    value={editForm.second_surname}
-                    onChange={handleEditFormChange}
-                    className="w-[320px]"
-                    error={!!editFormErrors.second_surname}
-                  />
-                </div>
-                <div className="flex flex-col items-center w-full">
-                  <label className="block font-poppins mb-2 text-center">Correo electrónico</label>
-                  <Input
-                    name="email"
-                    value={editForm.email}
-                    onChange={handleEmailChange}
-                    className="w-[320px]"
-                    error={!!editFormErrors.email}
-                  />
-                  {editFormErrors.email && (
-                    <p className="text-red-500 text-xs font-poppins mt-2">{editFormErrors.email}</p>
-                  )}
-                </div>
-                <div className="flex flex-col items-center w-full">
-                  <label className="block font-poppins mb-2 text-center">Teléfono</label>
-                  <Input
-                    name="phone"
-                    value={editForm.phone}
-                    onChange={handleEditFormChange}
-                    className="w-[320px]"
-                    error={!!editFormErrors.phone || !!phoneEditError}
-                    maxLength={10}
-                  />
-                  {(editFormErrors.phone || phoneEditError) && (
-                    <p className="text-red-500 text-xs font-poppins mt-2">{editFormErrors.phone || phoneEditError}</p>
-                  )}
-                </div>
-                <div className="flex flex-col items-center w-full">
-                  <label className="block font-poppins mb-2 text-center">Fecha de nacimiento</label>
-                  <DateInput
-                    name="birthdate"
-                    value={editForm.birthdate}
-                    onChange={handleEditFormChange}
-                    className="w-[320px]"
-                    error={!!editFormErrors.birthdate}
-                  />
-                  {editFormErrors.birthdate && (
-                    <p className="text-red-500 text-xs font-poppins mt-2">{editFormErrors.birthdate}</p>
-                  )}
-                </div>
-                <div className="flex flex-col items-center w-full md:col-span-2">
-                  <label className="block font-poppins mb-2 text-center">Ocupación</label>
-                  <Input
-                    name="occupation"
-                    value={editForm.occupation}
-                    onChange={handleEditFormChange}
-                    className="w-[320px]"
-                    error={!!editFormErrors.occupation}
-                  />
-                </div>
-              </form>
-              <div className="flex justify-center space-x-6 mt-8">
-                <Button
-                  className="bg-primary-blue hover:bg-primary-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-lg shadow-md"
-                  onClick={handleSaveEdit}
-                >
-                  Guardar cambios
-                </Button>
-                <Button
-                  className="bg-header-blue hover:bg-header-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-lg shadow-md"
-                  onClick={handleCancelEdit}
-                >
-                  Cancelar
-                </Button>
               </div>
             </div>
           </div>
@@ -706,99 +1072,130 @@ function PatientManagement() {
 
         {/* Modal de información del tutor */}
         {guardianModal.open && guardianModal.guardian && (
-          <div className="fixed inset-0 bg-header-blue bg-opacity-40 flex items-center justify-center z-50">
-            <div className="bg-white rounded-[12px] shadow-lg p-8 w-full max-w-[800px] flex flex-col items-center justify-center">
-              <h2 className="text-header-blue text-24 font-bold font-poppins mb-6 text-center">
-                Información del Tutor
-              </h2>
-              
-              <div className="w-full max-w-[600px] bg-gray-50 rounded-[8px] p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex flex-col">
-                    <label className="font-poppins font-semibold text-gray-700 mb-1">Tipo de Documento:</label>
-                    <span className="font-poppins text-gray-900 bg-white p-2 rounded border">
-                      {guardianModal.guardian.person.document_type}
-                    </span>
-                  </div>
-                  
-                  <div className="flex flex-col">
-                    <label className="font-poppins font-semibold text-gray-700 mb-1">Número de Documento:</label>
-                    <span className="font-poppins text-gray-900 bg-white p-2 rounded border">
-                      {guardianModal.guardian.person.document_number}
-                    </span>
-                  </div>
-                  
-                  <div className="flex flex-col">
-                    <label className="font-poppins font-semibold text-gray-700 mb-1">Primer Nombre:</label>
-                    <span className="font-poppins text-gray-900 bg-white p-2 rounded border">
-                      {guardianModal.guardian.person.first_name}
-                    </span>
-                  </div>
-                  
-                  <div className="flex flex-col">
-                    <label className="font-poppins font-semibold text-gray-700 mb-1">Primer Apellido:</label>
-                    <span className="font-poppins text-gray-900 bg-white p-2 rounded border">
-                      {guardianModal.guardian.person.first_surname}
-                    </span>
-                  </div>
-                  
-                  {guardianModal.guardian.person.second_surname && (
-                    <div className="flex flex-col">
-                      <label className="font-poppins font-semibold text-gray-700 mb-1">Segundo Apellido:</label>
-                      <span className="font-poppins text-gray-900 bg-white p-2 rounded border">
-                        {guardianModal.guardian.person.second_surname}
-                      </span>
+          <div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[700px] max-h-[90vh] overflow-y-auto">
+              {/* Header del modal con diseño único */}
+              <div className="bg-gradient-to-br from-primary-blue to-header-blue text-white p-6 rounded-t-[24px] relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-16 -mt-16"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full -ml-12 -mb-12"></div>
+                <div className="relative z-10 flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="bg-white bg-opacity-20 p-3 rounded-full">
+                      🛡️
                     </div>
-                  )}
-                  
-                  <div className="flex flex-col">
-                    <label className="font-poppins font-semibold text-gray-700 mb-1">Relación con el Paciente:</label>
-                    <span className="font-poppins text-gray-900 bg-white p-2 rounded border">
-                      {getRelationshipText(guardianModal.guardian.relationship_type)}
-                    </span>
-                  </div>
-                  
-                  {guardianModal.guardian.person.email && (
-                    <div className="flex flex-col">
-                      <label className="font-poppins font-semibold text-gray-700 mb-1">Correo Electrónico:</label>
-                      <span className="font-poppins text-gray-900 bg-white p-2 rounded border">
-                        {guardianModal.guardian.person.email}
-                      </span>
+                    <div>
+                      <h2 className="text-26 font-bold font-poppins">Información del Tutor Legal</h2>
+                      <p className="text-16 opacity-90 font-poppins">Detalles del responsable legal</p>
                     </div>
-                  )}
-                  
-                  {guardianModal.guardian.person.phone && (
-                    <div className="flex flex-col">
-                      <label className="font-poppins font-semibold text-gray-700 mb-1">Teléfono:</label>
-                      <span className="font-poppins text-gray-900 bg-white p-2 rounded border">
-                        {guardianModal.guardian.person.phone}
-                      </span>
-                    </div>
-                  )}
-                  
-                  <div className="flex flex-col">
-                    <label className="font-poppins font-semibold text-gray-700 mb-1">Fecha de Nacimiento:</label>
-                    <span className="font-poppins text-gray-900 bg-white p-2 rounded border">
-                      {new Date(guardianModal.guardian.person.birthdate).toLocaleDateString('es-CO')}
-                    </span>
                   </div>
-                  
-                  <div className="flex flex-col">
-                    <label className="font-poppins font-semibold text-gray-700 mb-1">Edad:</label>
-                    <span className="font-poppins text-gray-900 bg-white p-2 rounded border">
-                      {calculateAge(guardianModal.guardian.person.birthdate)} años
-                    </span>
-                  </div>
+                  <button
+                    className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-full transition-all duration-200"
+                    onClick={() => setGuardianModal({ open: false, guardian: null })}
+                  >
+                    ✖️
+                  </button>
                 </div>
               </div>
-              
-              <div className="flex justify-center mt-6">
-                <Button
-                  className="bg-primary-blue hover:bg-primary-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-lg shadow-md"
-                  onClick={() => setGuardianModal({ open: false, guardian: null })}
-                >
-                  Cerrar
-                </Button>
+
+              {/* Contenido del modal */}
+              <div className="p-6">
+                {/* Información principal del tutor */}
+                <div className="bg-gradient-to-r from-green-50 to-teal-50 rounded-[16px] p-6 mb-6">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-green-100 p-2 rounded-full mr-3">
+                      👤
+                    </div>
+                    <h3 className="text-20 font-semibold font-poppins text-gray-800">Datos Personales</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Nombre Completo</label>
+                      <p className="text-18 font-semibold text-gray-900 font-poppins">
+                        {guardianModal.guardian.person.first_name} {guardianModal.guardian.person.first_surname}
+                        {guardianModal.guardian.person.second_surname && ` ${guardianModal.guardian.person.second_surname}`}
+                      </p>
+                    </div>
+                    <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Documento</label>
+                      <p className="text-16 font-medium text-gray-900 font-poppins">
+                        {guardianModal.guardian.person.document_type} - {guardianModal.guardian.person.document_number}
+                      </p>
+                    </div>
+                    <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Relación</label>
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                        {getRelationshipText(guardianModal.guardian.relationship_type)}
+                      </span>
+                    </div>
+                    <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Edad</label>
+                      <p className="text-16 font-medium text-gray-900 font-poppins">
+                        {calculateAge(guardianModal.guardian.person.birthdate)} años
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Información de contacto */}
+                {(guardianModal.guardian.person.email || guardianModal.guardian.person.phone) && (
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-[16px] p-6 mb-6">
+                    <div className="flex items-center mb-4">
+                      <div className="bg-blue-100 p-2 rounded-full mr-3">
+                        📧
+                      </div>
+                      <h3 className="text-20 font-semibold font-poppins text-gray-800">Información de Contacto</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {guardianModal.guardian.person.email && (
+                        <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Correo Electrónico</label>
+                          <p className="text-16 font-medium text-gray-900 font-poppins break-all">
+                            {guardianModal.guardian.person.email}
+                          </p>
+                        </div>
+                      )}
+                      {guardianModal.guardian.person.phone && (
+                        <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Teléfono</label>
+                          <p className="text-16 font-medium text-gray-900 font-poppins">
+                            {guardianModal.guardian.person.phone}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Información adicional */}
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-[16px] p-6">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-purple-100 p-2 rounded-full mr-3">
+                      📅
+                    </div>
+                    <h3 className="text-20 font-semibold font-poppins text-gray-800">Detalles Adicionales</h3>
+                  </div>
+                  <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                    <label className="block text-sm font-medium text-gray-600 mb-1">Fecha de Nacimiento</label>
+                    <p className="text-16 font-medium text-gray-900 font-poppins">
+                      {new Date(guardianModal.guardian.person.birthdate).toLocaleDateString('es-CO', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Botón de cerrar */}
+                <div className="flex justify-center mt-8 pt-6 border-t border-gray-200">
+                  <Button
+                    className="bg-primary-blue hover:bg-primary-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-16 shadow-md"
+                    onClick={() => setGuardianModal({ open: false, guardian: null })}
+                  >
+                    Cerrar
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
