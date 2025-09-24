@@ -168,6 +168,15 @@ async def require_person_write(request: Request, db: Session = Depends(get_db)) 
     """Require permissions to write person data"""
     return await require_roles(RolePermissions.PERSON_WRITE)(request, db)
 
+# Dependencies generales
+async def require_basic_access(request: Request, db: Session = Depends(get_db)) -> User:
+    """Require basic access permissions (all authenticated roles)"""
+    return await require_roles(RolePermissions.BASIC_ACCESS)(request, db)
+
+async def require_user_management(request: Request, db: Session = Depends(get_db)) -> User:
+    """Require user management permissions (only ADMIN)"""
+    return await require_roles(RolePermissions.USER_MANAGEMENT)(request, db)
+
 def get_user_context(request: Request, db: Session = Depends(get_db)) -> tuple[Optional[int], str]:
     """
     Obtener contexto del usuario actual para auditoría

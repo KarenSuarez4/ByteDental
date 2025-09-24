@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import email_router, otp_router, users, auditoria, auth, patients, guardians, persons
+from app.routers import email_router, otp_router, users, auditoria, auth, patients, guardians, persons, dental_services
 from app.config import settings
 from app.database import get_db, engine, Base  # Asegúrate de importar Base y engine
 from sqlalchemy.orm import Session
@@ -44,6 +44,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(persons.router, prefix="/api")
 app.include_router(patients.router, prefix="/api")
 app.include_router(guardians.router, prefix="/api")
+app.include_router(dental_services.router, prefix="/api")
 
 # Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
