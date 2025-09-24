@@ -30,8 +30,10 @@ const Login = () => {
       // Redirigir según el rol (solo si no debe cambiar contraseña)
       if (userRole === "Administrador") {
         navigate('/users/register');
-      } else if (userRole === "Doctor" || userRole === "Asistente") {
+      } else if (userRole === "Doctor") {
         navigate('/patients');
+      } else if (userRole === "Asistente") {
+        navigate('/patients/register');
       } else if (userRole === "Auditor") {
         navigate('/audit-logs');
       } else {
@@ -289,7 +291,7 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen **w-full** flex flex-col overflow-hidden">
+    <div className="min-h-screen w-full flex flex-col">
       <div className="flex flex-col-reverse md:flex-row flex-1">
         {/* Lado izquierdo: Formulario de Login */}
         <main className="flex-1 flex flex-col items-center justify-center bg-[#FBFCFB]">

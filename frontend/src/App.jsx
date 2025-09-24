@@ -12,6 +12,8 @@ import ForcePasswordChange from './pages/ForcePasswordChange.jsx';
 import RegisterUser from './pages/Admin/RegisterUser';
 import UserManagement from './pages/Admin/UserManagement.jsx';
 import AuditLog from './pages/Auditor/AuditLog.jsx';
+import RegisterPatient from './pages/Asistente/RegisterPatient';
+import PatientManagement from './pages/Asistente/PatientManagement';
 import DummyPage from './pages/DummyPage';
 
 function AppContent() {
@@ -70,7 +72,12 @@ function AppContent() {
           <>
             <Route path="/patients" element={
               <ProtectedRoute>
-                <DummyPage title="Gestión de pacientes" />
+                <PatientManagement />
+              </ProtectedRoute>
+            } />
+            <Route path="/patients/register" element={
+              <ProtectedRoute>
+                <RegisterPatient />
               </ProtectedRoute>
             } />
           </>
@@ -79,7 +86,7 @@ function AppContent() {
           <>
             <Route path="/patients" element={
               <ProtectedRoute>
-                <DummyPage title="Gestión de pacientes" />
+                <PatientManagement />
               </ProtectedRoute>
             } />
             <Route path="/clinical-history" element={

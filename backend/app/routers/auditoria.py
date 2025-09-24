@@ -272,3 +272,136 @@ def get_eventos_por_rango_fechas(
         evento.event_timestamp_colombia = AuditoriaService.convertir_a_hora_colombia(evento.event_timestamp)
     
     return eventos
+
+# =============================================================================
+# ENDPOINTS CENTRALIZADOS DE AUDITORÍA POR ENTIDAD
+# =============================================================================
+
+@router.get("/patients/{patient_id}", response_model=dict)
+def get_patient_audit_trail(
+    patient_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_auditor_user)
+):
+    """Obtener historial de auditoría de un paciente específico - Solo AUDITORES"""
+    from app.services.patient_service import get_patient_service
+    
+    auditoria_service = AuditoriaService()
+    
+    # Verificar que el paciente existe
+    patient_service = get_patient_service(db)
+    patient = patient_service.get_patient_by_id(patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    
+    # Obtener registros de auditoría
+    audit_records = auditoria_service.obtener_eventos_por_registro(
+        db=db,
+        registro_id=str(patient_id),
+        tipo_registro="patients",
+        skip=skip,
+        limit=limit
+    )
+    
+    # Obtener conteo total
+    total_records = auditoria_service.obtener_conteo_eventos_por_registro(
+        db=db,
+        registro_id=str(patient_id),
+        tipo_registro="patients"
+    )
+    
+    return {
+        "entity_type": "patients",
+        "entity_id": patient_id,
+        "audit_trail": audit_records,
+        "total_records": total_records,
+        "returned_records": len(audit_records)
+    }
+
+@router.get("/guardians/{guardian_id}", response_model=dict)
+def get_guardian_audit_trail(
+    guardian_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_auditor_user)
+):
+    """Obtener historial de auditoría de un guardian específico - Solo AUDITORES"""
+    from app.services.guardian_service import get_guardian_service
+    
+    auditoria_service = AuditoriaService()
+    
+    # Verificar que el guardian existe
+    guardian_service = get_guardian_service(db)
+    guardian = guardian_service.get_guardian_by_id(guardian_id)
+    if not guardian:
+        raise HTTPException(status_code=404, detail="Guardian no encontrado")
+    
+    # Obtener registros de auditoría
+    audit_records = auditoria_service.obtener_eventos_por_registro(
+        db=db,
+        registro_id=str(guardian_id),
+        tipo_registro="guardians",
+        skip=skip,
+        limit=limit
+    )
+    
+    # Obtener conteo total
+    total_records = auditoria_service.obtener_conteo_eventos_por_registro(
+        db=db,
+        registro_id=str(guardian_id),
+        tipo_registro="guardians"
+    )
+    
+    return {
+        "entity_type": "guardians",
+        "entity_id": guardian_id,
+        "audit_trail": audit_records,
+        "total_records": total_records,
+        "returned_records": len(audit_records)
+    }
+
+@router.get("/persons/{person_id}", response_model=dict)
+def get_person_audit_trail(
+    person_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_auditor_user)
+):
+    """Obtener historial de auditoría de una persona específica - Solo AUDITORES"""
+    from app.services.person_service import get_person_service
+    
+    auditoria_service = AuditoriaService()
+    
+    # Verificar que la persona existe
+    person_service = get_person_service(db)
+    person = person_service.get_person_by_id(person_id)
+    if not person:
+        raise HTTPException(status_code=404, detail="Persona no encontrada")
+    
+    # Obtener registros de auditoría
+    audit_records = auditoria_service.obtener_eventos_por_registro(
+        db=db,
+        registro_id=str(person_id),
+        tipo_registro="persons",
+        skip=skip,
+        limit=limit
+    )
+    
+    # Obtener conteo total
+    total_records = auditoria_service.obtener_conteo_eventos_por_registro(
+        db=db,
+        registro_id=str(person_id),
+        tipo_registro="persons"
+    )
+    
+    return {
+        "entity_type": "persons",
+        "entity_id": person_id,
+        "audit_trail": audit_records,
+        "total_records": total_records,
+        "returned_records": len(audit_records)
+    }

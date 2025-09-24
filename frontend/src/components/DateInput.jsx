@@ -1,4 +1,4 @@
-// src/components/Input.jsx
+// src/components/DateInput.jsx
 import React from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -7,10 +7,10 @@ function cn(...args) {
   return twMerge(clsx(args));
 }
 
-const Input = ({ placeholder, className = '', error, type = 'text', ...props }) => {
+const DateInput = ({ placeholder, className = '', error, ...props }) => {
   return (
     <input
-      type={type}
+      type="date"
       placeholder={placeholder}
       className={cn(
         'w-[310px]',
@@ -27,8 +27,8 @@ const Input = ({ placeholder, className = '', error, type = 'text', ...props }) 
         'focus:outline-none',
         // Clases condicionales para el borde
         {
-          'border-red-500 focus:border-red-500': error, // Borde rojo si hay error [1]
-          'border-gray-300 focus:border-primary-blue':!error, // Borde normal si no hay error [2]
+          'border-red-500 focus:border-red-500': error, // Borde rojo si hay error
+          'border-gray-300 focus:border-primary-blue': !error, // Borde normal si no hay error
         },
         className
       )}
@@ -37,4 +37,4 @@ const Input = ({ placeholder, className = '', error, type = 'text', ...props }) 
   );
 };
 
-export default Input;
+export default DateInput;
