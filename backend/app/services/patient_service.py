@@ -115,7 +115,7 @@ class PatientService:
             raise e
     
     def get_patient_by_id(self, patient_id: int, include_person: bool = True, include_guardian: bool = False) -> Optional[Patient]:
-        """Obtener paciente por ID"""
+        """Obtener paciente por ID con verificación automática de requirements"""
         query = self.db.query(Patient)
         
         if include_person:
@@ -127,13 +127,25 @@ class PatientService:
                 joinedload(Patient.guardian, innerjoin=False).joinedload(Guardian.person, innerjoin=False)
             )
         
-        return query.filter(Patient.id == patient_id).first()
+        patient = query.filter(Patient.id == patient_id).first()
+        
+        # Verificación automática de requirements al leer
+        if patient and patient.is_active:
+            self._verify_and_update_guardian_requirements_for_patient(patient)
+            
+        return patient
     
     def get_patient_by_document(self, document_number: str) -> Optional[Patient]:
-        """Obtener paciente por número de documento"""
-        return self.db.query(Patient).join(Person).filter(
+        """Obtener paciente por número de documento con verificación automática de requirements"""
+        patient = self.db.query(Patient).join(Person).filter(
             Person.document_number == document_number
         ).options(joinedload(Patient.person)).first()
+        
+        # Verificación automática de requirements al leer
+        if patient and patient.is_active:
+            self._verify_and_update_guardian_requirements_for_patient(patient)
+            
+        return patient
     
     def get_patients(
         self, 
@@ -268,11 +280,15 @@ class PatientService:
     def update_guardian_requirements_by_age(self) -> dict:
         """
         Actualizar requirements de guardian basado en edad actual de todos los pacientes.
+        También desasigna automáticamente guardianes cuando ya no son necesarios.
         """
         updated_patients = []
-        patients = self.db.query(Patient).join(Person).options(joinedload(Patient.person)).filter(
-            Patient.is_active == True
-        ).all()
+        unassigned_guardians = []
+        
+        patients = self.db.query(Patient).join(Person).options(
+            joinedload(Patient.person),
+            joinedload(Patient.guardian, innerjoin=False).joinedload(Guardian.person, innerjoin=False)
+        ).filter(Patient.is_active == True).all()
         
         for patient in patients:
             current_age = self.person_service.calculate_age(patient.person.birthdate)
@@ -280,21 +296,94 @@ class PatientService:
             
             # Acceder al valor real de la propiedad
             current_requires_guardian = getattr(patient, 'requires_guardian')
+            current_guardian_id = getattr(patient, 'guardian_id')
+            patient_name = f"{patient.person.first_name} {patient.person.first_surname}"
+            
+            changes_made = False
+            
+            # 1. Actualizar requires_guardian si ha cambiado
             if current_requires_guardian != should_require_guardian:
                 setattr(patient, 'requires_guardian', should_require_guardian)
+                changes_made = True
+                
                 updated_patients.append({
                     "id": patient.id,
-                    "name": f"{patient.person.first_name} {patient.person.first_surname}",
+                    "name": patient_name,
                     "age": current_age,
-                    "now_requires_guardian": should_require_guardian
+                    "previous_requires_guardian": current_requires_guardian,
+                    "now_requires_guardian": should_require_guardian,
+                    "reason": "Cambio de edad automático"
                 })
+                
+                # Registrar evento de auditoría para cambio de requirements
+                self.auditoria_service.registrar_evento(
+                    db=self.db,
+                    usuario_id=self.user_id,
+                    tipo_evento="AUTO_UPDATE",
+                    registro_afectado_id=str(patient.id),
+                    registro_afectado_tipo="patients",
+                    descripcion_evento=f"Requirements de guardián actualizados automáticamente para {patient_name} (edad: {current_age})",
+                    detalles_cambios={
+                        "requires_guardian": {
+                            "antes": current_requires_guardian,
+                            "despues": should_require_guardian
+                        },
+                        "trigger": "automatic_age_verification",
+                        "age": current_age
+                    },
+                    ip_origen=self.user_ip
+                )
+            
+            # 2. Desasignar guardián automáticamente si ya no es necesario
+            if not should_require_guardian and current_guardian_id is not None:
+                guardian_info = "N/A"
+                if patient.guardian and patient.guardian.person:
+                    guardian_info = f"{patient.guardian.person.first_name} {patient.guardian.person.first_surname}"
+                
+                setattr(patient, 'guardian_id', None)
+                changes_made = True
+                
+                unassigned_guardians.append({
+                    "patient_id": patient.id,
+                    "patient_name": patient_name,
+                    "patient_age": current_age,
+                    "unassigned_guardian_id": current_guardian_id,
+                    "unassigned_guardian_name": guardian_info,
+                    "reason": f"Paciente cumplió {current_age} años - Ya no requiere guardián"
+                })
+                
+                # Registrar evento de auditoría para desasignación automática
+                self.auditoria_service.registrar_evento(
+                    db=self.db,
+                    usuario_id=self.user_id,
+                    tipo_evento="AUTO_UNASSIGN_GUARDIAN",
+                    registro_afectado_id=str(patient.id),
+                    registro_afectado_tipo="patients",
+                    descripcion_evento=f"Guardián desasignado automáticamente de {patient_name} - Edad: {current_age} años",
+                    detalles_cambios={
+                        "guardian_id": {
+                            "antes": current_guardian_id,
+                            "despues": None
+                        },
+                        "guardian_info": guardian_info,
+                        "trigger": "automatic_age_verification",
+                        "age": current_age,
+                        "reason": "Paciente alcanzó mayoría de edad"
+                    },
+                    ip_origen=self.user_ip
+                )
         
-        if updated_patients:
+        # Confirmar cambios en la base de datos
+        if updated_patients or unassigned_guardians:
             self.db.commit()
         
         return {
-            "updated_count": len(updated_patients),
-            "updated_patients": updated_patients
+            "requirements_updated_count": len(updated_patients),
+            "guardians_unassigned_count": len(unassigned_guardians),
+            "updated_patients": updated_patients,
+            "unassigned_guardians": unassigned_guardians,
+            "total_processed": len(patients),
+            "summary": f"Procesados {len(patients)} pacientes activos: {len(updated_patients)} actualizaciones de requirements, {len(unassigned_guardians)} guardianes desasignados automáticamente"
         }
     
     def change_patient_status(self, patient_id: int, new_status: bool, reason: Optional[str] = None) -> dict:
@@ -453,6 +542,103 @@ class PatientService:
         )
         
         return True
+    
+    def _verify_and_update_guardian_requirements_for_patient(self, patient: Patient) -> bool:
+        """
+        Verificar y actualizar automáticamente los requirements de guardián para un paciente específico.
+        Se ejecuta automáticamente en operaciones de lectura para mantener datos actualizados.
+        
+        Args:
+            patient: Instancia del paciente a verificar
+            
+        Returns:
+            bool: True si se realizaron cambios, False si no
+        """
+        if not patient or not patient.person or not patient.person.birthdate:
+            return False
+            
+        current_age = self.person_service.calculate_age(patient.person.birthdate)
+        should_require_guardian = current_age < 18 or current_age > 64
+        
+        current_requires_guardian = getattr(patient, 'requires_guardian')
+        current_guardian_id = getattr(patient, 'guardian_id')
+        
+        changes_made = False
+        patient_name = f"{patient.person.first_name} {patient.person.first_surname}"
+        
+        # 1. Actualizar requires_guardian si ha cambiado
+        if current_requires_guardian != should_require_guardian:
+            setattr(patient, 'requires_guardian', should_require_guardian)
+            changes_made = True
+            
+            # Registrar evento de auditoría
+            self.auditoria_service.registrar_evento(
+                db=self.db,
+                usuario_id=self.user_id,
+                tipo_evento="AUTO_UPDATE",
+                registro_afectado_id=str(patient.id),
+                registro_afectado_tipo="patients",
+                descripcion_evento=f"Requirements de guardián actualizados automáticamente para {patient_name} (edad: {current_age})",
+                detalles_cambios={
+                    "requires_guardian": {
+                        "antes": current_requires_guardian,
+                        "despues": should_require_guardian
+                    },
+                    "trigger": "automatic_read_verification",
+                    "age": current_age
+                },
+                ip_origen=self.user_ip
+            )
+        
+        # 2. Desasignar guardián automáticamente si ya no es necesario
+        if not should_require_guardian and current_guardian_id is not None:
+            # Obtener info del guardián antes de desasignarlo
+            guardian_info = "N/A"
+            try:
+                guardian = self.db.query(Guardian).options(
+                    joinedload(Guardian.person)
+                ).filter(Guardian.id == current_guardian_id).first()
+                
+                if guardian and guardian.person:
+                    guardian_info = f"{guardian.person.first_name} {guardian.person.first_surname}"
+            except Exception:
+                pass  # Si hay error obteniendo info del guardián, continuar con "N/A"
+            
+            setattr(patient, 'guardian_id', None)
+            changes_made = True
+            
+            # Registrar evento de auditoría
+            self.auditoria_service.registrar_evento(
+                db=self.db,
+                usuario_id=self.user_id,
+                tipo_evento="AUTO_UNASSIGN_GUARDIAN",
+                registro_afectado_id=str(patient.id),
+                registro_afectado_tipo="patients",
+                descripcion_evento=f"Guardián desasignado automáticamente de {patient_name} - Edad: {current_age} años",
+                detalles_cambios={
+                    "guardian_id": {
+                        "antes": current_guardian_id,
+                        "despues": None
+                    },
+                    "guardian_info": guardian_info,
+                    "trigger": "automatic_read_verification",
+                    "age": current_age,
+                    "reason": "Paciente alcanzó mayoría de edad"
+                },
+                ip_origen=self.user_ip
+            )
+        
+        # Confirmar cambios si se hicieron
+        if changes_made:
+            try:
+                self.db.commit()
+                self.db.refresh(patient)
+            except Exception as e:
+                self.db.rollback()
+                # Log del error pero no fallar la operación de lectura
+                print(f"Warning: Error al actualizar automáticamente requirements del paciente {patient.id}: {e}")
+                
+        return changes_made
 
 def get_patient_service(db: Session, user_id: Optional[str] = None, user_ip: Optional[str] = None) -> PatientService:
     """Factory para obtener instancia del servicio"""
