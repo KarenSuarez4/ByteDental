@@ -1,0 +1,44 @@
+name: Test Security Script
+
+on:
+  workflow_dispatch:  # Solo ejecución manual
+    inputs:
+      test_type:
+        description: 'Type of test'
+        required: true
+        default: 'sql-injection'
+        type: choice
+        options:
+        - sql-injection
+        - xss-injection
+        - auth-bypass
+
+jobs:
+  test-script:
+    name: Test Security Script
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        pip install requests urllib3
+
+    - name: Test script locally
+      run: |
+        python SecurityTesting.py --test-type ${{ github.event.inputs.test_type }} --url https://httpbin.org
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          security_report_*.json
+          security_test_*.log
