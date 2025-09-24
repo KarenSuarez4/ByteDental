@@ -93,6 +93,20 @@ function PatientManagement() {
     }
   }, [editError]);
 
+  // Estados para el tutor legal
+  const [needsGuardian, setNeedsGuardian] = useState(false);
+  const [guardianForm, setGuardianForm] = useState({
+    guardian_document_type: "",
+    guardian_document_number: "",
+    guardian_full_names: "",
+    guardian_full_surnames: "",
+    guardian_email: "",
+    guardian_phone: "",
+    guardian_birthdate: "",
+    guardian_relationship_type: "",
+  });
+  const [guardianFormErrors, setGuardianFormErrors] = useState({});
+
   // Abrir modal de edición
   const handleEdit = (patient) => {
     setEditPatient(patient);
@@ -110,8 +124,44 @@ function PatientManagement() {
       birthdate: patient.person.birthdate,
       occupation: patient.occupation || "",
     });
+
+    // Calcular si necesita tutor basado en la edad actual
+    const age = calculateAge(patient.person.birthdate);
+    const requiresGuardian = age < 18 || age > 64;
+    setNeedsGuardian(requiresGuardian);
+
+    // Si tiene tutor, llenar los datos del tutor
+    if (patient.guardian) {
+      const guardianFullNames = [patient.guardian.person.first_name, patient.guardian.person.middle_name].filter(Boolean).join(' ');
+      const guardianFullSurnames = [patient.guardian.person.first_surname, patient.guardian.person.second_surname].filter(Boolean).join(' ');
+      
+      setGuardianForm({
+        guardian_document_type: patient.guardian.person.document_type,
+        guardian_document_number: patient.guardian.person.document_number,
+        guardian_full_names: guardianFullNames,
+        guardian_full_surnames: guardianFullSurnames,
+        guardian_email: patient.guardian.person.email || "",
+        guardian_phone: patient.guardian.person.phone || "",
+        guardian_birthdate: patient.guardian.person.birthdate,
+        guardian_relationship_type: patient.guardian.relationship_type,
+      });
+    } else {
+      // Limpiar formulario del tutor
+      setGuardianForm({
+        guardian_document_type: "",
+        guardian_document_number: "",
+        guardian_full_names: "",
+        guardian_full_surnames: "",
+        guardian_email: "",
+        guardian_phone: "",
+        guardian_birthdate: "",
+        guardian_relationship_type: "",
+      });
+    }
+
     setEditError("");
     setSuccessMsg("");
+    setGuardianFormErrors({});
   };
 
   const handleEditFormChange = (e) => {
@@ -127,14 +177,69 @@ function PatientManagement() {
       if (!/^\d*$/.test(value)) return;
       setEditForm(prev => ({ ...prev, [name]: value }));
       if (value && value.length !== 10) {
-        setPhoneEditError("Ingrese un número válido.");
+        setPhoneEditError("El teléfono debe tener exactamente 10 dígitos.");
       } else {
         setPhoneEditError("");
       }
       return;
     }
 
+    // Si se cambia la fecha de nacimiento, recalcular si necesita tutor
+    if (name === "birthdate") {
+      setEditForm(prev => ({ ...prev, [name]: value }));
+      if (value) {
+        const age = calculateAge(value);
+        const requiresGuardian = age < 18 || age > 64;
+        setNeedsGuardian(requiresGuardian);
+        
+        // Si ya no necesita tutor, limpiar datos del tutor
+        if (!requiresGuardian) {
+          setGuardianForm({
+            guardian_document_type: "",
+            guardian_document_number: "",
+            guardian_full_names: "",
+            guardian_full_surnames: "",
+            guardian_email: "",
+            guardian_phone: "",
+            guardian_birthdate: "",
+            guardian_relationship_type: "",
+          });
+          setGuardianFormErrors({});
+        }
+      }
+      return;
+    }
+
     setEditForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleGuardianFormChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === "guardian_document_number") {
+      if (!/^\d*$/.test(value)) return;
+      setGuardianForm(prev => ({ ...prev, [name]: value }));
+      return;
+    }
+
+    if (name === "guardian_phone") {
+      if (!/^\d*$/.test(value)) return;
+      setGuardianForm(prev => ({ ...prev, [name]: value }));
+      return;
+    }
+
+    setGuardianForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleGuardianEmailChange = (e) => {
+    const { name, value } = e.target;
+    setGuardianForm(prev => ({ ...prev, [name]: value }));
+
+    if (value && (!value.includes('@') || !value.includes('.'))) {
+      setGuardianFormErrors(prev => ({ ...prev, [name]: 'Ingrese un correo electrónico válido' }));
+    } else {
+      setGuardianFormErrors(prev => ({ ...prev, [name]: '' }));
+    }
   };
 
   const handleEmailChange = (e) => {
@@ -150,31 +255,85 @@ function PatientManagement() {
 
   const validateEditForm = () => {
     const errors = {};
+    const guardianErrors = {};
+
+    // Validar campos del paciente
     if (!editForm.document_type) errors.document_type = "El tipo de documento es obligatorio.";
+    if (!editForm.document_number) errors.document_number = "El número de documento es obligatorio.";
     if (!editForm.full_names) errors.full_names = "Los nombres son obligatorios.";
     if (!editForm.full_surnames) errors.full_surnames = "Los apellidos son obligatorios.";
     if (!editForm.birthdate) errors.birthdate = "La fecha de nacimiento es obligatoria.";
+    
+    // Validar restricciones específicas del paciente
+    const patientAge = calculateAge(editForm.birthdate);
+    if (editForm.document_type === 'TI' && patientAge !== null && patientAge <= 7) {
+      errors.document_type = 'La Tarjeta de Identidad es solo para mayores de 7 años';
+    }
+
+    // Validar email del paciente
     if (editForm.email && (!editForm.email.includes('@') || !editForm.email.includes('.'))) {
       errors.email = "Ingrese un correo electrónico válido.";
     }
+    
+    // Validar teléfono del paciente siempre que se ingrese
     if (editForm.phone && editForm.phone.length !== 10) {
-      errors.phone = "Ingrese un número válido.";
+      errors.phone = "El teléfono debe tener exactamente 10 dígitos.";
+    }
+
+    // Validar campos del tutor si es necesario
+    if (needsGuardian) {
+      if (!guardianForm.guardian_document_type) guardianErrors.guardian_document_type = "El tipo de documento del tutor es obligatorio.";
+      if (!guardianForm.guardian_document_number) guardianErrors.guardian_document_number = "El número de documento del tutor es obligatorio.";
+      if (!guardianForm.guardian_full_names) guardianErrors.guardian_full_names = "Los nombres del tutor son obligatorios.";
+      if (!guardianForm.guardian_full_surnames) guardianErrors.guardian_full_surnames = "Los apellidos del tutor son obligatorios.";
+      if (!guardianForm.guardian_email) guardianErrors.guardian_email = "El correo del tutor es obligatorio.";
+      if (!guardianForm.guardian_phone) guardianErrors.guardian_phone = "El teléfono del tutor es obligatorio.";
+      if (!guardianForm.guardian_birthdate) guardianErrors.guardian_birthdate = "La fecha de nacimiento del tutor es obligatoria.";
+      if (!guardianForm.guardian_relationship_type) guardianErrors.guardian_relationship_type = "La relación con el paciente es obligatoria.";
+      
+      // Validar email del tutor
+      if (guardianForm.guardian_email && (!guardianForm.guardian_email.includes('@') || !guardianForm.guardian_email.includes('.'))) {
+        guardianErrors.guardian_email = "Ingrese un correo electrónico válido.";
+      }
+      
+      // Validar teléfono del tutor siempre que se ingrese
+      if (guardianForm.guardian_phone && guardianForm.guardian_phone.length !== 10) {
+        guardianErrors.guardian_phone = "El teléfono del tutor debe tener exactamente 10 dígitos.";
+      }
+
+      // Validar que el tutor sea mayor de 18 años
+      if (guardianForm.guardian_birthdate) {
+        const guardianAge = calculateAge(guardianForm.guardian_birthdate);
+        if (guardianAge !== null && guardianAge < 18) {
+          guardianErrors.guardian_birthdate = 'El tutor legal debe ser mayor de 18 años';
+        }
+      }
+
+      // Validar restricciones específicas del tutor
+      if (guardianForm.guardian_document_type === 'TI' && guardianForm.guardian_birthdate) {
+        const guardianAge = calculateAge(guardianForm.guardian_birthdate);
+        if (guardianAge !== null && guardianAge <= 7) {
+          guardianErrors.guardian_document_type = 'La Tarjeta de Identidad es solo para mayores de 7 años';
+        }
+      }
     }
 
     setEditFormErrors(errors);
+    setGuardianFormErrors(guardianErrors);
     setPhoneEditError(errors.phone || "");
-    return Object.keys(errors).length === 0;
+    
+    return Object.keys(errors).length === 0 && Object.keys(guardianErrors).length === 0;
   };
 
   // Guardar cambios
   const handleSaveEdit = async () => {
     if (!validateEditForm()) return;
     try {
-      // Separar los nombres y apellidos
+      // Separar los nombres y apellidos del paciente
       const namesArray = editForm.full_names.trim().split(/\s+/);
       const surnamesArray = editForm.full_surnames.trim().split(/\s+/);
       
-      // Preparar los datos para el backend
+      // Preparar los datos del paciente para el backend
       const updateData = {
         person: {
           document_type: editForm.document_type,
@@ -190,6 +349,28 @@ function PatientManagement() {
         occupation: editForm.occupation || null,
       };
 
+      // Si necesita tutor y se proporcionaron datos del tutor
+      if (needsGuardian && guardianForm.guardian_document_number) {
+        // Separar nombres y apellidos del tutor
+        const guardianNamesArray = guardianForm.guardian_full_names.trim().split(/\s+/);
+        const guardianSurnamesArray = guardianForm.guardian_full_surnames.trim().split(/\s+/);
+        
+        updateData.guardian = {
+          person: {
+            document_type: guardianForm.guardian_document_type,
+            document_number: guardianForm.guardian_document_number,
+            first_name: guardianNamesArray[0] || "",
+            middle_name: guardianNamesArray.length > 1 ? guardianNamesArray.slice(1).join(' ') : null,
+            first_surname: guardianSurnamesArray[0] || "",
+            second_surname: guardianSurnamesArray.length > 1 ? guardianSurnamesArray.slice(1).join(' ') : null,
+            email: guardianForm.guardian_email || null,
+            phone: guardianForm.guardian_phone || null,
+            birthdate: guardianForm.guardian_birthdate,
+          },
+          relationship_type: guardianForm.guardian_relationship_type,
+        };
+      }
+
       await updatePatient(editPatient.id, updateData, token);
       setSuccessMsg("Paciente actualizado correctamente");
       setEditPatient(null);
@@ -198,6 +379,7 @@ function PatientManagement() {
       setPatients(updatedPatients);
       setLoading(false);
       setEditFormErrors({});
+      setGuardianFormErrors({});
     } catch (err) {
       setEditFormErrors({ general: err.message || "Error al actualizar paciente" });
     }
@@ -208,6 +390,18 @@ function PatientManagement() {
     setEditPatient(null);
     setEditError("");
     setSuccessMsg("");
+    setNeedsGuardian(false);
+    setGuardianForm({
+      guardian_document_type: "",
+      guardian_document_number: "",
+      guardian_full_names: "",
+      guardian_full_surnames: "",
+      guardian_email: "",
+      guardian_phone: "",
+      guardian_birthdate: "",
+      guardian_relationship_type: "",
+    });
+    setGuardianFormErrors({});
   };
 
   // Desactivar paciente
@@ -616,7 +810,6 @@ function PatientManagement() {
                         <option value="TI">Tarjeta de Identidad</option>
                         <option value="CE">Cédula de Extranjería</option>
                         <option value="PA">Pasaporte</option>
-                        <option value="RC">Registro Civil</option>
                       </Select>
                       {editFormErrors.document_type && (
                         <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.document_type}</p>
@@ -628,10 +821,8 @@ function PatientManagement() {
                         name="document_number"
                         value={editForm.document_number}
                         onChange={handleEditFormChange}
-                        className="w-full bg-gray-100 cursor-not-allowed"
+                        className="w-full"
                         error={!!editFormErrors.document_number}
-                        readOnly
-                        disabled
                       />
                       {editFormErrors.document_number && (
                         <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.document_number}</p>
@@ -716,6 +907,147 @@ function PatientManagement() {
                       />
                     </div>
                   </div>
+
+                  {/* Sección del tutor legal */}
+                  {needsGuardian && (
+                    <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-[16px] border border-blue-200">
+                      <div className="flex items-center mb-4">
+                        <div className="bg-blue-100 p-2 rounded-full mr-3">
+                          🛡️
+                        </div>
+                        <div>
+                          <h3 className="text-20 font-semibold font-poppins text-gray-800">Información del Tutor Legal</h3>
+                          <p className="text-14 text-gray-600 font-poppins">El paciente requiere un tutor legal debido a su edad</p>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block font-poppins font-medium text-gray-700 mb-2">Tipo de documento</label>
+                          <Select
+                            name="guardian_document_type"
+                            value={guardianForm.guardian_document_type}
+                            onChange={handleGuardianFormChange}
+                            className="w-full"
+                            error={!!guardianFormErrors.guardian_document_type}
+                          >
+                            <option value="">Seleccionar tipo</option>
+                            <option value="CC">Cédula de Ciudadanía</option>
+                            <option value="TI">Tarjeta de Identidad</option>
+                            <option value="CE">Cédula de Extranjería</option>
+                            <option value="PA">Pasaporte</option>
+                          </Select>
+                          {guardianFormErrors.guardian_document_type && (
+                            <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_document_type}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block font-poppins font-medium text-gray-700 mb-2">Número de documento</label>
+                          <Input
+                            name="guardian_document_number"
+                            value={guardianForm.guardian_document_number}
+                            onChange={handleGuardianFormChange}
+                            className="w-full"
+                            error={!!guardianFormErrors.guardian_document_number}
+                          />
+                          {guardianFormErrors.guardian_document_number && (
+                            <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_document_number}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block font-poppins font-medium text-gray-700 mb-2">Nombres</label>
+                          <Input
+                            name="guardian_full_names"
+                            value={guardianForm.guardian_full_names}
+                            onChange={handleGuardianFormChange}
+                            className="w-full"
+                            error={!!guardianFormErrors.guardian_full_names}
+                            placeholder="Primer nombre segundo nombre"
+                          />
+                          {guardianFormErrors.guardian_full_names && (
+                            <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_full_names}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block font-poppins font-medium text-gray-700 mb-2">Apellidos</label>
+                          <Input
+                            name="guardian_full_surnames"
+                            value={guardianForm.guardian_full_surnames}
+                            onChange={handleGuardianFormChange}
+                            className="w-full"
+                            error={!!guardianFormErrors.guardian_full_surnames}
+                            placeholder="Primer apellido segundo apellido"
+                          />
+                          {guardianFormErrors.guardian_full_surnames && (
+                            <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_full_surnames}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block font-poppins font-medium text-gray-700 mb-2">Fecha de nacimiento</label>
+                          <DateInput
+                            name="guardian_birthdate"
+                            value={guardianForm.guardian_birthdate}
+                            onChange={handleGuardianFormChange}
+                            className="w-full"
+                            error={!!guardianFormErrors.guardian_birthdate}
+                          />
+                          {guardianFormErrors.guardian_birthdate && (
+                            <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_birthdate}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block font-poppins font-medium text-gray-700 mb-2">Relación con el paciente</label>
+                          <Select
+                            name="guardian_relationship_type"
+                            value={guardianForm.guardian_relationship_type}
+                            onChange={handleGuardianFormChange}
+                            className="w-full"
+                            error={!!guardianFormErrors.guardian_relationship_type}
+                          >
+                            <option value="">Seleccionar relación</option>
+                            <option value="Father">Padre</option>
+                            <option value="Mother">Madre</option>
+                            <option value="Grandfather">Abuelo</option>
+                            <option value="Grandmother">Abuela</option>
+                            <option value="Brother">Hermano</option>
+                            <option value="Sister">Hermana</option>
+                            <option value="Legal_Guardian">Tutor Legal</option>
+                            <option value="Other">Otro</option>
+                          </Select>
+                          {guardianFormErrors.guardian_relationship_type && (
+                            <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_relationship_type}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block font-poppins font-medium text-gray-700 mb-2">Correo electrónico</label>
+                          <Input
+                            name="guardian_email"
+                            value={guardianForm.guardian_email}
+                            onChange={handleGuardianEmailChange}
+                            className="w-full"
+                            error={!!guardianFormErrors.guardian_email}
+                          />
+                          {guardianFormErrors.guardian_email && (
+                            <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_email}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block font-poppins font-medium text-gray-700 mb-2">Teléfono</label>
+                          <Input
+                            name="guardian_phone"
+                            value={guardianForm.guardian_phone}
+                            onChange={handleGuardianFormChange}
+                            className="w-full"
+                            error={!!guardianFormErrors.guardian_phone}
+                            maxLength={10}
+                          />
+                          {guardianFormErrors.guardian_phone && (
+                            <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_phone}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </form>
 
                 {/* Botones de acción */}
@@ -858,7 +1190,7 @@ function PatientManagement() {
                 {/* Botón de cerrar */}
                 <div className="flex justify-center mt-8 pt-6 border-t border-gray-200">
                   <Button
-                    className="bg-gradient-to-r from-primary-blue to-header-blue hover:from-primary-blue-hover hover:to-header-blue-hover text-white px-8 py-3 font-semibold rounded-[40px] text-16 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                    className="bg-primary-blue hover:bg-primary-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-16 shadow-md"
                     onClick={() => setGuardianModal({ open: false, guardian: null })}
                   >
                     Cerrar
