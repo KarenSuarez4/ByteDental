@@ -9,8 +9,8 @@ from app.database import get_db
 from app.services.dental_service import get_dental_service_service
 from app.utils.audit_context import get_user_context
 from app.middleware.auth_middleware import (
-    require_basic_access,  # Todos los roles autenticados pueden leer
-    require_user_management,  # Solo ADMIN puede crear/actualizar/eliminar
+    require_dental_service_read,  # Solo ADMIN y ASSISTANT pueden leer
+    require_dental_service_write,  # Solo ADMIN puede crear/actualizar/eliminar
 )
 from app.schemas.dental_service_schema import (
     DentalServiceCreate,
@@ -33,7 +33,7 @@ def create_dental_service(
     service_data: DentalServiceCreate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user = Depends(require_user_management)  # Solo ADMIN
+    current_user = Depends(require_dental_service_write)  # Solo ADMIN
 ):
     """Crear un nuevo servicio odontológico (Solo ADMIN)"""
     user_id, user_ip = get_user_context(request, db)
@@ -57,7 +57,7 @@ def get_dental_services(
     min_price: Optional[float] = Query(None, ge=0, description="Precio mínimo"),
     max_price: Optional[float] = Query(None, ge=0, description="Precio máximo"),
     db: Session = Depends(get_db),
-    current_user = Depends(require_basic_access)  # Todos los roles autenticados
+    current_user = Depends(require_dental_service_read)  # Solo ADMIN y ASSISTANT
 ):
     """
     Obtener lista de servicios odontológicos con filtros múltiples:
@@ -88,7 +88,7 @@ def get_dental_service(
     service_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user = Depends(require_basic_access)  # Todos los roles autenticados
+    current_user = Depends(require_dental_service_read)  # Solo ADMIN y ASSISTANT
 ):
     """Obtener un servicio odontológico por ID"""
     user_id, user_ip = get_user_context(request, db)
@@ -108,7 +108,7 @@ def update_dental_service(
     service_data: DentalServiceUpdate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user = Depends(require_user_management)  # Solo ADMIN
+    current_user = Depends(require_dental_service_write)  # Solo ADMIN
 ):
     """Actualizar un servicio odontológico (Solo ADMIN)"""
     user_id, user_ip = get_user_context(request, db)
@@ -130,7 +130,7 @@ def change_service_status(
     status_data: DentalServiceStatusChange,
     request: Request,
     db: Session = Depends(get_db),
-    current_user = Depends(require_user_management)  # Solo ADMIN
+    current_user = Depends(require_dental_service_write)  # Solo ADMIN
 ):
     """Cambiar el estado de un servicio odontológico (Solo ADMIN)"""
     user_id, user_ip = get_user_context(request, db)
@@ -149,7 +149,7 @@ def delete_dental_service(
     service_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user = Depends(require_user_management)  # Solo ADMIN
+    current_user = Depends(require_dental_service_write)  # Solo ADMIN
 ):
     """Eliminar un servicio odontológico (soft delete - Solo ADMIN)"""
     user_id, user_ip = get_user_context(request, db)
