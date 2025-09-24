@@ -405,3 +405,49 @@ def get_person_audit_trail(
         "total_records": total_records,
         "returned_records": len(audit_records)
     }
+
+@router.get("/dental-services/{service_id}", response_model=dict)
+def get_dental_service_audit_trail(
+    service_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_auditor_user)
+):
+    """Obtener historial de auditoría de un servicio odontológico específico - Solo AUDITORES"""
+    from app.services.dental_service import get_dental_service_service
+    
+    auditoria_service = AuditoriaService()
+    
+    # Verificar que el servicio odontológico existe
+    dental_service_service = get_dental_service_service(db)
+    dental_service = dental_service_service.get_dental_service(service_id)
+    if not dental_service:
+        raise HTTPException(status_code=404, detail="Servicio odontológico no encontrado")
+    
+    # Obtener registros de auditoría
+    audit_records = auditoria_service.obtener_eventos_por_registro(
+        db=db,
+        registro_id=str(service_id),
+        tipo_registro="dental_services",
+        skip=skip,
+        limit=limit
+    )
+    
+    # Obtener conteo total
+    total_records = auditoria_service.obtener_conteo_eventos_por_registro(
+        db=db,
+        registro_id=str(service_id),
+        tipo_registro="dental_services"
+    )
+    
+    return {
+        "entity_type": "dental_services",
+        "entity_id": service_id,
+        "service_name": dental_service.name,
+        "service_value": str(dental_service.value),
+        "service_status": "activo" if dental_service.is_active else "inactivo",
+        "audit_trail": audit_records,
+        "total_records": total_records,
+        "returned_records": len(audit_records)
+    }

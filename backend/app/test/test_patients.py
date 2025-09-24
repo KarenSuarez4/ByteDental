@@ -370,5 +370,175 @@ class TestPatientCreationEdgeCases:
             assert data["requires_guardian"] is True
 
 
+class TestGuardianAutoUnassignment:
+    """Tests para verificar la desvinculación automática de guardianes cuando el paciente cumple 18 años"""
+    
+    def test_guardian_unassignment_when_patient_turns_18(
+        self,
+        client,
+        mock_firebase_service,
+        assistant_user,
+        auth_headers,
+        db_session
+    ):
+        """Test: Verificar que se desvincula el guardián automáticamente cuando el paciente cumple 18 años"""
+        from datetime import datetime, date
+        from app.models.guardian_models import Guardian
+        
+        # 1. Crear un guardián
+        guardian_person = Person(
+            document_type="CC",
+            document_number="87654321",
+            first_name="María",
+            first_surname="González",
+            email="maria.guardian@example.com",
+            phone="3009999999",
+            birthdate=date(1980, 1, 1)  # Adulto
+        )
+        db_session.add(guardian_person)
+        db_session.flush()
+        
+        guardian = Guardian(
+            person_id=guardian_person.id,
+            relationship_type="Mother",
+            is_active=True
+        )
+        db_session.add(guardian)
+        db_session.flush()
+        
+        # 2. Crear un paciente que recién cumplió 18 años
+        # (nació hace exactamente 18 años y 1 día)
+        eighteen_years_ago = date.today().replace(year=date.today().year - 18)
+        patient_person = Person(
+            document_type="TI",
+            document_number="12345678",
+            first_name="Juan",
+            first_surname="Pérez",
+            email="juan.perez@example.com",
+            phone="3001234567",
+            birthdate=eighteen_years_ago  # Exactamente 18 años
+        )
+        db_session.add(patient_person)
+        db_session.flush()
+        
+        # 3. Crear paciente con guardián asignado (simula que era menor antes)
+        patient = Patient(
+            person_id=patient_person.id,
+            occupation="Estudiante",
+            guardian_id=guardian.id,     # TIENE guardián asignado
+            requires_guardian=True,      # PERO ya no lo requiere por edad
+            is_active=True
+        )
+        db_session.add(patient)
+        db_session.commit()
+        
+        # 4. Ejecutar el endpoint que actualiza los requirements por edad
+        response = client.patch(
+            "/api/patients/update-guardian-requirements",
+            headers=auth_headers
+        )
+        
+        # 5. Verificar que la actualización fue exitosa
+        assert response.status_code == 200
+        result = response.json()
+        
+        # 6. Verificar que se realizó la desvinculación
+        assert result["success"] is True
+        assert result["statistics"]["guardians_auto_unassigned"] >= 1
+        
+        # 7. Verificar los detalles de la desvinculación
+        unassigned_guardians = result["details"]["unassigned_guardians"]
+        assert len(unassigned_guardians) >= 1
+        
+        # Buscar nuestro paciente en la lista de desvinculaciones
+        our_patient_unassignment = None
+        for unassignment in unassigned_guardians:
+            if unassignment["patient_name"] == "Juan Pérez":
+                our_patient_unassignment = unassignment
+                break
+        
+        assert our_patient_unassignment is not None
+        assert our_patient_unassignment["patient_age"] >= 18
+        assert our_patient_unassignment["unassigned_guardian_name"] == "María González"
+        assert "Ya no requiere guardián" in our_patient_unassignment["reason"]
+        
+        # 8. Verificar en la base de datos que el guardián fue desvinculado
+        db_session.refresh(patient)
+        assert getattr(patient, 'requires_guardian') is False
+        assert getattr(patient, 'guardian_id') is None
+    
+    def test_minor_patient_keeps_guardian(
+        self,
+        client,
+        mock_firebase_service,
+        assistant_user,
+        auth_headers,
+        db_session
+    ):
+        """Test: Verificar que los menores de 18 años mantienen su guardián"""
+        from datetime import date
+        from app.models.guardian_models import Guardian
+        
+        # 1. Crear un guardián
+        guardian_person = Person(
+            document_type="CC",
+            document_number="11122233",
+            first_name="Ana",
+            first_surname="Martínez",
+            email="ana.guardian@example.com",
+            phone="3008888888",
+            birthdate=date(1985, 5, 15)
+        )
+        db_session.add(guardian_person)
+        db_session.flush()
+        
+        guardian = Guardian(
+            person_id=guardian_person.id,
+            relationship_type="Mother",
+            is_active=True
+        )
+        db_session.add(guardian)
+        db_session.flush()
+        
+        # 2. Crear un paciente menor de edad (15 años)
+        fifteen_years_ago = date.today().replace(year=date.today().year - 15)
+        minor_person = Person(
+            document_type="TI",
+            document_number="99988877",
+            first_name="Sofía",
+            first_surname="Torres",
+            email="sofia.torres@example.com",
+            phone="3007777777",
+            birthdate=fifteen_years_ago
+        )
+        db_session.add(minor_person)
+        db_session.flush()
+        
+        # 3. Crear paciente menor con guardián asignado
+        minor_patient = Patient(
+            person_id=minor_person.id,
+            occupation="Estudiante",
+            guardian_id=guardian.id,
+            requires_guardian=True,
+            is_active=True
+        )
+        db_session.add(minor_patient)
+        db_session.commit()
+        
+        # 4. Ejecutar la actualización
+        response = client.patch(
+            "/api/patients/update-guardian-requirements",
+            headers=auth_headers
+        )
+        
+        # 5. Verificar que la actualización fue exitosa
+        assert response.status_code == 200
+        
+        # 6. Verificar en la base de datos que el menor mantiene su guardián
+        db_session.refresh(minor_patient)
+        assert getattr(minor_patient, 'requires_guardian') is True
+        assert getattr(minor_patient, 'guardian_id') == guardian.id
+
+
 if __name__ == "__main__":
     pytest.main([__file__])
