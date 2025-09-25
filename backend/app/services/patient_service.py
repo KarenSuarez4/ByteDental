@@ -33,46 +33,57 @@ class PatientService:
         
         # VALIDACIONES PREVIAS - antes de crear cualquier registro
         guardian_id = None
-        if hasattr(patient_data, 'guardian_id') and patient_data.guardian_id:
-            # Verificar que el guardian existe si se proporciona
-            guardian = self.db.query(Guardian).filter(
-                and_(Guardian.id == patient_data.guardian_id, Guardian.is_active == True)
-            ).first()
-            if not guardian:
-                raise ValueError(f"El guardian con ID {patient_data.guardian_id} no existe o no está activo")
-            guardian_id = patient_data.guardian_id
-        elif hasattr(patient_data, 'guardian') and patient_data.guardian:
-            # Crear un guardian nuevo
-            from app.services.guardian_service import GuardianService
-            guardian_service = GuardianService(self.db, self.user_id, self.user_ip)
-            
-            # Verificar que no exista otra persona con el mismo documento del guardian
-            existing_guardian_person = self.person_service.get_person_by_document(
-                patient_data.guardian.person.document_number
-            )
-            if existing_guardian_person:
-                raise ValueError(f"Ya existe una persona con el documento {patient_data.guardian.person.document_number}")
-            
-            # Crear el guardian
-            from app.schemas.guardian_schema import GuardianCreate
-            guardian_create_data = GuardianCreate(
-                person=patient_data.guardian.person,
-                relationship_type=patient_data.guardian.relationship_type
-            )
-            new_guardian = guardian_service.create_guardian(guardian_create_data)
-            guardian_id = new_guardian.id
+        guardian_created = False  # Flag para rollback
         
-        # VALIDACIÓN: Si el paciente requiere guardián, debe proporcionarse uno válido
-        if requires_guardian and guardian_id is None:
-            age_reason = "menor de 18 años" if age < 18 else "mayor de 64 años"
-            raise ValueError(f"El paciente es {age_reason} (edad: {age}) y requiere un guardián. Debe proporcionar un guardian_id válido")
-        
-        # VALIDACIÓN: Si no requiere guardián, no debe asignarse uno
-        if not requires_guardian and guardian_id is not None:
-            raise ValueError(f"El paciente tiene {age} años y no requiere guardián. No debe proporcionar guardian_id")
-
+        # Iniciar transacción completa
+        transaction = self.db.begin()
         try:
-            # Crear la persona (ya validamos todo previamente)
+            if hasattr(patient_data, 'guardian_id') and patient_data.guardian_id:
+                # Verificar que el guardian existe si se proporciona
+                guardian = self.db.query(Guardian).filter(
+                    and_(Guardian.id == patient_data.guardian_id, Guardian.is_active == True)
+                ).first()
+                if not guardian:
+                    raise ValueError(f"El guardian con ID {patient_data.guardian_id} no existe o no está activo")
+                guardian_id = patient_data.guardian_id
+                
+            elif hasattr(patient_data, 'guardian') and patient_data.guardian:
+                # Crear un guardian nuevo
+                from app.services.guardian_service import GuardianService
+                guardian_service = GuardianService(self.db, self.user_id, self.user_ip)
+                
+                # Verificar que no exista otra persona con el mismo documento del guardian
+                existing_guardian_person = self.person_service.get_person_by_document(
+                    patient_data.guardian.person.document_number
+                )
+                if existing_guardian_person:
+                    raise ValueError(f"Ya existe una persona con el documento {patient_data.guardian.person.document_number}")
+                
+                # Crear el guardian (permitiendo email y teléfono duplicado para tutores legales)
+                from app.schemas.guardian_schema import GuardianCreate
+                guardian_create_data = GuardianCreate(
+                    person=patient_data.guardian.person,
+                    relationship_type=patient_data.guardian.relationship_type
+                )
+                
+                # Crear guardian permitiendo duplicados de email/teléfono para tutores legales
+                new_guardian = guardian_service.create_guardian(
+                    guardian_create_data, 
+                    allow_duplicate_contact=True
+                )
+                guardian_id = new_guardian.id
+                guardian_created = True
+            
+            # VALIDACIÓN: Si el paciente requiere guardián, debe proporcionarse uno válido
+            if requires_guardian and guardian_id is None:
+                age_reason = "menor de 18 años" if age < 18 else "mayor de 64 años"
+                raise ValueError(f"El paciente es {age_reason} (edad: {age}) y requiere un guardián. Debe proporcionar un guardian_id válido o datos del guardian")
+            
+            # VALIDACIÓN: Si no requiere guardián, no debe asignarse uno
+            if not requires_guardian and guardian_id is not None:
+                raise ValueError(f"El paciente tiene {age} años y no requiere guardián. No debe proporcionar guardian_id")
+
+            # Crear la persona del paciente
             person = self.person_service.create_person(patient_data.person)
             
             # Crear el paciente
@@ -101,17 +112,22 @@ class PatientService:
                         "occupation": patient_data.occupation,
                         "guardian_id": guardian_id,
                         "requires_guardian": requires_guardian
-                    }
+                    },
+                    "guardian_created": guardian_created
                 },
                 ip_origen=self.user_ip
             )
+            
+            # Confirmar transacción
+            transaction.commit()
             
             # Cargar la relación con person y guardian
             patient = self.get_patient_by_id(getattr(patient, 'id'), include_person=True, include_guardian=True)
             return patient
             
         except Exception as e:
-            self.db.rollback()
+            # Rollback completo en caso de cualquier error
+            transaction.rollback()
             raise e
     
     def get_patient_by_id(self, patient_id: int, include_person: bool = True, include_guardian: bool = False) -> Optional[Patient]:

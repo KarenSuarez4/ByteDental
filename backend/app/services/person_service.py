@@ -37,21 +37,28 @@ class PersonService:
         self.user_ip = user_ip
         self.auditoria_service = AuditoriaService()
     
-    def create_person(self, person_data: PersonCreate) -> Person:
-        """Crear una nueva persona"""
+    def create_person(self, person_data: PersonCreate, allow_duplicate_email: bool = False, allow_duplicate_phone: bool = False) -> Person:
+        """
+        Crear una nueva persona
+        
+        Args:
+            person_data: Datos de la persona
+            allow_duplicate_email: Permite emails duplicados (útil para tutores legales)
+            allow_duplicate_phone: Permite teléfonos duplicados (útil para tutores legales)
+        """
         # Verificar que no exista otra persona con el mismo documento
         existing_person = self.get_person_by_document(person_data.document_number)
         if existing_person:
             raise ValueError(f"Ya existe una persona con el documento {person_data.document_number}")
         
-        # Verificar que no exista otra persona con el mismo email
-        if person_data.email:
+        # Verificar email solo si no se permite duplicado
+        if person_data.email and not allow_duplicate_email:
             existing_email = self.get_person_by_email(person_data.email)
             if existing_email:
                 raise ValueError(f"Ya existe una persona con el email {person_data.email}")
         
-        # Verificar que no exista otra persona con el mismo teléfono
-        if person_data.phone:
+        # Verificar teléfono solo si no se permite duplicado
+        if person_data.phone and not allow_duplicate_phone:
             existing_phone = self.get_person_by_phone(person_data.phone)
             if existing_phone:
                 raise ValueError(f"Ya existe una persona con el teléfono {person_data.phone}")

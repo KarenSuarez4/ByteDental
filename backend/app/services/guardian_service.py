@@ -17,8 +17,14 @@ class GuardianService:
         self.person_service = PersonService(db, user_id, user_ip)
         self.auditoria_service = AuditoriaService()
     
-    def create_guardian(self, guardian_data: GuardianCreate) -> Guardian:
-        """Crear un nuevo guardian (incluye crear la persona)"""
+    def create_guardian(self, guardian_data: GuardianCreate, allow_duplicate_contact: bool = False) -> Guardian:
+        """
+        Crear un nuevo guardian (incluye crear la persona)
+        
+        Args:
+            guardian_data: Datos del guardian
+            allow_duplicate_contact: Permite emails y teléfonos duplicados para tutores legales
+        """
         
         # Verificar que no exista otra persona con el mismo documento
         existing_person = self.person_service.get_person_by_document(
@@ -43,8 +49,12 @@ class GuardianService:
             # Usar la persona existente
             person = existing_person
         else:
-            # Crear nueva persona
-            person = self.person_service.create_person(guardian_data.person)
+            # Crear nueva persona (permitiendo duplicados de contacto si es tutor legal)
+            person = self.person_service.create_person(
+                guardian_data.person, 
+                allow_duplicate_email=allow_duplicate_contact,
+                allow_duplicate_phone=allow_duplicate_contact
+            )
         
         # Verificar que el guardian sea mayor de edad
         age = self.person_service.calculate_age(person.birthdate)
@@ -74,7 +84,8 @@ class GuardianService:
                     "person_data": serialize_for_audit(guardian_data.person.model_dump()) if hasattr(guardian_data, 'person') else None,
                     "guardian_data": {
                         "relationship_type": guardian_data.relationship_type.value
-                    }
+                    },
+                    "allow_duplicate_contact": allow_duplicate_contact
                 },
                 ip_origen=self.user_ip
             )

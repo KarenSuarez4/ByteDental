@@ -31,12 +31,7 @@ class PersonCreate(PersonBase):
     pass
 
 class PersonUpdate(BaseModel):
-    """Schema para actualizar una persona - solo campos permitidos"""
-    # Tipo de documento
-    document_type: Optional[DocumentTypeEnum] = None
-    
-    # Número de documento
-    document_number: Optional[str] = Field(None, min_length=1, max_length=30, description="Número de documento")
+    """Schema para actualizar una persona - solo campos permitidos (documento NO editable)"""
     
     # Nombre completo
     first_surname: Optional[str] = Field(None, min_length=1, max_length=50, description="Primer apellido")
@@ -44,10 +39,8 @@ class PersonUpdate(BaseModel):
     first_name: Optional[str] = Field(None, min_length=1, max_length=50, description="Primer nombre")
     middle_name: Optional[str] = Field(None, max_length=50, description="Segundo nombre")
     
-    # Correo electrónico
-    email: Optional[EmailStr] = None
-    
-    # Número de teléfono
+    # Información de contacto
+    email: Optional[EmailStr] = Field(None, description="Correo electrónico")
     phone: Optional[str] = Field(None, max_length=20, description="Teléfono")
     
     # Fecha de nacimiento
