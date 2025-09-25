@@ -20,8 +20,9 @@ const UserHeader = ({ userRole }) => {
     'Administrador': [
       { path: "/users/register", label: "Registrar usuarios" },
       { path: "/users/manage", label: "Gestión de usuarios" },
+      { path: "/dental-services/register", label: "Crear servicios" },
+      { path: "/dental-services/manage", label: "Gestionar servicios" },
       { path: "/reports", label: "Reportes" },
-      { path: "/services", label: "Catálogo de servicios" },
     ],
     'Asistente': [
       { path: "/patients/register", label: "Registrar paciente" },
