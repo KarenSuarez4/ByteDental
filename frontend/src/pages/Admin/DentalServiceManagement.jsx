@@ -406,7 +406,7 @@ function DentalServiceManagement() {
                             className="bg-primary-blue hover:bg-primary-blue-hover text-white px-4 py-2 rounded-[40px] font-poppins text-14 font-bold w-[100px] h-[32px]"
                             onClick={() => handleEdit(service)}
                           >
-                            Editar
+                            Modificar
                           </Button>
                           <Button
                             className="bg-header-blue hover:bg-header-blue-hover text-white px-4 py-2 rounded-[40px] font-poppins text-14 font-bold w-[100px] h-[32px]"
