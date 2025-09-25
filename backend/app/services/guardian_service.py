@@ -148,8 +148,15 @@ class GuardianService:
         
         return query.offset(skip).limit(limit).all()
     
-    def update_guardian(self, guardian_id: int, guardian_data: GuardianUpdate) -> Optional[Guardian]:
-        """Actualizar guardian (puede incluir datos de persona)"""
+    def update_guardian(self, guardian_id: int, guardian_data: GuardianUpdate, allow_duplicate_contact: bool = False) -> Optional[Guardian]:
+        """
+        Actualizar guardian (puede incluir datos de persona)
+        
+        Args:
+            guardian_id: ID del guardian a actualizar
+            guardian_data: Datos para actualizar
+            allow_duplicate_contact: Permite emails y teléfonos duplicados para casos familiares
+        """
         guardian = self.get_guardian_by_id(guardian_id, include_person=True)
         if not guardian:
             return None
@@ -157,7 +164,12 @@ class GuardianService:
         try:
             # Actualizar datos de la persona si se proporcionan
             if guardian_data.person:
-                self.person_service.update_person(guardian.person_id, guardian_data.person)
+                self.person_service.update_person(
+                    guardian.person_id, 
+                    guardian_data.person,
+                    allow_duplicate_email=allow_duplicate_contact,
+                    allow_duplicate_phone=allow_duplicate_contact
+                )
                 
                 # Verificar que siga siendo mayor de edad
                 updated_person = self.person_service.get_person_by_id(guardian.person_id)

@@ -12,6 +12,8 @@ class PatientBase(BaseModel):
     occupation: Optional[str] = Field(None, max_length=50, description="Ocupación")
     requires_guardian: bool = Field(default=False, description="Requiere tutor/guardian")
     guardian_id: Optional[int] = Field(None, description="ID del guardian asignado")
+    has_disability: bool = Field(default=False, description="Indica si el paciente tiene alguna discapacidad")
+    disability_description: Optional[str] = Field(None, description="Descripción de la discapacidad")
 
 class PatientCreate(BaseModel):
     """Schema para crear un paciente (incluye datos de persona)"""
@@ -20,8 +22,24 @@ class PatientCreate(BaseModel):
     # Datos específicos del paciente
     occupation: Optional[str] = Field(None, max_length=50, description="Ocupación")
     guardian_id: Optional[int] = Field(None, description="ID del guardian asignado (si ya existe)")
+    has_disability: bool = Field(default=False, description="Indica si el paciente tiene alguna discapacidad")
+    disability_description: Optional[str] = Field(None, description="Descripción de la discapacidad")
     # Datos del guardian nuevo (si se va a crear)
     guardian: Optional['GuardianCreateEmbedded'] = Field(None, description="Datos para crear un guardian nuevo")
+
+    @validator('disability_description')
+    def validate_disability_description(cls, v, values):
+        has_disability = values.get('has_disability', False)
+        
+        # Si tiene discapacidad, debe proporcionar descripción
+        if has_disability and not v:
+            raise ValueError('La descripción de la discapacidad es requerida cuando el paciente tiene alguna discapacidad')
+        
+        # Si no tiene discapacidad, la descripción debe ser None
+        if not has_disability and v:
+            raise ValueError('No debe proporcionar descripción de discapacidad cuando has_disability=False')
+        
+        return v
 
 class PatientUpdate(BaseModel):
     """Schema para actualizar un paciente"""
@@ -31,9 +49,27 @@ class PatientUpdate(BaseModel):
     occupation: Optional[str] = Field(None, max_length=50)
     guardian_id: Optional[int] = None
     requires_guardian: Optional[bool] = None
+    has_disability: Optional[bool] = None
+    disability_description: Optional[str] = None
     is_active: Optional[bool] = None
     # Datos del guardian nuevo (si se va a crear o actualizar)
     guardian: Optional['GuardianCreateEmbedded'] = Field(None, description="Datos para crear o actualizar guardian")
+
+    @validator('disability_description')
+    def validate_disability_description(cls, v, values):
+        has_disability = values.get('has_disability')
+        
+        # Solo validar si has_disability está siendo actualizado
+        if has_disability is not None:
+            # Si tiene discapacidad, debe proporcionar descripción
+            if has_disability and not v:
+                raise ValueError('La descripción de la discapacidad es requerida cuando el paciente tiene alguna discapacidad')
+            
+            # Si no tiene discapacidad, la descripción debe ser None
+            if not has_disability and v:
+                raise ValueError('No debe proporcionar descripción de discapacidad cuando has_disability=False')
+        
+        return v
 
 class PatientStatusChange(BaseModel):
     """Schema para cambiar el estado de un paciente"""

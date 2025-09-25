@@ -155,8 +155,16 @@ class PersonService:
         
         return query.offset(skip).limit(limit).all()
     
-    def update_person(self, person_id: int, person_data: PersonUpdate) -> Optional[Person]:
-        """Actualizar persona"""
+    def update_person(self, person_id: int, person_data: PersonUpdate, allow_duplicate_email: bool = False, allow_duplicate_phone: bool = False) -> Optional[Person]:
+        """
+        Actualizar persona
+        
+        Args:
+            person_id: ID de la persona a actualizar
+            person_data: Datos para actualizar
+            allow_duplicate_email: Permite emails duplicados (útil para tutores legales)
+            allow_duplicate_phone: Permite teléfonos duplicados (útil para tutores legales)
+        """
         person = self.get_person_by_id(person_id)
         if not person:
             return None
@@ -177,18 +185,20 @@ class PersonService:
         try:
             update_data = person_data.model_dump(exclude_unset=True)
             
-            # Validar duplicados antes de actualizar
+            # Validar duplicados antes de actualizar (solo si no se permiten duplicados)
             if 'document_number' in update_data and update_data['document_number'] != person.document_number:
                 existing_document = self.get_person_by_document(update_data['document_number'])
                 if existing_document and existing_document.id != person_id:
                     raise ValueError(f"Ya existe una persona con el documento {update_data['document_number']}")
             
-            if 'email' in update_data and update_data['email'] and update_data['email'] != person.email:
+            # Validar email solo si no se permite duplicado
+            if 'email' in update_data and update_data['email'] and update_data['email'] != person.email and not allow_duplicate_email:
                 existing_email = self.get_person_by_email(update_data['email'])
                 if existing_email and existing_email.id != person_id:
                     raise ValueError(f"Ya existe una persona con el email {update_data['email']}")
             
-            if 'phone' in update_data and update_data['phone'] and update_data['phone'] != person.phone:
+            # Validar teléfono solo si no se permite duplicado
+            if 'phone' in update_data and update_data['phone'] and update_data['phone'] != person.phone and not allow_duplicate_phone:
                 existing_phone = self.get_person_by_phone(update_data['phone'])
                 if existing_phone and existing_phone.id != person_id:
                     raise ValueError(f"Ya existe una persona con el teléfono {update_data['phone']}")
