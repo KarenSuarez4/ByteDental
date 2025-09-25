@@ -1,7 +1,7 @@
 """
 Router para servicios odontológicos con autenticación y autorización
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
