@@ -45,6 +45,10 @@ class RolePermissions:
     PERSON_WRITE = [ASSISTANT]  # Solo ASSISTANT puede crear, actualizar, eliminar personas
     PERSON_READ = [ASSISTANT, DENTIST]  # ASSISTANT y DENTIST pueden leer información de personas
 
+    # Permisos para servicios dentales
+    DENTAL_SERVICE_READ = [ADMIN, ASSISTANT]  # Solo ADMIN y ASSISTANT pueden leer servicios dentales
+    DENTAL_SERVICE_WRITE = [ADMIN]  # Solo ADMIN puede crear, actualizar, eliminar servicios dentales
+
 def get_current_user_from_header(request: Request, db: Session = Depends(get_db)) -> Optional[User]:
     """
     Obtener usuario actual desde el header Authorization
@@ -167,6 +171,24 @@ async def require_person_read(request: Request, db: Session = Depends(get_db)) -
 async def require_person_write(request: Request, db: Session = Depends(get_db)) -> User:
     """Require permissions to write person data"""
     return await require_roles(RolePermissions.PERSON_WRITE)(request, db)
+
+# Dependencies generales
+async def require_basic_access(request: Request, db: Session = Depends(get_db)) -> User:
+    """Require basic access permissions (all authenticated roles)"""
+    return await require_roles(RolePermissions.BASIC_ACCESS)(request, db)
+
+async def require_user_management(request: Request, db: Session = Depends(get_db)) -> User:
+    """Require user management permissions (only ADMIN)"""
+    return await require_roles(RolePermissions.USER_MANAGEMENT)(request, db)
+
+# Dependencies específicas para servicios dentales
+async def require_dental_service_read(request: Request, db: Session = Depends(get_db)) -> User:
+    """Require permissions to read dental services (only ADMIN and ASSISTANT)"""
+    return await require_roles(RolePermissions.DENTAL_SERVICE_READ)(request, db)
+
+async def require_dental_service_write(request: Request, db: Session = Depends(get_db)) -> User:
+    """Require permissions to write dental services (only ADMIN)"""
+    return await require_roles(RolePermissions.DENTAL_SERVICE_WRITE)(request, db)
 
 def get_user_context(request: Request, db: Session = Depends(get_db)) -> tuple[Optional[int], str]:
     """

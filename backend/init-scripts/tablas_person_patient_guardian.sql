@@ -120,3 +120,19 @@ COMMENT ON COLUMN patients.guardian_id IS 'Reference to the guardian assigned to
 -- =============================================
 -- SCRIPT EJECUTADO EXITOSAMENTE
 -- =============================================
+
+
+-- Crear tabla Dental_Service
+CREATE TABLE IF NOT EXISTS dental_service (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    value NUMERIC(10,2) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+-- Agregar trigger de auditoría genérico
+DROP TRIGGER IF EXISTS audit_dental_service_trigger ON dental_service;
+CREATE TRIGGER audit_dental_service_trigger
+    AFTER INSERT OR UPDATE OR DELETE ON dental_service
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();

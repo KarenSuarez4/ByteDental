@@ -11,6 +11,8 @@ import PasswordReset3 from './pages/PasswordReset3.jsx';
 import ForcePasswordChange from './pages/ForcePasswordChange.jsx';
 import RegisterUser from './pages/Admin/RegisterUser';
 import UserManagement from './pages/Admin/UserManagement.jsx';
+import RegisterDentalService from './pages/Admin/RegisterDentalService';
+import DentalServiceManagement from './pages/Admin/DentalServiceManagement';
 import AuditLog from './pages/Auditor/AuditLog.jsx';
 import RegisterPatient from './pages/Asistente/RegisterPatient';
 import PatientManagement from './pages/Asistente/PatientManagement';
@@ -56,14 +58,19 @@ function AppContent() {
                 <UserManagement />
               </ProtectedRoute>
             } />
+            <Route path="/dental-services/register" element={
+              <ProtectedRoute>
+                <RegisterDentalService />
+              </ProtectedRoute>
+            } />
+            <Route path="/dental-services/manage" element={
+              <ProtectedRoute>
+                <DentalServiceManagement />
+              </ProtectedRoute>
+            } />
             <Route path="/reports" element={
               <ProtectedRoute>
                 <DummyPage title="Reportes" />
-              </ProtectedRoute>
-            } />
-            <Route path="/services" element={
-              <ProtectedRoute>
-                <DummyPage title="Catálogo de servicios" />
               </ProtectedRoute>
             } />
           </>
@@ -125,7 +132,7 @@ function AppContent() {
             userRole === "Auditor" ? "/audit-logs" :
             "/login"
           ) : "/login"
-        } />} />
+        } replace />} />
       </Routes>
     </div>
   );

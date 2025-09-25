@@ -34,6 +34,35 @@ class AuditResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class EntityAuditTrailResponse(BaseModel):
+    """Respuesta para el historial de auditoría de una entidad específica"""
+    entity_type: str
+    entity_id: int
+    audit_trail: List[AuditResponse]
+    total_records: int
+    returned_records: int
+    
+    class Config:
+        from_attributes = True
+
+class PatientAuditTrailResponse(EntityAuditTrailResponse):
+    """Respuesta específica para auditoría de pacientes"""
+    pass
+
+class GuardianAuditTrailResponse(EntityAuditTrailResponse):
+    """Respuesta específica para auditoría de guardianes"""
+    pass
+
+class PersonAuditTrailResponse(EntityAuditTrailResponse):
+    """Respuesta específica para auditoría de personas"""
+    pass
+
+class DentalServiceAuditTrailResponse(EntityAuditTrailResponse):
+    """Respuesta específica para auditoría de servicios dentales"""
+    service_name: str
+    service_value: str
+    service_status: str
+
 @router.get("/", response_model=List[AuditResponse])
 def get_eventos_auditoria(
     skip: int = Query(0, ge=0),
@@ -277,7 +306,7 @@ def get_eventos_por_rango_fechas(
 # ENDPOINTS CENTRALIZADOS DE AUDITORÍA POR ENTIDAD
 # =============================================================================
 
-@router.get("/patients/{patient_id}", response_model=dict)
+@router.get("/patients/{patient_id}", response_model=PatientAuditTrailResponse)
 def get_patient_audit_trail(
     patient_id: int,
     skip: int = Query(0, ge=0),
@@ -312,15 +341,15 @@ def get_patient_audit_trail(
         tipo_registro="patients"
     )
     
-    return {
-        "entity_type": "patients",
-        "entity_id": patient_id,
-        "audit_trail": audit_records,
-        "total_records": total_records,
-        "returned_records": len(audit_records)
-    }
+    return PatientAuditTrailResponse(
+        entity_type="patients",
+        entity_id=patient_id,
+        audit_trail=audit_records,
+        total_records=total_records,
+        returned_records=len(audit_records)
+    )
 
-@router.get("/guardians/{guardian_id}", response_model=dict)
+@router.get("/guardians/{guardian_id}", response_model=GuardianAuditTrailResponse)
 def get_guardian_audit_trail(
     guardian_id: int,
     skip: int = Query(0, ge=0),
@@ -355,15 +384,15 @@ def get_guardian_audit_trail(
         tipo_registro="guardians"
     )
     
-    return {
-        "entity_type": "guardians",
-        "entity_id": guardian_id,
-        "audit_trail": audit_records,
-        "total_records": total_records,
-        "returned_records": len(audit_records)
-    }
+    return GuardianAuditTrailResponse(
+        entity_type="guardians",
+        entity_id=guardian_id,
+        audit_trail=audit_records,
+        total_records=total_records,
+        returned_records=len(audit_records)
+    )
 
-@router.get("/persons/{person_id}", response_model=dict)
+@router.get("/persons/{person_id}", response_model=PersonAuditTrailResponse)
 def get_person_audit_trail(
     person_id: int,
     skip: int = Query(0, ge=0),
@@ -398,10 +427,56 @@ def get_person_audit_trail(
         tipo_registro="persons"
     )
     
-    return {
-        "entity_type": "persons",
-        "entity_id": person_id,
-        "audit_trail": audit_records,
-        "total_records": total_records,
-        "returned_records": len(audit_records)
-    }
+    return PersonAuditTrailResponse(
+        entity_type="persons",
+        entity_id=person_id,
+        audit_trail=audit_records,
+        total_records=total_records,
+        returned_records=len(audit_records)
+    )
+
+@router.get("/dental-services/{service_id}", response_model=DentalServiceAuditTrailResponse)
+def get_dental_service_audit_trail(
+    service_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_auditor_user)
+):
+    """Obtener historial de auditoría de un servicio odontológico específico - Solo AUDITORES"""
+    from app.services.dental_service import get_dental_service_service
+    
+    auditoria_service = AuditoriaService()
+    
+    # Verificar que el servicio odontológico existe
+    dental_service_service = get_dental_service_service(db)
+    dental_service = dental_service_service.get_dental_service(service_id)
+    if not dental_service:
+        raise HTTPException(status_code=404, detail="Servicio odontológico no encontrado")
+    
+    # Obtener registros de auditoría
+    audit_records = auditoria_service.obtener_eventos_por_registro(
+        db=db,
+        registro_id=str(service_id),
+        tipo_registro="dental_services",
+        skip=skip,
+        limit=limit
+    )
+    
+    # Obtener conteo total
+    total_records = auditoria_service.obtener_conteo_eventos_por_registro(
+        db=db,
+        registro_id=str(service_id),
+        tipo_registro="dental_services"
+    )
+    
+    return DentalServiceAuditTrailResponse(
+        entity_type="dental_services",
+        entity_id=service_id,
+        service_name=dental_service.name,
+        service_value=str(dental_service.value),
+        service_status="activo" if dental_service.is_active else "inactivo",
+        audit_trail=audit_records,
+        total_records=total_records,
+        returned_records=len(audit_records)
+    )

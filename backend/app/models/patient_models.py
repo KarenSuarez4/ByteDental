@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Index
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Index, Text
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -10,6 +10,8 @@ class Patient(Base):
     occupation = Column(String(50), nullable=True)
     guardian_id = Column(Integer, ForeignKey("guardians.id", ondelete="SET NULL"), nullable=True)
     requires_guardian = Column(Boolean, default=False)
+    has_disability = Column(Boolean, default=False)
+    disability_description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
 
     # Relaciones

@@ -38,13 +38,49 @@ def create_patient(
     try:
         return service.create_patient(patient_data)
     except ValueError as e:
+        # Errores de validación de negocio (400 Bad Request)
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        # Log detallado para debugging
         print(f"Error detallado en create_patient: {str(e)}")
         print(f"Tipo de error: {type(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
+        
+        # Manejo específico de errores comunes
+        error_message = str(e)
+        
+        if "A transaction is already begun" in error_message:
+            raise HTTPException(
+                status_code=500, 
+                detail="Error de transacción en base de datos. Verifique que los datos sean válidos y no existan conflictos."
+            )
+        elif "duplicate key" in error_message.lower():
+            raise HTTPException(
+                status_code=409, 
+                detail="Ya existe un registro con los mismos datos (documento, email o teléfono duplicado)."
+            )
+        elif "foreign key" in error_message.lower():
+            raise HTTPException(
+                status_code=400, 
+                detail="Referencias inválidas en los datos proporcionados."
+            )
+        elif "not null" in error_message.lower():
+            raise HTTPException(
+                status_code=400, 
+                detail="Faltan campos obligatorios en los datos proporcionados."
+            )
+        elif "fecha de nacimiento no puede ser futura" in error_message.lower():
+            raise HTTPException(
+                status_code=400, 
+                detail="La fecha de nacimiento no puede ser futura."
+            )
+        else:
+            # Error genérico
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Error interno del servidor. Por favor contacte al administrador. Detalle: {error_message[:200]}"
+            )
 
 @router.get("/", response_model=List[PatientWithGuardian])
 def get_patients(
@@ -258,13 +294,55 @@ def change_patient_status(
 
 @router.patch("/update-guardian-requirements")
 def update_guardian_requirements_by_age(
+    request: Request,
     db: Session = Depends(get_db),
     current_user = Depends(require_patient_write)  # Solo ASSISTANT
 ):
-    """Calcula la edad actual de todos los pacientes en la base de datos y actualiza automáticamente el campo requires_guardian basándose en la edad"""
-    service = get_patient_service(db)
-    result = service.update_guardian_requirements_by_age()
-    return {
-        "message": "Requirements de guardian actualizados",
-        **result
-    }
+    """
+    Calcula la edad actual de todos los pacientes y actualiza automáticamente:
+    - El campo requires_guardian basándose en la edad actual
+    - Desasigna automáticamente guardianes de pacientes que ya no los requieren
+    
+    Reglas de edad:
+    - Menores de 18 años: REQUIEREN guardián
+    - Entre 18-64 años: NO requieren guardián (desasignación automática)
+    - Mayores de 64 años: REQUIEREN guardián
+    """
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
+    
+    try:
+        result = service.update_guardian_requirements_by_age()
+        
+        # Preparar mensaje de respuesta más informativo
+        total_changes = result['requirements_updated_count'] + result['guardians_unassigned_count']
+        
+        if total_changes == 0:
+            message = "✅ Todos los pacientes ya tienen requirements correctos - No se realizaron cambios"
+        else:
+            changes = []
+            if result['requirements_updated_count'] > 0:
+                changes.append(f"{result['requirements_updated_count']} requirements actualizados")
+            if result['guardians_unassigned_count'] > 0:
+                changes.append(f"{result['guardians_unassigned_count']} guardianes desasignados automáticamente")
+            
+            message = f"🔄 Actualización completada: {', '.join(changes)}"
+        
+        return {
+            "success": True,
+            "message": message,
+            "summary": result['summary'],
+            "statistics": {
+                "total_patients_processed": result['total_processed'],
+                "requirements_updated": result['requirements_updated_count'],
+                "guardians_auto_unassigned": result['guardians_unassigned_count'],
+                "total_changes_made": total_changes
+            },
+            "details": {
+                "updated_patients": result['updated_patients'],
+                "unassigned_guardians": result['unassigned_guardians']
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error durante la actualización: {str(e)}")

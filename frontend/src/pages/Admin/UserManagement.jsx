@@ -664,18 +664,18 @@ function UserManagement() {
                 </form>
 
                 {/* Botones de acción */}
-                <div className="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200">
+                <div className="flex justify-center space-x-6 mt-8 pt-6 border-t border-gray-200">
                   <Button
-                    className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-3 font-semibold rounded-[40px] text-16 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                    className="bg-header-blue hover:bg-header-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-16 shadow-md"
                     onClick={handleCancelEdit}
                   >
                     Cancelar
                   </Button>
                   <Button
-                    className="bg-gradient-to-r from-primary-blue to-header-blue hover:from-primary-blue-hover hover:to-header-blue-hover text-white px-8 py-3 font-semibold rounded-[40px] text-16 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                    className="bg-primary-blue hover:bg-primary-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-16 shadow-md"
                     onClick={handleSaveEdit}
                   >
-                    Guardar Cambios
+                    Guardar cambios
                   </Button>
                 </div>
               </div>
