@@ -8,7 +8,7 @@ class DocumentTypeEnum(enum.Enum):
     CC = "CC"  # Cédula de Ciudadanía
     TI = "TI"  # Tarjeta de Identidad
     CE = "CE"  # Cédula de Extranjería
-    PA = "PA"  # Pasaporte
+    PP = "PP"  # Pasaporte
     RC = "RC"  # Registro Civil
 
 class Person(Base):

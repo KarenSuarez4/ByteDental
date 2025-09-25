@@ -38,13 +38,49 @@ def create_patient(
     try:
         return service.create_patient(patient_data)
     except ValueError as e:
+        # Errores de validación de negocio (400 Bad Request)
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        # Log detallado para debugging
         print(f"Error detallado en create_patient: {str(e)}")
         print(f"Tipo de error: {type(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
+        
+        # Manejo específico de errores comunes
+        error_message = str(e)
+        
+        if "A transaction is already begun" in error_message:
+            raise HTTPException(
+                status_code=500, 
+                detail="Error de transacción en base de datos. Verifique que los datos sean válidos y no existan conflictos."
+            )
+        elif "duplicate key" in error_message.lower():
+            raise HTTPException(
+                status_code=409, 
+                detail="Ya existe un registro con los mismos datos (documento, email o teléfono duplicado)."
+            )
+        elif "foreign key" in error_message.lower():
+            raise HTTPException(
+                status_code=400, 
+                detail="Referencias inválidas en los datos proporcionados."
+            )
+        elif "not null" in error_message.lower():
+            raise HTTPException(
+                status_code=400, 
+                detail="Faltan campos obligatorios en los datos proporcionados."
+            )
+        elif "fecha de nacimiento no puede ser futura" in error_message.lower():
+            raise HTTPException(
+                status_code=400, 
+                detail="La fecha de nacimiento no puede ser futura."
+            )
+        else:
+            # Error genérico
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Error interno del servidor. Por favor contacte al administrador. Detalle: {error_message[:200]}"
+            )
 
 @router.get("/", response_model=List[PatientWithGuardian])
 def get_patients(
