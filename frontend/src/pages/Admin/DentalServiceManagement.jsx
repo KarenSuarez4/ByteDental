@@ -228,9 +228,6 @@ function DentalServiceManagement() {
     
     return nameMatch && statusMatch && minPriceMatch && maxPriceMatch;
   });
-
-  // Calcular total de páginas
-  const totalPagesCount = Math.ceil(filteredServices.length / itemsPerPage);
   
   // Obtener servicios para la página actual
   const currentServices = filteredServices.slice(
