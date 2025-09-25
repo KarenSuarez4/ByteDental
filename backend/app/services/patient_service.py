@@ -198,11 +198,52 @@ class PatientService:
                 updated_person = self.person_service.update_person(patient.person.id, patient_data.person)
             
             # Actualizar datos específicos del paciente
-            patient_fields = patient_data.model_dump(exclude_unset=True, exclude={'person'})
+            patient_fields = patient_data.model_dump(exclude_unset=True, exclude={'person', 'guardian'})
             print(f"DEBUG: patient_fields = {patient_fields}")
             
-            # Validar guardian_id si se proporciona
-            if 'guardian_id' in patient_fields and patient_fields['guardian_id']:
+            # Manejar guardian si se proporciona
+            if hasattr(patient_data, 'guardian') and patient_data.guardian:
+                from app.services.guardian_service import GuardianService
+                guardian_service = GuardianService(self.db, self.user_id, self.user_ip)
+                
+                current_guardian_id = getattr(patient, 'guardian_id')
+                
+                # Si el paciente ya tiene un guardian, actualizarlo
+                if current_guardian_id:
+                    # Actualizar guardian existente
+                    from app.schemas.guardian_schema import GuardianUpdate
+                    from app.schemas.person_schema import PersonUpdate
+                    
+                    # Convertir PersonCreate a PersonUpdate
+                    person_update_data = PersonUpdate(
+                        document_type=patient_data.guardian.person.document_type,
+                        document_number=patient_data.guardian.person.document_number,
+                        first_name=patient_data.guardian.person.first_name,
+                        middle_name=patient_data.guardian.person.middle_name,
+                        first_surname=patient_data.guardian.person.first_surname,
+                        second_surname=patient_data.guardian.person.second_surname,
+                        email=patient_data.guardian.person.email,
+                        phone=patient_data.guardian.person.phone,
+                        birthdate=patient_data.guardian.person.birthdate
+                    )
+                    
+                    guardian_update_data = GuardianUpdate(
+                        person=person_update_data,
+                        relationship_type=patient_data.guardian.relationship_type
+                    )
+                    updated_guardian = guardian_service.update_guardian(current_guardian_id, guardian_update_data)
+                else:
+                    # Crear nuevo guardian
+                    from app.schemas.guardian_schema import GuardianCreate
+                    guardian_create_data = GuardianCreate(
+                        person=patient_data.guardian.person,
+                        relationship_type=patient_data.guardian.relationship_type
+                    )
+                    new_guardian = guardian_service.create_guardian(guardian_create_data)
+                    patient_fields['guardian_id'] = new_guardian.id
+            
+            # Validar guardian_id si se proporciona directamente
+            elif 'guardian_id' in patient_fields and patient_fields['guardian_id']:
                 guardian = self.db.query(Guardian).filter(
                     and_(Guardian.id == patient_fields['guardian_id'], Guardian.is_active == True)
                 ).first()
@@ -210,12 +251,16 @@ class PatientService:
                     raise ValueError(f"El guardian con ID {patient_fields['guardian_id']} no existe o no está activo")
             
             # Recalcular requires_guardian si se actualiza la fecha de nacimiento
-            # Nota: PersonUpdate no incluye birthdate, por lo que esta validación no se ejecutará
-            # Solo se recalcula si el campo está presente en el modelo
             person_data_dict = patient_data.person.model_dump(exclude_unset=True) if patient_data.person else {}
             if person_data_dict.get('birthdate'):
                 age = self.person_service.calculate_age(person_data_dict['birthdate'])
-                patient_fields['requires_guardian'] = age < 18 or age > 64
+                new_requires_guardian = age < 18 or age > 64
+                patient_fields['requires_guardian'] = new_requires_guardian
+                
+                # Si el paciente ya no requiere guardian, remover el guardian_id
+                current_guardian_id = getattr(patient, 'guardian_id')
+                if not new_requires_guardian and current_guardian_id:
+                    patient_fields['guardian_id'] = None
             
             # VALIDACIÓN: Verificar consistencia entre requires_guardian y guardian_id
             # Obtener los valores actuales o los que se van a actualizar
