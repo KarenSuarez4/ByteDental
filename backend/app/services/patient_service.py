@@ -261,6 +261,22 @@ class PatientService:
                         # Si cambia a has_disability=False, limpiar la descripción automáticamente
                         patient_fields['disability_description'] = None
             
+            # VALIDACIONES DE ESTADO Y MOTIVO DE DESACTIVACIÓN
+            if 'is_active' in patient_fields or 'deactivation_reason' in patient_fields:
+                is_active = patient_fields.get('is_active', getattr(patient, 'is_active', True))
+                deactivation_reason = patient_fields.get('deactivation_reason', getattr(patient, 'deactivation_reason'))
+                
+                # Si se está desactivando, debe proporcionar motivo
+                if not is_active and not deactivation_reason:
+                    raise ValueError("El motivo de desactivación es requerido cuando se desactiva un paciente")
+                
+                # Si se está activando, limpiar el motivo automáticamente
+                if is_active and deactivation_reason:
+                    patient_fields['deactivation_reason'] = None
+                elif is_active and 'deactivation_reason' not in patient_fields:
+                    # Asegurar que se limpie el motivo al activar
+                    patient_fields['deactivation_reason'] = None
+            
             # Manejar guardian si se proporciona
             if hasattr(patient_data, 'guardian') and patient_data.guardian:
                 from app.services.guardian_service import GuardianService
@@ -383,35 +399,6 @@ class PatientService:
             self.db.rollback()
             raise e
     
-    def delete_patient(self, patient_id: int) -> bool:
-        """Eliminar paciente (soft delete)"""
-        patient = self.get_patient_by_id(patient_id, include_person=True)
-        if not patient:
-            return False
-        
-        # Guardar datos para auditoría antes del cambio
-        person_info = f"{patient.person.first_name} {patient.person.first_surname}" if patient.person else "N/A"
-        
-        # Realizar soft delete
-        for field, value in {"is_active": False}.items():
-            setattr(patient, field, value)
-        
-        self.db.commit()
-        
-        # Registrar evento de auditoría
-        self.auditoria_service.registrar_evento(
-            db=self.db,
-            usuario_id=self.user_id,
-            tipo_evento="DELETE",
-            registro_afectado_id=str(patient.id),
-            registro_afectado_tipo="patients",
-            descripcion_evento=f"Paciente desactivado: {person_info}",
-            detalles_cambios={"is_active": {"antes": True, "despues": False}},
-            ip_origen=self.user_ip
-        )
-        
-        return True
-    
     def update_guardian_requirements_by_age(self) -> dict:
         """
         Actualizar requirements de guardian basado en edad actual de todos los pacientes.
@@ -522,7 +509,7 @@ class PatientService:
             "summary": f"Procesados {len(patients)} pacientes activos: {len(updated_patients)} actualizaciones de requirements, {len(unassigned_guardians)} guardianes desasignados automáticamente"
         }
     
-    def change_patient_status(self, patient_id: int, new_status: bool, reason: Optional[str] = None) -> dict:
+    def change_patient_status(self, patient_id: int, new_status: bool, deactivation_reason: Optional[str] = None) -> dict:
         """
         Cambiar estado de paciente con validación y auditoría completa
         
@@ -551,15 +538,31 @@ class PatientService:
             raise ValueError(f"El paciente ya está {status_text}")
         
         # Validar motivo para desactivación
-        if not new_status and not reason:
+        if not new_status and not deactivation_reason:
             raise ValueError("El motivo es requerido para desactivar un paciente")
         
-        if new_status and reason:
+        if new_status and deactivation_reason:
             raise ValueError("No se debe proporcionar motivo al activar un paciente")
         
         try:
-            # Actualizar estado
+            # Actualizar estado y motivo de desactivación
             setattr(patient, 'is_active', new_status)
+            
+            # Actualizar deactivation_reason según el nuevo estado
+            if new_status:
+                # Si se está activando, limpiar el motivo de desactivación
+                setattr(patient, 'deactivation_reason', None)
+            else:
+                # Si se está desactivando, guardar el motivo
+                setattr(patient, 'deactivation_reason', deactivation_reason)
+            
+            # LÓGICA DE GUARDIAN: Manejar estado del guardian basado en sus pacientes asociados
+            guardian_status_changes = []
+            if patient.guardian_id:
+                guardian_status_changes = self._handle_guardian_status_on_patient_change(
+                    patient.guardian_id, new_status, deactivation_reason, patient_id
+                )
+            
             self.db.commit()
             
             # Preparar detalles para auditoría
@@ -567,18 +570,23 @@ class PatientService:
                 "is_active": {
                     "antes": previous_status,
                     "despues": new_status
+                },
+                "deactivation_reason": {
+                    "antes": getattr(patient, 'deactivation_reason', None) if not new_status else None,
+                    "despues": deactivation_reason if not new_status else None
                 }
             }
             
-            if reason:
-                change_details["motivo_desactivacion"] = reason
-            
+            # Agregar información de cambios del guardian a la auditoría
+            if guardian_status_changes:
+                change_details["guardian_auto_changes"] = guardian_status_changes
+
             # Preparar descripción del evento
             if new_status:
                 event_description = f"Paciente reactivado: {person_info}"
                 event_type = "REACTIVATE"
             else:
-                event_description = f"Paciente desactivado: {person_info} - Motivo: {reason}"
+                event_description = f"Paciente desactivado: {person_info} - Motivo: {deactivation_reason}"
                 event_type = "DEACTIVATE"
             
             # Registrar evento de auditoría
@@ -593,14 +601,29 @@ class PatientService:
                 ip_origen=self.user_ip
             )
             
-            return {
+            result = {
                 "patient_id": patient_id,
                 "patient_name": person_info,
                 "previous_status": "activo" if previous_status else "inactivo",
                 "new_status": "activo" if new_status else "inactivo",
-                "reason": reason,
+                "deactivation_reason": deactivation_reason,
                 "message": f"Paciente {'activado' if new_status else 'desactivado'} correctamente"
             }
+            
+            # Agregar información de cambios del guardian si los hay
+            if guardian_status_changes:
+                result["guardian_auto_changes"] = guardian_status_changes
+                
+                # Agregar mensaje adicional sobre el guardian
+                for change in guardian_status_changes:
+                    if change["action"] == "deactivated":
+                        result["message"] += f" - Guardian {change['guardian_id']} también fue desactivado automáticamente"
+                    elif change["action"] == "reactivated":
+                        result["message"] += f" - Guardian {change['guardian_id']} también fue reactivado automáticamente"
+                    elif change["action"] == "kept_active":
+                        result["message"] += f" - Guardian {change['guardian_id']} se mantiene activo ({change['reason']})"
+            
+            return result
             
         except Exception as e:
             self.db.rollback()
@@ -786,6 +809,107 @@ class PatientService:
                 print(f"Warning: Error al actualizar automáticamente requirements del paciente {patient.id}: {e}")
                 
         return changes_made
+    
+    def _handle_guardian_status_on_patient_change(self, guardian_id: int, patient_new_status: bool, deactivation_reason: str, current_patient_id: int) -> list:
+        """
+        Maneja automáticamente el estado del guardian cuando cambia el estado de un paciente.
+        
+        Lógica:
+        - Si el paciente se DESACTIVA: verificar si el guardian tiene otros pacientes activos
+          - Si NO tiene otros pacientes activos: desactivar guardian automáticamente
+          - Si SÍ tiene otros pacientes activos: mantener guardian activo
+        - Si el paciente se ACTIVA: activar guardian automáticamente si estaba inactivo
+        
+        Args:
+            guardian_id: ID del guardian a evaluar
+            patient_new_status: Nuevo estado del paciente (True=activo, False=inactivo)
+            deactivation_reason: Motivo de desactivación (solo si patient_new_status=False)
+            
+        Returns:
+            list: Lista de cambios realizados al guardian para auditoría
+        """
+        from app.models.guardian_models import Guardian
+        
+        # Obtener el guardian
+        guardian = self.db.query(Guardian).filter(Guardian.id == guardian_id).first()
+        if not guardian:
+            return []
+        
+        changes = []
+        
+        # Obtener todos los pacientes activos asociados a este guardian (excluyendo el actual que está cambiando)
+        other_active_patients = self.db.query(Patient).filter(
+            and_(
+                Patient.guardian_id == guardian_id,
+                Patient.is_active == True,
+                Patient.id != current_patient_id  # Excluir paciente actual
+            )
+        ).count()
+        
+        if not patient_new_status:
+            # PACIENTE SE DESACTIVA: verificar si guardian debe desactivarse
+            if other_active_patients == 0:
+                # No hay otros pacientes activos, desactivar guardian
+                if getattr(guardian, 'is_active', True):  # Solo si está activo
+                    setattr(guardian, 'is_active', False)
+                    
+                    # Registrar auditoría del cambio automático del guardian
+                    self.auditoria_service.registrar_evento(
+                        db=self.db,
+                        usuario_id=self.user_id,
+                        tipo_evento="AUTO_DEACTIVATE",
+                        registro_afectado_id=str(guardian_id),
+                        registro_afectado_tipo="guardians",
+                        descripcion_evento=f"Guardian desactivado automáticamente - Último paciente asociado fue desactivado",
+                        detalles_cambios={
+                            "is_active": {"antes": True, "despues": False},
+                            "trigger": "patient_deactivation",
+                            "trigger_reason": deactivation_reason
+                        },
+                        ip_origen=self.user_ip
+                    )
+                    
+                    changes.append({
+                        "guardian_id": guardian_id,
+                        "action": "deactivated",
+                        "reason": "No tiene pacientes activos asociados",
+                        "trigger_reason": deactivation_reason
+                    })
+            else:
+                # Hay otros pacientes activos, mantener guardian activo
+                changes.append({
+                    "guardian_id": guardian_id,
+                    "action": "kept_active",
+                    "reason": f"Tiene {other_active_patients} paciente(s) activo(s) restante(s)"
+                })
+        
+        else:
+            # PACIENTE SE ACTIVA: activar guardian si estaba inactivo
+            if not getattr(guardian, 'is_active', True):  # Solo si está inactivo
+                setattr(guardian, 'is_active', True)
+                
+                # Registrar auditoría del cambio automático del guardian
+                self.auditoria_service.registrar_evento(
+                    db=self.db,
+                    usuario_id=self.user_id,
+                    tipo_evento="AUTO_REACTIVATE",
+                    registro_afectado_id=str(guardian_id),
+                    registro_afectado_tipo="guardians", 
+                    descripcion_evento=f"Guardian reactivado automáticamente - Paciente asociado fue reactivado",
+                    detalles_cambios={
+                        "is_active": {"antes": False, "despues": True},
+                        "trigger": "patient_reactivation"
+                    },
+                    ip_origen=self.user_ip
+                )
+                
+                changes.append({
+                    "guardian_id": guardian_id,
+                    "action": "reactivated",
+                    "reason": "Paciente asociado fue reactivado"
+                })
+        
+        return changes
 
 def get_patient_service(db: Session, user_id: Optional[str] = None, user_ip: Optional[str] = None) -> PatientService:
     """Factory para obtener instancia del servicio"""

@@ -1,5 +1,4 @@
 import pytest
-import json
 import warnings
 from decimal import Decimal
 from unittest.mock import Mock, patch
@@ -23,7 +22,6 @@ from main import app
 from app.models.user_models import User
 from app.models.rol_models import Role
 from app.models.dental_service_models import DentalService
-from app.schemas.dental_service_schema import DentalServiceCreate, DentalServiceUpdate, DentalServiceStatusChange
 
 # Configuración de base de datos de test en memoria
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
