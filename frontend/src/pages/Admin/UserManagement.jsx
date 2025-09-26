@@ -78,8 +78,37 @@ function UserManagement() {
     const { name, value } = e.target;
 
     if (name === "document_number") {
-      if (!/^\d*$/.test(value)) return;
+      const docType = editForm.document_type;
+      
+      // Validar según el tipo de documento
+      if (docType === 'PP') {
+        // Pasaporte: alfanumérico, entre 6 y 10 caracteres, puede contener letras y números
+        if (!/^[a-zA-Z0-9]*$/.test(value)) return;
+        if (value.length > 10) return;
+      } else {
+        // Otros documentos: solo números
+        if (!/^\d*$/.test(value)) return;
+      }
+      
       setEditForm(prev => ({ ...prev, [name]: value }));
+      
+      const newErrors = { ...editFormErrors };
+      
+      // Limpiar error anterior primero
+      if (newErrors[name]) {
+        delete newErrors[name];
+      }
+      
+      // Validar longitud según tipo de documento
+      if (value) {
+        if (docType === 'PP') {
+          if (value.length < 6) {
+            newErrors[name] = 'El pasaporte debe tener entre 6 y 10 caracteres';
+          }
+        }
+      }
+      
+      setEditFormErrors(newErrors);
       return;
     }
 
@@ -120,6 +149,18 @@ function UserManagement() {
       errors.specialty = "La especialidad es obligatoria para el rol Doctor.";
     if (editForm.phone && editForm.phone.length !== 10) {
       errors.phone = "Ingrese un número válido.";
+    }
+
+    // Validar número de documento según tipo
+    if (editForm.document_number) {
+      if (editForm.document_type === 'PP') {
+        if (editForm.document_number.length < 6 || editForm.document_number.length > 10) {
+          errors.document_number = 'El pasaporte debe tener entre 6 y 10 caracteres';
+        }
+        if (!/^[a-zA-Z0-9]+$/.test(editForm.document_number)) {
+          errors.document_number = 'El pasaporte solo puede contener letras y números';
+        }
+      }
     }
 
     setEditFormErrors(errors);
@@ -355,6 +396,13 @@ function UserManagement() {
                   </td>
                 </tr>
               ))}
+              {currentUsers.length === 0 && (
+                <tr>
+                  <td colSpan="6" className="text-center py-8 text-gray-500 font-poppins text-16">
+                    {searchDoc ? "La información proporcionada no corresponde a ningún registro existente" : "No hay usuarios registrados"}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -560,8 +608,9 @@ function UserManagement() {
                         name="document_number"
                         value={editForm.document_number}
                         onChange={e => setEditForm(f => ({ ...f, document_number: e.target.value }))}
-                        className="w-full"
+                        className="w-full bg-gray-100 cursor-not-allowed"
                         error={!!editFormErrors.document_number}
+                        readOnly={true}
                       />
                       {editFormErrors.document_number && (
                         <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.document_number}</p>

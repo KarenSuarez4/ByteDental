@@ -429,6 +429,13 @@ function DentalServiceManagement() {
                   </td>
                 </tr>
               ))}
+              {currentServices.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="text-center py-8 text-gray-500 font-poppins text-16">
+                    {searchName ? "La información proporcionada no corresponde a ningún registro existente" : "No hay servicios odontológicos registrados"}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

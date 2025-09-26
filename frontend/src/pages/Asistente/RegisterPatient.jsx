@@ -4,6 +4,7 @@ import Input from "../../components/Input";
 import Select from "../../components/Select";
 import DateInput from "../../components/DateInput";
 import ProgressBar from "../../components/ProgressBar";
+import ConfirmDialog from "../../components/ConfirmDialog";
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -29,6 +30,8 @@ const RegisterPatient = () => {
     phone: "",
     occupation: "",
     birthdate: "",
+    has_disability: null,
+    disability_description: "",
     // Datos del tutor legal
     guardian_document_type: "",
     guardian_document_number: "",
@@ -36,6 +39,7 @@ const RegisterPatient = () => {
     guardian_apellidos: "",
     guardian_email: "",
     guardian_phone: "",
+    guardian_birthdate: "",
     guardian_relationship_type: "",
   });
 
@@ -47,6 +51,7 @@ const RegisterPatient = () => {
   const [age, setAge] = useState(null);
   const [progress, setProgress] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Función para calcular edad
   const calculateAge = (birthDate) => {
@@ -63,6 +68,12 @@ const RegisterPatient = () => {
     return age;
   };
 
+  // Función para validar solo letras y espacios
+  const isValidName = (name) => {
+    const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/;
+    return nameRegex.test(name);
+  };
+
   // Función para calcular progreso
   const calculateProgress = () => {
     const requiredFields = [
@@ -73,8 +84,12 @@ const RegisterPatient = () => {
       'email', 
       'phone', 
       'occupation', 
-      'birthdate'
+      'birthdate',
+      'has_disability'
     ];
+    
+    // Si tiene discapacidad, incluir la descripción como campo requerido
+    const disabilityFields = formData.has_disability === true || formData.has_disability === "true" ? ['disability_description'] : [];
     
     const guardianFields = [
       'guardian_document_type',
@@ -83,14 +98,22 @@ const RegisterPatient = () => {
       'guardian_apellidos', 
       'guardian_email', 
       'guardian_phone',
+      'guardian_birthdate',
       'guardian_relationship_type'
     ];
 
-    let totalFields = requiredFields.length;
+    let totalFields = requiredFields.length + disabilityFields.length;
     let completedFields = 0;
 
     // Contar campos del paciente completados
     requiredFields.forEach(field => {
+      if (formData[field] && String(formData[field]).trim() !== '') {
+        completedFields++;
+      }
+    });
+
+    // Contar campos de discapacidad si aplica
+    disabilityFields.forEach(field => {
       if (formData[field] && String(formData[field]).trim() !== '') {
         completedFields++;
       }
@@ -114,14 +137,14 @@ const RegisterPatient = () => {
     setProgress(calculateProgress());
   }, [formData, needsGuardian]);
 
-  // Actualizar edad y necesidad de tutor cuando cambia la fecha de nacimiento
+  // Actualizar edad y necesidad de tutor cuando cambia la fecha de nacimiento o discapacidad
   useEffect(() => {
     if (formData.birthdate) {
       const calculatedAge = calculateAge(formData.birthdate);
       setAge(calculatedAge);
       
-      // Determinar si necesita tutor legal (menor de 18)
-      if (calculatedAge !== null && calculatedAge < 18) {
+      // Determinar si necesita tutor legal (menor de 18 O mayor de 64 O tiene discapacidad)
+      if (calculatedAge !== null && (calculatedAge < 18 || calculatedAge > 64) || (formData.has_disability === true || formData.has_disability === "true")) {
         setNeedsGuardian(true);
       } else {
         setNeedsGuardian(false);
@@ -134,14 +157,20 @@ const RegisterPatient = () => {
           guardian_apellidos: "",
           guardian_email: "",
           guardian_phone: "",
+          guardian_birthdate: "",
           guardian_relationship_type: "",
         }));
       }
     } else {
       setAge(null);
-      setNeedsGuardian(false);
+      // Si no hay fecha pero tiene discapacidad, aún necesita tutor
+      if (formData.has_disability === true || formData.has_disability === "true") {
+        setNeedsGuardian(true);
+      } else {
+        setNeedsGuardian(false);
+      }
     }
-  }, [formData.birthdate]);
+  }, [formData.birthdate, formData.has_disability]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -153,26 +182,233 @@ const RegisterPatient = () => {
       
       setFormData((prev) => ({ ...prev, [name]: value }));
       
+      const newErrors = { ...formErrors };
+      
+      // Limpiar error anterior primero
+      if (newErrors[name]) {
+        delete newErrors[name];
+      }
+      
       // Validar longitud del teléfono
       if (value && value.length !== 10) {
-        setFormErrors(prev => ({ ...prev, [name]: 'El teléfono debe tener exactamente 10 dígitos' }));
-      } else {
-        setFormErrors(prev => ({ ...prev, [name]: '' }));
+        newErrors[name] = 'El teléfono debe tener exactamente 10 dígitos';
       }
+      
+      setFormErrors({ ...newErrors, _timestamp: Date.now() });
       return;
     }
 
     // Validaciones específicas para número de documento
     if (name === 'document_number' || name === 'guardian_document_number') {
-      // Solo permitir números
-      if (!/^\d*$/.test(value)) return;
+      const docTypeField = name === 'document_number' ? 'document_type' : 'guardian_document_type';
+      const docType = formData[docTypeField];
+      
+      // Validar según el tipo de documento
+      if (docType === 'PP') {
+        // Pasaporte: alfanumérico, entre 6 y 10 caracteres, puede contener letras y números
+        if (!/^[a-zA-Z0-9]*$/.test(value)) return;
+        if (value.length > 10) return;
+      } else {
+        // Otros documentos: solo números
+        if (!/^\d*$/.test(value)) return;
+      }
+      
+      setFormData((prev) => ({ ...prev, [name]: value }));
+      
+      const newErrors = { ...formErrors };
+      
+      // Limpiar error anterior primero
+      if (newErrors[name]) {
+        delete newErrors[name];
+      }
+      
+      // Validar longitud según tipo de documento
+      if (value) {
+        if (docType === 'PP') {
+          if (value.length < 6) {
+            newErrors[name] = 'El pasaporte debe tener entre 6 y 10 caracteres';
+          }
+        }
+      }
+      
+      if (Object.keys(newErrors).length !== Object.keys(formErrors).length || newErrors[name]) {
+        setFormErrors({ ...newErrors, _timestamp: Date.now() });
+      }
+      return;
+    }
+
+    // Validación inmediata para nombres y apellidos
+    if (name === 'nombres' || name === 'apellidos' || name === 'guardian_nombres' || name === 'guardian_apellidos') {
+      const newErrors = { ...formErrors };
+      
+      // Limpiar error anterior primero
+      if (newErrors[name]) {
+        delete newErrors[name];
+      }
+      
+      if (value && !isValidName(value)) {
+        const fieldNames = {
+          nombres: 'Los nombres solo pueden contener letras y espacios',
+          apellidos: 'Los apellidos solo pueden contener letras y espacios',
+          guardian_nombres: 'Los nombres del tutor solo pueden contener letras y espacios',
+          guardian_apellidos: 'Los apellidos del tutor solo pueden contener letras y espacios'
+        };
+        newErrors[name] = fieldNames[name];
+      } else if (!value) {
+        const requiredMessages = {
+          nombres: 'Nombres son obligatorios',
+          apellidos: 'Apellidos son obligatorios',
+          guardian_nombres: 'Nombres del tutor son obligatorios',
+          guardian_apellidos: 'Apellidos del tutor son obligatorios'
+        };
+        newErrors[name] = requiredMessages[name];
+      }
+      
+      setFormErrors({ ...newErrors, _timestamp: Date.now() });
+    }
+
+    // Validación inmediata para fecha de nacimiento
+    if (name === 'birthdate') {
+      const newErrors = { ...formErrors };
+      
+      // Limpiar error anterior primero para forzar re-render
+      if (newErrors.birthdate) {
+        delete newErrors.birthdate;
+      }
+      
+      if (value === '') {
+        newErrors.birthdate = 'Fecha de nacimiento es obligatoria';
+      } else if (value.length < 10) {
+        // Mientras se está escribiendo la fecha
+        newErrors.birthdate = 'Ingrese la fecha completa (día/mes/año)';
+      } else if (value.length === 10) {
+        // Validar fecha completa
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const birthDate = new Date(value);
+        
+        // Verificar que la fecha sea válida
+        if (isNaN(birthDate.getTime())) {
+          newErrors.birthdate = 'Fecha de nacimiento inválida';
+        } else if (birthDate > today) {
+          newErrors.birthdate = 'La fecha de nacimiento no puede ser en el futuro';
+        } else {
+          // Calcular edad
+          const calculatedAge = calculateAge(value);
+          if (calculatedAge < 0 || calculatedAge > 120) {
+            newErrors.birthdate = 'Edad inválida - debe estar entre 0 y 120 años';
+          }
+          // Si no hay errores, no agregar nada (ya se limpió arriba)
+        }
+      }
+      
+      // Forzar actualización usando una clave temporal para asegurar re-render
+      setFormErrors({ ...newErrors, _timestamp: Date.now() });
+    }
+
+    // Validación inmediata para fecha de nacimiento del tutor
+    if (name === 'guardian_birthdate') {
+      const newErrors = { ...formErrors };
+      
+      // Limpiar error anterior primero para forzar re-render
+      if (newErrors.guardian_birthdate) {
+        delete newErrors.guardian_birthdate;
+      }
+      
+      if (value === '') {
+        newErrors.guardian_birthdate = 'Fecha de nacimiento del tutor es obligatoria';
+      } else if (value.length < 10) {
+        // Mientras se está escribiendo la fecha
+        newErrors.guardian_birthdate = 'Ingrese la fecha completa (día/mes/año)';
+      } else if (value.length === 10) {
+        // Validar fecha completa
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const birthDate = new Date(value);
+        
+        // Verificar que la fecha sea válida
+        if (isNaN(birthDate.getTime())) {
+          newErrors.guardian_birthdate = 'Fecha de nacimiento inválida';
+        } else if (birthDate > today) {
+          newErrors.guardian_birthdate = 'La fecha de nacimiento del tutor no puede ser en el futuro';
+        } else {
+          // Calcular edad
+          const guardianAge = calculateAge(value);
+          if (guardianAge < 18) {
+            newErrors.guardian_birthdate = 'El tutor legal debe ser mayor de 18 años';
+          } else if (guardianAge > 120) {
+            newErrors.guardian_birthdate = 'Edad inválida - debe estar entre 18 y 120 años';
+          }
+          // Si no hay errores, no agregar nada (ya se limpió arriba)
+        }
+      }
+      
+      // Forzar actualización usando una clave temporal para asegurar re-render
+      setFormErrors({ ...newErrors, _timestamp: Date.now() });
+    }
+
+    // Validación inmediata para campos obligatorios
+    if (['document_type', 'occupation', 'guardian_document_type', 'guardian_relationship_type'].includes(name)) {
+      const newErrors = { ...formErrors };
+      
+      // Limpiar error anterior primero
+      if (newErrors[name]) {
+        delete newErrors[name];
+      }
+      
+      if (!value) {
+        const requiredMessages = {
+          document_type: 'Tipo de documento es obligatorio',
+          occupation: 'Ocupación es obligatoria', 
+          guardian_document_type: 'Tipo de documento del tutor es obligatorio',
+          guardian_relationship_type: 'La relación con el paciente es obligatoria'
+        };
+        newErrors[name] = requiredMessages[name];
+      }
+      
+      setFormErrors({ ...newErrors, _timestamp: Date.now() });
+    }
+
+    // Validación para discapacidad
+    if (name === 'has_disability') {
+      // Limpiar descripción de discapacidad si se marca como false
+      if (value === "false" || value === false) {
+        setFormData(prev => ({ ...prev, has_disability: false, disability_description: "" }));
+        const newErrors = { ...formErrors };
+        if (newErrors.disability_description) {
+          delete newErrors.disability_description;
+          setFormErrors({ ...newErrors, _timestamp: Date.now() });
+        }
+      } else if (value === "true" || value === true) {
+        setFormData(prev => ({ ...prev, has_disability: true }));
+      }
+      return;
+    }
+
+    // Validación para descripción de discapacidad
+    if (name === 'disability_description') {
+      const newErrors = { ...formErrors };
+      
+      // Limpiar error anterior primero
+      if (newErrors[name]) {
+        delete newErrors[name];
+      }
+      
+      if ((formData.has_disability === true || formData.has_disability === "true") && !value.trim()) {
+        newErrors[name] = 'La descripción de la discapacidad es obligatoria';
+      }
+      
+      setFormErrors({ ...newErrors, _timestamp: Date.now() });
     }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
     
-    // Limpiar error específico del campo
-    if (formErrors[name]) {
-      setFormErrors(prev => ({ ...prev, [name]: '' }));
+    // Limpiar error específico del campo para otros campos que no tienen validación especial
+    const specialFields = ['nombres', 'apellidos', 'guardian_nombres', 'guardian_apellidos', 'document_type', 'occupation', 'guardian_document_type', 'guardian_relationship_type', 'birthdate', 'guardian_birthdate', 'phone', 'guardian_phone', 'document_number', 'guardian_document_number', 'has_disability', 'disability_description'];
+    if (formErrors[name] && !specialFields.includes(name)) {
+      const newErrors = { ...formErrors };
+      delete newErrors[name];
+      setFormErrors({ ...newErrors, _timestamp: Date.now() });
     }
   };
 
@@ -180,12 +416,21 @@ const RegisterPatient = () => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
 
-    // Validar email
-    if (value && (!value.includes('@') || !value.includes('.'))) {
-      setFormErrors(prev => ({ ...prev, [name]: 'Ingrese un correo electrónico válido' }));
-    } else {
-      setFormErrors(prev => ({ ...prev, [name]: '' }));
+    // Validación inmediata de email
+    const newErrors = { ...formErrors };
+    
+    // Limpiar error anterior primero
+    if (newErrors[name]) {
+      delete newErrors[name];
     }
+    
+    if (!value) {
+      newErrors[name] = name === 'email' ? 'Correo electrónico es obligatorio' : 'Correo del tutor es obligatorio';
+    } else if (!value.includes('@') || !value.includes('.')) {
+      newErrors[name] = 'Ingrese un correo electrónico válido';
+    }
+    
+    setFormErrors({ ...newErrors, _timestamp: Date.now() });
   };
 
   const validateForm = () => {
@@ -196,10 +441,39 @@ const RegisterPatient = () => {
     if (!formData.document_number) errors.document_number = 'Número de documento es obligatorio';
     if (!formData.nombres) errors.nombres = 'Nombres son obligatorios';
     if (!formData.apellidos) errors.apellidos = 'Apellidos son obligatorios';
+    if (formData.has_disability === null || formData.has_disability === "") errors.has_disability = '¿Tiene discapacidad? es obligatorio';
+    
+    // Validar formato de nombres y apellidos
+    if (formData.nombres && !isValidName(formData.nombres)) {
+      errors.nombres = 'Los nombres solo pueden contener letras y espacios';
+    }
+    if (formData.apellidos && !isValidName(formData.apellidos)) {
+      errors.apellidos = 'Los apellidos solo pueden contener letras y espacios';
+    }
     if (!formData.email) errors.email = 'Correo electrónico es obligatorio';
     if (!formData.phone) errors.phone = 'Teléfono es obligatorio';
     if (!formData.occupation) errors.occupation = 'Ocupación es obligatoria';
     if (!formData.birthdate) errors.birthdate = 'Fecha de nacimiento es obligatoria';
+
+    // Validar fecha de nacimiento y edad
+    if (formData.birthdate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const birthDate = new Date(formData.birthdate);
+      
+      // Verificar que la fecha sea válida
+      if (isNaN(birthDate.getTime())) {
+        errors.birthdate = 'Fecha de nacimiento inválida';
+      }
+      // Verificar que la fecha no sea futura
+      else if (birthDate > today) {
+        errors.birthdate = 'La fecha de nacimiento no puede ser en el futuro';
+      }
+      // Verificar edad mínima (0 años) y máxima (120 años)
+      else if (age !== null && (age < 0 || age > 120)) {
+        errors.birthdate = 'Edad inválida - debe estar entre 0 y 120 años';
+      }
+    }
 
     // Validar restricciones específicas del paciente
     if (formData.document_type === 'TI' && age !== null && age <= 7) {
@@ -211,14 +485,40 @@ const RegisterPatient = () => {
       errors.phone = 'El teléfono debe tener exactamente 10 dígitos';
     }
 
+    // Validar número de documento según tipo
+    if (formData.document_number) {
+      if (formData.document_type === 'PP') {
+        if (formData.document_number.length < 6 || formData.document_number.length > 10) {
+          errors.document_number = 'El pasaporte debe tener entre 6 y 10 caracteres';
+        }
+        if (!/^[a-zA-Z0-9]+$/.test(formData.document_number)) {
+          errors.document_number = 'El pasaporte solo puede contener letras y números';
+        }
+      }
+    }
+
+    // Validar discapacidad
+    if ((formData.has_disability === true || formData.has_disability === "true") && !formData.disability_description?.trim()) {
+      errors.disability_description = 'La descripción de la discapacidad es obligatoria';
+    }
+
     // Validar campos del tutor si es necesario
     if (needsGuardian) {
       if (!formData.guardian_document_type) errors.guardian_document_type = 'Tipo de documento del tutor es obligatorio';
       if (!formData.guardian_document_number) errors.guardian_document_number = 'Número de documento del tutor es obligatorio';
       if (!formData.guardian_nombres) errors.guardian_nombres = 'Nombres del tutor son obligatorios';
       if (!formData.guardian_apellidos) errors.guardian_apellidos = 'Apellidos del tutor son obligatorios';
+      
+      // Validar formato de nombres y apellidos del tutor
+      if (formData.guardian_nombres && !isValidName(formData.guardian_nombres)) {
+        errors.guardian_nombres = 'Los nombres del tutor solo pueden contener letras y espacios';
+      }
+      if (formData.guardian_apellidos && !isValidName(formData.guardian_apellidos)) {
+        errors.guardian_apellidos = 'Los apellidos del tutor solo pueden contener letras y espacios';
+      }
       if (!formData.guardian_email) errors.guardian_email = 'Correo del tutor es obligatorio';
       if (!formData.guardian_phone) errors.guardian_phone = 'Teléfono del tutor es obligatorio';
+      if (!formData.guardian_birthdate) errors.guardian_birthdate = 'Fecha de nacimiento del tutor es obligatoria';
       if (!formData.guardian_relationship_type) errors.guardian_relationship_type = 'La relación con el paciente es obligatoria';
 
       // Validar teléfono del tutor siempre que se ingrese
@@ -226,13 +526,50 @@ const RegisterPatient = () => {
         errors.guardian_phone = 'El teléfono del tutor debe tener exactamente 10 dígitos';
       }
 
-      // Nota: En el registro de pacientes no tenemos la fecha de nacimiento del tutor
-      // La validación de edad del tutor se debe hacer en el backend o en el proceso de edición
+      // Validar número de documento del tutor según tipo
+      if (formData.guardian_document_number) {
+        if (formData.guardian_document_type === 'PP') {
+          if (formData.guardian_document_number.length < 6 || formData.guardian_document_number.length > 10) {
+            errors.guardian_document_number = 'El pasaporte debe tener entre 6 y 10 caracteres';
+          }
+          if (!/^[a-zA-Z0-9]+$/.test(formData.guardian_document_number)) {
+            errors.guardian_document_number = 'El pasaporte solo puede contener letras y números';
+          }
+        }
+      }
+
+      // Validar fecha de nacimiento del tutor
+      if (formData.guardian_birthdate) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const guardianBirthDate = new Date(formData.guardian_birthdate);
+        
+        // Verificar que la fecha sea válida
+        if (isNaN(guardianBirthDate.getTime())) {
+          errors.guardian_birthdate = 'Fecha de nacimiento inválida';
+        }
+        // Verificar que la fecha no sea futura
+        else if (guardianBirthDate > today) {
+          errors.guardian_birthdate = 'La fecha de nacimiento del tutor no puede ser en el futuro';
+        } else {
+          const guardianAge = calculateAge(formData.guardian_birthdate);
+          if (guardianAge < 18) {
+            errors.guardian_birthdate = 'El tutor legal debe ser mayor de 18 años';
+          } else if (guardianAge > 120) {
+            errors.guardian_birthdate = 'Edad inválida - debe estar entre 18 y 120 años';
+          }
+        }
+      }
     }
 
     // Verificar errores de email
     if (formErrors.email || formErrors.guardian_email) {
       Object.assign(errors, formErrors);
+    }
+
+    // Limpiar la clave temporal si existe
+    if (errors._timestamp) {
+      delete errors._timestamp;
     }
 
     setFormErrors(errors);
@@ -248,6 +585,13 @@ const RegisterPatient = () => {
       setFormError('Por favor, complete todos los campos obligatorios.');
       return;
     }
+
+    // Mostrar modal de confirmación
+    setShowConfirmModal(true);
+  };
+
+  const confirmSubmit = async () => {
+    setShowConfirmModal(false);
 
     // Procesar nombres y apellidos para el paciente
     const nombresArray = formData.nombres.trim().split(' ');
@@ -274,6 +618,24 @@ const RegisterPatient = () => {
       guardian_second_surname = guardianApellidosArray.slice(1).join(' ') || null;
     }
 
+    // Verificar lógica de discapacidad
+    const hasDisabilityValue = formData.has_disability === "true" || formData.has_disability === true;
+    const disabilityDescValue = hasDisabilityValue && formData.disability_description ? formData.disability_description.trim() : null;
+
+    console.log('🔍 Debug de discapacidad:');
+    console.log('  - formData.has_disability:', formData.has_disability, typeof formData.has_disability);
+    console.log('  - hasDisabilityValue:', hasDisabilityValue);
+    console.log('  - formData.disability_description:', formData.disability_description);
+    console.log('  - disabilityDescValue final:', disabilityDescValue);
+    console.log('  - Validación backend: Si has_disability=true, disability_description debe no ser null/empty');
+
+    // Validación previa para evitar error 422
+    if (hasDisabilityValue && !disabilityDescValue) {
+      setFormError('Si el paciente tiene discapacidad, debe proporcionar una descripción válida.');
+      setLoading(false);
+      return;
+    }
+
     const patientPayload = {
       person: {
         document_type: formData.document_type,
@@ -282,12 +644,13 @@ const RegisterPatient = () => {
         middle_name: middle_name,
         first_surname: first_surname,
         second_surname: second_surname,
-        email: formData.email,
-        phone: formData.phone,
+        email: formData.email || null,
+        phone: formData.phone || null,
         birthdate: formData.birthdate,
       },
-      occupation: formData.occupation,
-      requires_guardian: needsGuardian,
+      occupation: formData.occupation || null,
+      has_disability: hasDisabilityValue,
+      disability_description: disabilityDescValue,
       guardian: needsGuardian ? {
         person: {
           document_type: formData.guardian_document_type,
@@ -296,9 +659,9 @@ const RegisterPatient = () => {
           middle_name: guardian_middle_name,
           first_surname: guardian_first_surname,
           second_surname: guardian_second_surname,
-          email: formData.guardian_email,
-          phone: formData.guardian_phone,
-          birthdate: "2000-01-01", // Placeholder, el backend no lo requiere para el tutor
+          email: formData.guardian_email || null,
+          phone: formData.guardian_phone || null,
+          birthdate: formData.guardian_birthdate,
         },
         relationship_type: formData.guardian_relationship_type,
       } : null,
@@ -306,6 +669,7 @@ const RegisterPatient = () => {
 
     try {
       setLoading(true);
+      console.log('🚀 Payload being sent:', JSON.stringify(patientPayload, null, 2));
       await createPatient(patientPayload, token);
       setSuccessMessage("¡Paciente registrado con éxito!");
       
@@ -319,12 +683,15 @@ const RegisterPatient = () => {
         phone: "",
         occupation: "",
         birthdate: "",
+        has_disability: null,
+        disability_description: "",
         guardian_document_type: "",
         guardian_document_number: "",
         guardian_nombres: "",
         guardian_apellidos: "",
         guardian_email: "",
         guardian_phone: "",
+        guardian_birthdate: "",
         guardian_relationship_type: "",
       });
       setFormErrors({});
@@ -332,8 +699,35 @@ const RegisterPatient = () => {
       setAge(null);
       setProgress(0);
     } catch (error) {
-      console.error('Error al registrar el paciente:', error);
-      setFormError(error.message || 'Error al registrar el paciente.');
+      console.error('❌ Error al registrar el paciente:', error);
+      console.error('❌ Error response:', error.response);
+      console.error('❌ Error response data:', error.response?.data);
+      
+      let errorMessage = 'Error al registrar el paciente.';
+      
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        if (errorData.detail) {
+          if (Array.isArray(errorData.detail)) {
+            // Errores de validación de Pydantic
+            const errorMessages = errorData.detail.map(err => {
+              const field = err.loc?.slice(1).join('.') || 'campo';
+              return `${field}: ${err.msg}`;
+            }).join('\n');
+            errorMessage = `Errores de validación:\n${errorMessages}`;
+          } else {
+            errorMessage = errorData.detail;
+          }
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else {
+          errorMessage = `Error ${error.response.status}: ${JSON.stringify(errorData)}`;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setFormError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -349,12 +743,15 @@ const RegisterPatient = () => {
       phone: "",
       occupation: "",
       birthdate: "",
+      has_disability: null,
+      disability_description: "",
       guardian_document_type: "",
       guardian_document_number: "",
       guardian_nombres: "",
       guardian_apellidos: "",
       guardian_email: "",
       guardian_phone: "",
+      guardian_birthdate: "",
       guardian_relationship_type: "",
     });
     setFormErrors({});
@@ -375,15 +772,57 @@ const RegisterPatient = () => {
       {/* Barra de progreso */}
       <ProgressBar progress={progress} />
 
-      {/* Mostrar edad si está calculada */}
-      {age !== null && (
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-blue-700 font-poppins">
-            Edad: {age} años
-            {needsGuardian && (
-              <span className="ml-2 text-blue-800 font-semibold">
-                - Se requiere información del tutor legal
-              </span>
+      {/* Mostrar información de fecha y edad */}
+      {formData.birthdate && formData.birthdate.length > 0 && (
+        <div className={`mb-6 p-4 rounded-lg ${
+          (age !== null && (age < 0 || age > 120)) || formErrors.birthdate
+            ? 'bg-red-50 border border-red-200' 
+            : formData.birthdate.length === 10 && age !== null
+            ? 'bg-blue-50 border border-blue-200'
+            : 'bg-yellow-50 border border-yellow-200'
+        }`}>
+          <p className={`font-poppins ${
+            (age !== null && (age < 0 || age > 120)) || formErrors.birthdate
+              ? 'text-red-700' 
+              : formData.birthdate.length === 10 && age !== null
+              ? 'text-blue-700'
+              : 'text-yellow-700'
+          }`}>
+            {formData.birthdate.length < 10 ? (
+              <>
+                <span className="font-semibold">📅 Ingresando fecha...</span>
+                <span className="block text-sm mt-1">
+                  Complete la fecha de nacimiento para calcular la edad
+                </span>
+              </>
+            ) : age !== null && (age < 0 || age > 120) ? (
+              <>
+                <span className="font-semibold">⚠️ Edad inválida:</span> {age} años
+                <span className="block text-sm mt-1">
+                  La edad debe estar entre 0 y 120 años
+                </span>
+              </>
+            ) : age !== null ? (
+              <>
+                Edad: {age} años
+                {needsGuardian && (
+                  <span className="ml-2 text-blue-800 font-semibold">
+                    - Se requiere información del tutor legal
+                    {formData.has_disability && age >= 18 && age <= 64 && (
+                      <span className="block text-sm mt-1">
+                        (Requerido por discapacidad)
+                      </span>
+                    )}
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <span className="font-semibold">⚠️ Fecha inválida</span>
+                <span className="block text-sm mt-1">
+                  Verifique el formato de la fecha de nacimiento
+                </span>
+              </>
             )}
           </p>
         </div>
@@ -427,7 +866,7 @@ const RegisterPatient = () => {
             <option value="CC">Cédula de Ciudadanía</option>
             <option value="TI">Tarjeta de Identidad</option>
             <option value="CE">Cédula de Extranjería</option>
-            <option value="PA">Pasaporte</option>
+            <option value="PP">Pasaporte</option>
           </Select>
           {formErrors.document_type && (
             <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.document_type}</p>
@@ -446,6 +885,7 @@ const RegisterPatient = () => {
             value={formData.document_number}
             onChange={handleChange}
             error={!!formErrors.document_number}
+
           />
           {formErrors.document_number && (
             <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.document_number}</p>
@@ -559,6 +999,55 @@ const RegisterPatient = () => {
           )}
         </div>
 
+        {/* ¿Tiene discapacidad? */}
+        <div className="flex flex-col items-center md:items-start w-full">
+          <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">
+            ¿Tiene discapacidad? *
+          </label>
+          <Select
+            name="has_disability"
+            value={formData.has_disability || ""}
+            onChange={handleChange}
+            error={!!formErrors.has_disability}
+            placeholder="Seleccione una opción"
+          >
+            <option value="">Seleccione una opción</option>
+            <option value="false">No</option>
+            <option value="true">Sí</option>
+          </Select>
+          {formErrors.has_disability && (
+            <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.has_disability}</p>
+          )}
+        </div>
+
+        {/* Descripción de discapacidad - Solo si tiene discapacidad */}
+        {(formData.has_disability === true || formData.has_disability === "true") && (
+          <div className="md:col-span-2 flex flex-col items-center md:items-start w-full">
+            <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">
+              Descripción de la discapacidad *
+            </label>
+            <textarea
+              name="disability_description"
+              value={formData.disability_description}
+              onChange={handleChange}
+              placeholder="Describa la discapacidad del paciente"
+              className={`w-full px-4 py-3 border rounded-[25px] text-16 font-poppins focus:outline-none focus:ring-2 focus:ring-primary-blue resize-none ${
+                formErrors.disability_description 
+                  ? 'border-red-500 focus:ring-red-500' 
+                  : 'border-gray-300 focus:border-primary-blue'
+              }`}
+              rows={3}
+              maxLength={500}
+            />
+            {formErrors.disability_description && (
+              <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.disability_description}</p>
+            )}
+            <p className="text-gray-500 text-sm font-poppins mt-1">
+              Máximo 500 caracteres ({formData.disability_description.length}/500)
+            </p>
+          </div>
+        )}
+
         {/* Sección de datos del tutor legal - Solo se muestra si es necesario */}
         {needsGuardian && (
           <>
@@ -584,7 +1073,7 @@ const RegisterPatient = () => {
                 <option value="CC">Cédula de Ciudadanía</option>
                 <option value="TI">Tarjeta de Identidad</option>
                 <option value="CE">Cédula de Extranjería</option>
-                <option value="PA">Pasaporte</option>
+                <option value="PP">Pasaporte</option>
               </Select>
               {formErrors.guardian_document_type && (
                 <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.guardian_document_type}</p>
@@ -642,6 +1131,22 @@ const RegisterPatient = () => {
               />
               {formErrors.guardian_apellidos && (
                 <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.guardian_apellidos}</p>
+              )}
+            </div>
+
+            {/* Fecha de nacimiento del tutor */}
+            <div className="flex flex-col items-center md:items-start w-full">
+              <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">
+                Fecha de nacimiento *
+              </label>
+              <DateInput
+                name="guardian_birthdate"
+                value={formData.guardian_birthdate}
+                onChange={handleChange}
+                error={!!formErrors.guardian_birthdate}
+              />
+              {formErrors.guardian_birthdate && (
+                <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.guardian_birthdate}</p>
               )}
             </div>
 
@@ -713,10 +1218,10 @@ const RegisterPatient = () => {
       <div className="flex flex-col md:flex-row justify-center items-center md:space-x-6 space-y-4 md:space-y-0 mt-10 w-full max-w-[700px] mx-auto">
         <Button 
           onClick={handleSubmit} 
-          disabled={progress < 100 || loading}
+          disabled={loading}
           className={cn(
             "w-full md:w-auto px-10 py-4 font-bold rounded-[40px] !text-18 shadow-md",
-            progress < 100 || loading
+            loading
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-primary-blue hover:bg-primary-blue-hover text-white"
           )}
@@ -740,6 +1245,22 @@ const RegisterPatient = () => {
           Cancelar
         </Button>
       </div>
+
+      {/* Modal de confirmación */}
+      <ConfirmDialog
+        open={showConfirmModal}
+        onConfirm={confirmSubmit}
+        onCancel={() => setShowConfirmModal(false)}
+        title="Confirmar registro"
+        message={
+          <span>
+            ¿Seguro que quieres guardar el registro con número de documento{' '}
+            <strong>{formData.document_number}</strong>?
+          </span>
+        }
+        confirmText="Sí, guardar"
+        cancelText="Cancelar"
+      />
     </main>
   );
 };

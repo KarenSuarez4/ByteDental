@@ -3,8 +3,42 @@ const API_URL = import.meta.env.VITE_API_URL;
 // Función genérica para manejar las respuestas de la API
 const handleResponse = async (response) => {
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ detail: 'Error desconocido' }));
-    throw new Error(errorData.detail || `Error ${response.status}`);
+    let errorData;
+    try {
+      errorData = await response.json();
+    } catch (e) {
+      errorData = { detail: 'Error desconocido en el servidor' };
+    }
+    
+    // Crear un error con estructura completa para debugging
+    const error = new Error(errorData.detail || errorData.message || `Error ${response.status}`);
+    error.response = {
+      status: response.status,
+      statusText: response.statusText,
+      data: errorData
+    };
+    
+    console.error('❌ patientService handleResponse error:', {
+      status: response.status,
+      statusText: response.statusText,
+      errorData,
+      url: response.url
+    });
+    
+    // Log específico del detail si es array
+    if (errorData.detail && Array.isArray(errorData.detail)) {
+      console.error('❌ Errores de validación específicos:', errorData.detail);
+      errorData.detail.forEach((error, index) => {
+        console.error(`  Error ${index + 1}:`, {
+          field: error.loc?.join('.'),
+          message: error.msg,  
+          type: error.type,
+          input: error.input
+        });
+      });
+    }
+    
+    throw error;
   }
   return response.json();
 };

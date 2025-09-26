@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Button from "../../components/Button";
 import Input from "../../components/Input";
 import Select from "../../components/Select";
+import ConfirmDialog from "../../components/ConfirmDialog";
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { createUser } from "../../services/userService";
@@ -30,7 +31,9 @@ const RegisterUser = () => {
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [formErrors, setFormErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const { currentUser, token } = useAuth();
 
   const specialties = [
@@ -57,20 +60,80 @@ const RegisterUser = () => {
     const { name, value } = e.target;
 
     if (name === "documentNumber") {
-      if (!/^\d*$/.test(value)) return;
+      // Validar según el tipo de documento
+      if (formData.documentType === 'PP') {
+        // Pasaporte: alfanumérico, entre 6 y 10 caracteres, puede contener letras y números
+        if (!/^[a-zA-Z0-9]*$/.test(value)) return;
+        if (value.length > 10) return;
+      } else {
+        // Otros documentos: solo números
+        if (!/^\d*$/.test(value)) return;
+      }
+      
       setFormData((prev) => ({ ...prev, [name]: value }));
+      
+      const newErrors = { ...formErrors };
+      
+      // Limpiar error anterior primero
+      if (newErrors.documentNumber) {
+        delete newErrors.documentNumber;
+      }
+      
+      // Validar longitud según tipo de documento
+      if (value) {
+        if (formData.documentType === 'PP') {
+          if (value.length < 6) {
+            newErrors.documentNumber = 'El pasaporte debe tener entre 6 y 10 caracteres';
+          }
+        }
+      }
+      
+      setFormErrors(newErrors);
       return;
     }
 
     if (name === "phoneNumber") {
       if (!/^\d*$/.test(value)) return;
       setFormData((prev) => ({ ...prev, [name]: value }));
+      // Validación inmediata de teléfono
+      const newErrors = { ...formErrors };
       if (value && value.length !== 10) {
-        setPhoneError("Ingrese un número válido.");
+        newErrors.phoneNumber = "El teléfono debe tener exactamente 10 dígitos";
+      } else if (!value) {
+        newErrors.phoneNumber = "Teléfono es obligatorio";
       } else {
-        setPhoneError("");
+        delete newErrors.phoneNumber;
       }
+      setFormErrors(newErrors);
       return;
+    }
+
+    // Validación inmediata de nombres y apellidos
+    if (name === "firstName" || name === "lastName") {
+      const newErrors = { ...formErrors };
+      if (value && !isValidName(value)) {
+        newErrors[name] = name === "firstName" ? 
+          "El nombre solo puede contener letras y espacios" : 
+          "El apellido solo puede contener letras y espacios";
+      } else if (!value) {
+        newErrors[name] = name === "firstName" ? "Nombre es obligatorio" : "Apellido es obligatorio";
+      } else {
+        delete newErrors[name];
+      }
+      setFormErrors(newErrors);
+    }
+
+    // Validación inmediata de campos obligatorios
+    if (name === "documentType" || name === "role") {
+      const newErrors = { ...formErrors };
+      if (!value) {
+        newErrors[name] = name === "documentType" ? 
+          "Tipo de documento es obligatorio" : 
+          "Rol es obligatorio";
+      } else {
+        delete newErrors[name];
+      }
+      setFormErrors(newErrors);
     }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -85,37 +148,74 @@ const RegisterUser = () => {
     const { value } = e.target;
     setFormData((prev) => ({ ...prev, email: value }));
 
-    if (!value.includes('@') || !value.includes('.')) {
-      setEmailError('Ingrese un correo electrónico válido');
+    const newErrors = { ...formErrors };
+    if (!value) {
+      newErrors.email = 'Correo electrónico es obligatorio';
+    } else if (!value.includes('@') || !value.includes('.')) {
+      newErrors.email = 'Ingrese un correo electrónico válido';
     } else {
-      setEmailError('');
+      delete newErrors.email;
     }
+    setFormErrors(newErrors);
+  };
+
+  // Función para validar solo letras y espacios
+  const isValidName = (name) => {
+    const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/;
+    return nameRegex.test(name);
   };
 
   const validateForm = () => {
-    if (
-      !formData.documentType ||
-      !formData.documentNumber ||
-      !formData.firstName ||
-      !formData.lastName ||
-      !formData.email ||
-      !formData.role ||
-      (isDoctor && !formData.specialty)
-    ) {
-      setFormError("Todos los campos marcados con * son obligatorios.");
-      return false;
+    const errors = {};
+    
+    // Validar campos obligatorios
+    if (!formData.documentType) errors.documentType = 'Tipo de documento es obligatorio';
+    if (!formData.documentNumber) errors.documentNumber = 'Número de documento es obligatorio';
+    if (!formData.firstName) errors.firstName = 'Nombre es obligatorio';
+    if (!formData.lastName) errors.lastName = 'Apellido es obligatorio';
+    
+    // Validar formato de nombres
+    if (formData.firstName && !isValidName(formData.firstName)) {
+      errors.firstName = 'El nombre solo puede contener letras y espacios';
     }
-    if (emailError) {
-      setFormError("Por favor, corrige los errores del formulario.");
-      return false;
+    if (formData.lastName && !isValidName(formData.lastName)) {
+      errors.lastName = 'El apellido solo puede contener letras y espacios';
     }
+    if (!formData.email) errors.email = 'Correo electrónico es obligatorio';
+    if (!formData.phoneNumber) errors.phoneNumber = 'Teléfono es obligatorio';
+    if (!formData.role) errors.role = 'Rol es obligatorio';
+    if (isDoctor && !formData.specialty) errors.specialty = 'Especialidad es obligatoria';
+
+    // Validar email
+    if (formData.email && (!formData.email.includes('@') || !formData.email.includes('.'))) {
+      errors.email = 'Ingrese un correo electrónico válido';
+    }
+
+    // Validar teléfono
     if (formData.phoneNumber && formData.phoneNumber.length !== 10) {
-      setPhoneError("Ingrese un número válido.");
-      setFormError("Por favor, corrige los errores del formulario.");
+      errors.phoneNumber = 'El teléfono debe tener exactamente 10 dígitos';
+    }
+
+    // Validar número de documento según tipo
+    if (formData.documentNumber) {
+      if (formData.documentType === 'PP') {
+        if (formData.documentNumber.length < 6 || formData.documentNumber.length > 10) {
+          errors.documentNumber = 'El pasaporte debe tener entre 6 y 10 caracteres';
+        }
+        if (!/^[a-zA-Z0-9]+$/.test(formData.documentNumber)) {
+          errors.documentNumber = 'El pasaporte solo puede contener letras y números';
+        }
+      }
+    }
+
+    setFormErrors(errors);
+    
+    if (Object.keys(errors).length > 0) {
+      setFormError("Por favor, complete todos los campos obligatorios correctamente.");
       return false;
     }
+    
     setFormError("");
-    setPhoneError("");
     return true;
   };
 
@@ -125,6 +225,13 @@ const RegisterUser = () => {
     if (!validateForm()) {
       return;
     }
+
+    // Mostrar modal de confirmación
+    setShowConfirmModal(true);
+  };
+
+  const confirmSubmit = async () => {
+    setShowConfirmModal(false);
 
     const userData = {
       document_type: formData.documentType,
@@ -142,6 +249,8 @@ const RegisterUser = () => {
       await createUser(userData, token);
       setSuccessMessage("Usuario creado exitosamente. Se han enviado las credenciales por correo electrónico.");
       setFormError('');
+      setFormErrors({});
+      setEmailError('');
       setFormData({
         documentType: "",
         documentNumber: "",
@@ -176,6 +285,7 @@ const RegisterUser = () => {
     setIsDoctor(false);
     setEmailError('');
     setFormError('');
+    setFormErrors({});
     setSuccessMessage('');
   };
 
@@ -211,7 +321,7 @@ const RegisterUser = () => {
             name="documentType"
             value={formData.documentType}
             onChange={handleChange}
-            error={!formData.documentType && formError}
+            error={!!formErrors.documentType}
             placeholder="Seleccione tipo de documento"
           >
             <option value="CC">Cédula de Ciudadanía</option>
@@ -219,6 +329,9 @@ const RegisterUser = () => {
             <option value="CE">Cédula de Extranjería</option>
             <option value="PP">Pasaporte</option>
           </Select>
+          {formErrors.documentType && (
+            <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.documentType}</p>
+          )}
         </div>
         {/* Columna Derecha */}
         <div className="flex flex-col items-center md:items-start w-full">
@@ -228,8 +341,11 @@ const RegisterUser = () => {
             placeholder="Ingrese el número de documento"
             value={formData.documentNumber}
             onChange={handleChange}
-            error={!formData.documentNumber && formError}
+            error={!!formErrors.documentNumber}
           />
+          {formErrors.documentNumber && (
+            <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.documentNumber}</p>
+          )}
         </div>
 
         {/* Columna Izquierda */}
@@ -242,8 +358,11 @@ const RegisterUser = () => {
             placeholder="Ingrese el nombre"
             value={formData.firstName}
             onChange={handleChange}
-            error={!formData.firstName && formError}
+            error={!!formErrors.firstName}
           />
+          {formErrors.firstName && (
+            <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.firstName}</p>
+          )}
         </div>
         {/* Columna Derecha */}
         <div className="flex flex-col items-center md:items-start w-full">
@@ -253,23 +372,26 @@ const RegisterUser = () => {
             placeholder="Ingrese el apellido"
             value={formData.lastName}
             onChange={handleChange}
-            error={!formData.lastName && formError}
+            error={!!formErrors.lastName}
           />
+          {formErrors.lastName && (
+            <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.lastName}</p>
+          )}
         </div>
 
         {/* Columna Izquierda */}
         <div className="flex flex-col items-center md:items-start w-full">
-          <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">Teléfono</label>
+          <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">Teléfono *</label>
           <Input
             name="phoneNumber"
             placeholder="Ingrese el número de teléfono"
             value={formData.phoneNumber}
             onChange={handleChange}
-            error={!!phoneError}
+            error={!!formErrors.phoneNumber}
             maxLength={10}
           />
-          {phoneError && (
-            <p className="text-red-500 text-sm mt-2 font-poppins">{phoneError}</p>
+          {formErrors.phoneNumber && (
+            <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.phoneNumber}</p>
           )}
         </div>
         {/* Columna Derecha */}
@@ -280,10 +402,10 @@ const RegisterUser = () => {
             placeholder="Ingrese el correo electrónico"
             value={formData.email}
             onChange={handleEmailChange}
-            error={!!emailError}
+            error={!!formErrors.email}
           />
-          {emailError && (
-            <p className="text-red-500 text-sm mt-2 font-poppins">{emailError}</p>
+          {formErrors.email && (
+            <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.email}</p>
           )}
         </div>
 
@@ -294,7 +416,7 @@ const RegisterUser = () => {
             name="role"
             value={formData.role}
             onChange={handleChange}
-            error={!formData.role && formError}
+            error={!!formErrors.role}
             placeholder="Seleccione el Rol"
           >
             {rolesList.map((role) => (
@@ -303,6 +425,9 @@ const RegisterUser = () => {
               </option>
             ))}
           </Select>
+          {formErrors.role && (
+            <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.role}</p>
+          )}
         </div>
         {/* Columna Derecha */}
         <div className="flex flex-col items-center md:items-start w-full">
@@ -314,13 +439,19 @@ const RegisterUser = () => {
             value={formData.specialty}
             onChange={handleChange}
             disabled={!isDoctor}
-            error={isDoctor && !formData.specialty && formError}
+            error={!!formErrors.specialty}
             placeholder="Seleccione la especialidad"
           >
             {specialties.map((specialty) => (
               <option key={specialty} value={specialty}>{specialty}</option>
             ))}
           </Select>
+          {formErrors.specialty && (
+            <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.specialty}</p>
+          )}
+          {!isDoctor && (
+            <p className="text-gray-500 text-sm font-poppins mt-1">Solo requerido para usuarios con rol de Doctor</p>
+          )}
         </div>
       </form>
       <div className="flex flex-col md:flex-row justify-center items-center md:space-x-6 space-y-4 md:space-y-0 mt-10 w-full max-w-[700px] mx-auto">
@@ -353,6 +484,22 @@ const RegisterUser = () => {
           Cancelar
         </Button>
       </div>
+
+      {/* Modal de confirmación */}
+      <ConfirmDialog
+        open={showConfirmModal}
+        onConfirm={confirmSubmit}
+        onCancel={() => setShowConfirmModal(false)}
+        title="Confirmar registro"
+        message={
+          <span>
+            ¿Seguro que quieres guardar el registro con número de documento{' '}
+            <strong>{formData.documentNumber}</strong>?
+          </span>
+        }
+        confirmText="Sí, guardar"
+        cancelText="Cancelar"
+      />
     </main>
   );
 };
