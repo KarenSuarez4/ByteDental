@@ -89,28 +89,32 @@ export const updatePatient = async (patientId, patientData, token) => {
   return handleResponse(response);
 };
 
-// Desactivar un paciente (soft delete)
-export const deactivatePatient = async (patientId, token) => {
-    const response = await fetch(`${API_URL}/api/patients/${patientId}/status`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({ is_active: false, reason: "Desactivado desde el frontend" }),
-    });
-    return handleResponse(response);
-  };
+// Cambiar estado de un paciente (activar/desactivar) con motivo
+export const changePatientStatus = async (patientId, isActive, deactivationReason, token) => {
+  const body = { is_active: isActive };
   
-  // Activar un paciente
-  export const activatePatient = async (patientId, token) => {
-    const response = await fetch(`${API_URL}/api/patients/${patientId}/status`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({ is_active: true }),
-    });
-    return handleResponse(response);
-  };
+  // Solo incluir deactivation_reason si se está desactivando
+  if (!isActive && deactivationReason) {
+    body.deactivation_reason = deactivationReason;
+  }
+  
+  const response = await fetch(`${API_URL}/api/patients/${patientId}/status`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+  return handleResponse(response);
+};
+
+// Desactivar un paciente con motivo (soft delete)
+export const deactivatePatient = async (patientId, deactivationReason, token) => {
+  return changePatientStatus(patientId, false, deactivationReason, token);
+};
+
+// Activar un paciente
+export const activatePatient = async (patientId, token) => {
+  return changePatientStatus(patientId, true, null, token);
+};

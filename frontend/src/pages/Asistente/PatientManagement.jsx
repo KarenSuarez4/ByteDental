@@ -19,10 +19,12 @@ function PatientManagement() {
   const [editFormErrors, setEditFormErrors] = useState({});
   const [editError, setEditError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-  const [confirmDialog, setConfirmDialog] = useState({ open: false, patient: null });
+  const [editLoading, setEditLoading] = useState(false);
+
   const [phoneEditError, setPhoneEditError] = useState("");
   const [guardianModal, setGuardianModal] = useState({ open: false, guardian: null });
   const [disabilityModal, setDisabilityModal] = useState({ open: false, description: '', patientName: '' });
+  const [deactivationModal, setDeactivationModal] = useState({ open: false, patient: null, reason: '', loading: false });
 
   // Filtros y búsqueda
   const [searchDoc, setSearchDoc] = useState("");
@@ -572,6 +574,8 @@ function PatientManagement() {
   // Guardar cambios
   const handleSaveEdit = async () => {
     if (!validateEditForm()) return;
+    
+    setEditLoading(true);
     try {
       // Separar los nombres y apellidos del paciente
       const namesArray = editForm.full_names.trim().split(/\s+/);
@@ -628,6 +632,8 @@ function PatientManagement() {
       setGuardianFormErrors({});
     } catch (err) {
       setEditFormErrors({ general: err.message || "Error al actualizar paciente" });
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -636,6 +642,7 @@ function PatientManagement() {
     setEditPatient(null);
     setEditError("");
     setSuccessMsg("");
+    setEditLoading(false);
     setNeedsGuardian(false);
     setGuardianForm({
       guardian_document_type: "",
@@ -650,17 +657,36 @@ function PatientManagement() {
     setGuardianFormErrors({});
   };
 
-  // Desactivar paciente
-  const handleDeactivate = async (patient) => {
+  // Abrir modal de desactivación
+  const handleDeactivateClick = (patient) => {
+    setDeactivationModal({ open: true, patient, reason: '', loading: false });
+  };
+
+  // Desactivar paciente con motivo
+  const handleDeactivate = async () => {
+    if (!deactivationModal.reason.trim()) {
+      setEditError("El motivo de desactivación es obligatorio");
+      return;
+    }
+
+    setDeactivationModal(prev => ({ ...prev, loading: true }));
+    
     try {
-      await deactivatePatient(patient.id, token);
+      await deactivatePatient(deactivationModal.patient.id, deactivationModal.reason.trim(), token);
       setSuccessMsg("Paciente desactivado correctamente");
+      
+      // Cerrar modal
+      setDeactivationModal({ open: false, patient: null, reason: '', loading: false });
+      
+      // Actualizar lista
       setLoading(true);
       const updatedPatients = await getAllPatients(token);
       setPatients(updatedPatients);
       setLoading(false);
     } catch (err) {
+      console.error('Error al desactivar paciente:', err);
       setEditError(err.message || "Error al desactivar paciente");
+      setDeactivationModal(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -862,7 +888,7 @@ function PatientManagement() {
                             </Button>
                             <Button
                               className="bg-header-blue hover:bg-header-blue-hover text-white px-4 py-2 rounded-[40px] font-poppins text-16 font-bold w-[130px] h-[35px]"
-                              onClick={() => setConfirmDialog({ open: true, patient })}
+                              onClick={() => handleDeactivateClick(patient)}
                             >
                               Desactivar
                             </Button>
@@ -1377,14 +1403,26 @@ function PatientManagement() {
                   <Button
                     className="bg-header-blue hover:bg-header-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-16 shadow-md"
                     onClick={handleCancelEdit}
+                    disabled={editLoading}
                   >
                     Cancelar
                   </Button>
                   <Button
                     className="bg-primary-blue hover:bg-primary-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-16 shadow-md"
                     onClick={handleSaveEdit}
+                    disabled={editLoading}
                   >
-                    Guardar cambios
+                    {editLoading ? (
+                      <div className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Guardando...
+                      </div>
+                    ) : (
+                      'Guardar cambios'
+                    )}
                   </Button>
                 </div>
               </div>
@@ -1580,16 +1618,96 @@ function PatientManagement() {
           </div>
         )}
 
-        <ConfirmDialog
-          open={confirmDialog.open}
-          title="Confirmar desactivación"
-          message={`¿Seguro que deseas desactivar al paciente ${confirmDialog.patient?.person.first_name} ${confirmDialog.patient?.person.first_surname}?`}
-          onConfirm={async () => {
-            await handleDeactivate(confirmDialog.patient);
-            setConfirmDialog({ open: false, patient: null });
-          }}
-          onCancel={() => setConfirmDialog({ open: false, patient: null })}
-        />
+        {/* Modal de desactivación con motivo */}
+        {deactivationModal.open && (
+          <div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[500px] max-h-[90vh] overflow-y-auto">
+              {/* Header del modal */}
+              <div className="bg-gradient-to-br from-red-500 to-red-600 text-white p-6 rounded-t-[24px] relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-16 -mt-16"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full -ml-12 -mb-12"></div>
+                <div className="relative z-10 flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="bg-white bg-opacity-20 p-3 rounded-full">
+                      ⚠️
+                    </div>
+                    <div>
+                      <h2 className="text-26 font-bold font-poppins">Desactivar Paciente</h2>
+                      <p className="text-16 opacity-90 font-poppins">
+                        {deactivationModal.patient?.person.first_name} {deactivationModal.patient?.person.first_surname}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-full transition-all duration-200"
+                    onClick={() => setDeactivationModal({ open: false, patient: null, reason: '', loading: false })}
+                    disabled={deactivationModal.loading}
+                  >
+                    ✖️
+                  </button>
+                </div>
+              </div>
+
+              {/* Contenido del modal */}
+              <div className="p-6">
+                <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-[16px] p-6 mb-6">
+                  <div className="flex items-center mb-4">
+                    <div className="bg-red-100 p-2 rounded-full mr-3">
+                      📝
+                    </div>
+                    <h3 className="text-20 font-semibold font-poppins text-gray-800">Motivo de Desactivación</h3>
+                  </div>
+                  <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                    <label className="block text-sm font-medium text-gray-600 mb-2">
+                      Ingrese el motivo de desactivación *
+                    </label>
+                    <textarea
+                      className="w-full px-4 py-3 border border-gray-300 rounded-[12px] resize-none font-poppins text-16 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      rows="4"
+                      placeholder="Ej: Paciente se trasladó a otra ciudad, duplicado en el sistema, etc."
+                      value={deactivationModal.reason}
+                      onChange={(e) => setDeactivationModal(prev => ({ ...prev, reason: e.target.value }))}
+                      disabled={deactivationModal.loading}
+                    />
+                    {!deactivationModal.reason.trim() && (
+                      <p className="text-sm text-red-500 mt-2 font-poppins">Este campo es obligatorio</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Botones */}
+                <div className="flex justify-center space-x-4 pt-6 border-t border-gray-200">
+                  <Button
+                    className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 font-bold rounded-[40px] text-16 shadow-md"
+                    onClick={() => setDeactivationModal({ open: false, patient: null, reason: '', loading: false })}
+                    disabled={deactivationModal.loading}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 font-bold rounded-[40px] text-16 shadow-md"
+                    onClick={handleDeactivate}
+                    disabled={deactivationModal.loading || !deactivationModal.reason.trim()}
+                  >
+                    {deactivationModal.loading ? (
+                      <div className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Desactivando...
+                      </div>
+                    ) : (
+                      'Desactivar'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+
       </section>
     </main>
   );

@@ -297,6 +297,18 @@ const RegisterPatient = () => {
           const calculatedAge = calculateAge(value);
           if (calculatedAge < 0 || calculatedAge > 120) {
             newErrors.birthdate = 'Edad inválida - debe estar entre 0 y 120 años';
+          } else if (formData.document_type === 'TI') {
+            // Validar TI con edad
+            if (calculatedAge >= 18) {
+              newErrors.document_type = 'La Tarjeta de Identidad es solo para menores de 18 años';
+            } else if (calculatedAge <= 7) {
+              newErrors.document_type = 'La Tarjeta de Identidad es solo para mayores de 7 años';
+            } else {
+              // Si la edad está en el rango correcto, limpiar error de document_type
+              if (newErrors.document_type && newErrors.document_type.includes('Tarjeta de Identidad')) {
+                delete newErrors.document_type;
+              }
+            }
           }
           // Si no hay errores, no agregar nada (ya se limpió arriba)
         }
@@ -367,6 +379,22 @@ const RegisterPatient = () => {
       }
       
       setFormErrors({ ...newErrors, _timestamp: Date.now() });
+    }
+
+    // Validación en tiempo real para TI y edad
+    if (name === 'document_type') {
+      const newErrors = { ...formErrors };
+      
+      if (value === 'TI' && formData.birthdate) {
+        const age = calculateAge(formData.birthdate);
+        if (age !== null && age >= 18) {
+          newErrors.document_type = 'La Tarjeta de Identidad es solo para menores de 18 años';
+          setFormErrors({ ...newErrors, _timestamp: Date.now() });
+        } else if (age !== null && age <= 7) {
+          newErrors.document_type = 'La Tarjeta de Identidad es solo para mayores de 7 años';
+          setFormErrors({ ...newErrors, _timestamp: Date.now() });
+        }
+      }
     }
 
     // Validación para discapacidad
@@ -1071,7 +1099,6 @@ const RegisterPatient = () => {
                 placeholder="Seleccione tipo de documento"
               >
                 <option value="CC">Cédula de Ciudadanía</option>
-                <option value="TI">Tarjeta de Identidad</option>
                 <option value="CE">Cédula de Extranjería</option>
                 <option value="PP">Pasaporte</option>
               </Select>
