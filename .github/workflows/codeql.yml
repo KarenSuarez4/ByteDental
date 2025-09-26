@@ -33,6 +33,9 @@ jobs:
         # Análisis de JavaScript/TypeScript (React frontend)
         - language: javascript
           build-mode: none
+        # Análisis de GitHub Actions workflows
+        - language: actions
+          build-mode: none
 
     steps:
     - name: Checkout repository
