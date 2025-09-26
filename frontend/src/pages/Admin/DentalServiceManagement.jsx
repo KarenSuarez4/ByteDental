@@ -26,7 +26,6 @@ function DentalServiceManagement() {
   const [editLoading, setEditLoading] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, service: null, action: null });
 
-  // Filtros y búsqueda
   const [searchName, setSearchName] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [minPrice, setMinPrice] = useState("");
