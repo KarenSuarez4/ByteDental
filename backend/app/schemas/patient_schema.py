@@ -52,6 +52,7 @@ class PatientUpdate(BaseModel):
     has_disability: Optional[bool] = None
     disability_description: Optional[str] = None
     is_active: Optional[bool] = None
+    deactivation_reason: Optional[str] = Field(None, max_length=200, description="Motivo de desactivación")
     # Datos del guardian nuevo (si se va a crear o actualizar)
     guardian: Optional['GuardianCreateEmbedded'] = Field(None, description="Datos para crear o actualizar guardian")
 
@@ -71,12 +72,28 @@ class PatientUpdate(BaseModel):
         
         return v
 
+    @validator('deactivation_reason')
+    def validate_deactivation_reason(cls, v, values):
+        is_active = values.get('is_active')
+        
+        # Solo validar si is_active está siendo actualizado
+        if is_active is not None:
+            # Si se está desactivando, debe proporcionar motivo
+            if not is_active and not v:
+                raise ValueError('El motivo de desactivación es requerido cuando se desactiva un paciente')
+            
+            # Si se está activando, no debe proporcionar motivo
+            if is_active and v:
+                raise ValueError('No se debe proporcionar motivo de desactivación cuando se activa un paciente')
+        
+        return v
+
 class PatientStatusChange(BaseModel):
     """Schema para cambiar el estado de un paciente"""
     is_active: bool = Field(..., description="True para activar, False para desactivar")
-    reason: Optional[str] = Field(None, max_length=200, description="Motivo de desactivación (requerido solo para desactivar)")
+    deactivation_reason: Optional[str] = Field(None, max_length=200, description="Motivo de desactivación (requerido solo para desactivar)")
     
-    @validator('reason')
+    @validator('deactivation_reason')
     def validate_reason_for_deactivation(cls, v, values):
         # Si is_active es False (desactivar), reason es requerido
         if 'is_active' in values and not values['is_active'] and not v:
@@ -91,6 +108,7 @@ class PatientResponse(PatientBase):
     id: int
     person_id: int
     is_active: bool
+    deactivation_reason: Optional[str] = None
     
     # Datos de la persona incluidos
     person: PersonResponse

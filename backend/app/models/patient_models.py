@@ -13,7 +13,8 @@ class Patient(Base):
     has_disability = Column(Boolean, default=False)
     disability_description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
-
+    deactivation_reason = Column(Text, nullable=True)
+    
     # Relaciones
     person = relationship("Person", back_populates="patient")
     guardian = relationship("Guardian", back_populates="patients")  # Un paciente apunta a un guardian

@@ -196,12 +196,23 @@ def delete_patient(
     service = get_patient_service(db, user_id, user_ip)
     
     try:
-        success = service.delete_patient(patient_id)
+        # Usar el método change_patient_status con motivo estándar
+        result = service.change_patient_status(
+            patient_id=patient_id,
+            new_status=False,  # Desactivar
+            deactivation_reason="Eliminación administrativa"
+        )
         
-        if not success:
-            raise HTTPException(status_code=404, detail="Paciente no encontrado")
-        
-        return {"message": "Paciente desactivado correctamente"}
+        return {
+            "message": "Paciente eliminado correctamente",
+            "patient_id": patient_id,
+            "deactivation_reason": "Eliminación administrativa"
+        }
+    except ValueError as e:
+        # Si el paciente ya está inactivo
+        if "ya está inactivo" in str(e):
+            raise HTTPException(status_code=400, detail="El paciente ya está eliminado")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
@@ -277,7 +288,7 @@ def change_patient_status(
         result = service.change_patient_status(
             patient_id=patient_id,
             new_status=status_data.is_active,
-            reason=status_data.reason
+            deactivation_reason=status_data.deactivation_reason
         )
         
         action = "activado" if status_data.is_active else "desactivado"
