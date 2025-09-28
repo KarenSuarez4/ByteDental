@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChange, getCurrentUser, logout } from '../Firebase/client';
 import { registerLogoutEvent } from '../services/authAuditService';
-import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext();
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -27,7 +26,6 @@ export function AuthProvider({ children }) {
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChange(async (user) => {
