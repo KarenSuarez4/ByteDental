@@ -51,6 +51,5 @@ class PatientBasicInfo(BaseModel):
     class Config:
         from_attributes = True
 
-# Importación diferida para evitar circular imports
-from app.schemas.patient_schema import PatientResponse
+
 GuardianWithPatients.model_rebuild()

@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from pydantic import Field, validator
 import re
 from app.database import get_db
 from app.services.patient_service import get_patient_service
@@ -197,7 +196,7 @@ def delete_patient(
     
     try:
         # Usar el método change_patient_status con motivo estándar
-        result = service.change_patient_status(
+        _unused_result = service.change_patient_status(
             patient_id=patient_id,
             new_status=False,  # Desactivar
             deactivation_reason="Eliminación administrativa"

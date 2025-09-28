@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from app.schemas.person_schema import PersonResponse, PersonCreate, PersonUpdate
 from app.models.guardian_models import PatientRelationshipEnum
@@ -27,7 +27,8 @@ class PatientCreate(BaseModel):
     # Datos del guardian nuevo (si se va a crear)
     guardian: Optional['GuardianCreateEmbedded'] = Field(None, description="Datos para crear un guardian nuevo")
 
-    @validator('disability_description')
+    @field_validator('disability_description')
+    @classmethod
     def validate_disability_description(cls, v, values):
         has_disability = values.get('has_disability', False)
         
@@ -56,7 +57,8 @@ class PatientUpdate(BaseModel):
     # Datos del guardian nuevo (si se va a crear o actualizar)
     guardian: Optional['GuardianCreateEmbedded'] = Field(None, description="Datos para crear o actualizar guardian")
 
-    @validator('disability_description')
+    @field_validator('disability_description')
+    @classmethod
     def validate_disability_description(cls, v, values):
         has_disability = values.get('has_disability')
         
@@ -72,7 +74,8 @@ class PatientUpdate(BaseModel):
         
         return v
 
-    @validator('deactivation_reason')
+    @field_validator('deactivation_reason')
+    @classmethod
     def validate_deactivation_reason(cls, v, values):
         is_active = values.get('is_active')
         
@@ -93,7 +96,8 @@ class PatientStatusChange(BaseModel):
     is_active: bool = Field(..., description="True para activar, False para desactivar")
     deactivation_reason: Optional[str] = Field(None, max_length=200, description="Motivo de desactivación (requerido solo para desactivar)")
     
-    @validator('deactivation_reason')
+    @field_validator('deactivation_reason')
+    @classmethod
     def validate_reason_for_deactivation(cls, v, values):
         # Si is_active es False (desactivar), reason es requerido
         if 'is_active' in values and not values['is_active'] and not v:

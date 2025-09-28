@@ -1,7 +1,7 @@
 import pytest
 import warnings
 from decimal import Decimal
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

@@ -1,7 +1,6 @@
 import pytest
-import json
 import warnings
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -23,7 +22,6 @@ from app.models.user_models import User
 from app.models.rol_models import Role
 from app.models.person_models import Person
 from app.models.patient_models import Patient
-from app.schemas.patient_schema import PatientCreate
 
 
 # Configuración de base de datos de test en memoria
