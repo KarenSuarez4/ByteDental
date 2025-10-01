@@ -231,7 +231,7 @@ function DentalServiceManagement() {
     const maxPriceMatch = maxPrice === "" || service.value <= parseFloat(maxPrice);
     
     return nameMatch && statusMatch && minPriceMatch && maxPriceMatch;
-  });
+  }).sort((a, b) => a.id - b.id); // Ordenar por ID ascendente
   
   // Obtener servicios para la página actual
   const currentServices = filteredServices.slice(
@@ -513,7 +513,7 @@ function DentalServiceManagement() {
 
         {/* Modal de edición */}
         {editService && (
-          <div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{backgroundColor: 'rgba(255, 255, 255, 0.3)'}}>
             <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[700px] max-h-[90vh] overflow-y-auto">
               {/* Header del modal */}
               <div className="bg-gradient-to-br from-primary-blue to-header-blue text-white p-6 rounded-t-[24px] relative overflow-hidden">

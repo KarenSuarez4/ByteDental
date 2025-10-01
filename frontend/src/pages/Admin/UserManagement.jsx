@@ -218,7 +218,7 @@ function UserManagement() {
     const roleMatch = filterRole === "ALL" || user.role_id === parseInt(filterRole);
     const statusMatch = filterStatus === "ALL" || (filterStatus === "ACTIVO" ? user.is_active : !user.is_active);
     return docMatch && roleMatch && statusMatch;
-  });
+  }).sort((a, b) => a.uid - b.uid); // Ordenar por ID ascendente
 
   // Calcular total de páginas
   const totalPagesCount = Math.ceil(filteredUsers.length / itemsPerPage);
@@ -550,7 +550,7 @@ function UserManagement() {
 
         {/* Modal de edición */}
         {editUser && (
-          <div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{backgroundColor: 'rgba(255, 255, 255, 0.3)'}}>
             <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[1000px] max-h-[90vh] overflow-y-auto">
               {/* Header del modal */}
               <div className="bg-gradient-to-br from-primary-blue to-header-blue text-white p-6 rounded-t-[24px] relative overflow-hidden">

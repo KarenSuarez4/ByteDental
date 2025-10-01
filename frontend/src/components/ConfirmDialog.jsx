@@ -4,7 +4,7 @@ import Button from "./Button";
 const ConfirmDialog = ({ open, title, message, onConfirm, onCancel }) => {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 bg-header-blue bg-opacity-40 flex items-center justify-center z-50">
+    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50" style={{backgroundColor: 'rgba(255, 255, 255, 0.3)'}}>
       <div className="bg-white rounded-[20px] shadow-lg p-8 w-full max-w-[400px] text-center font-poppins">
         <h2 className="text-header-blue text-24 font-bold mb-4">{title}</h2>
         <div className="text-gray-700 text-16 mb-8">{message}</div>

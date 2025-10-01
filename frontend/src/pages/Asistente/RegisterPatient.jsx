@@ -30,7 +30,7 @@ const RegisterPatient = () => {
     phone: "",
     occupation: "",
     birthdate: "",
-    has_disability: null,
+    has_disability: "",
     disability_description: "",
     // Datos del tutor legal
     guardian_document_type: "",
@@ -74,6 +74,44 @@ const RegisterPatient = () => {
     return nameRegex.test(name);
   };
 
+  // Función para obtener tipos de documento válidos según la edad
+  const getValidDocumentTypes = (age, isGuardian = false) => {
+    if (isGuardian) {
+      // Los tutores solo pueden tener documentos de adulto
+      return [
+        { value: "CC", label: "Cédula de Ciudadanía" },
+        { value: "CE", label: "Cédula de Extranjería" },
+        { value: "PP", label: "Pasaporte" }
+      ];
+    }
+    
+    if (age === null) {
+      // Si no hay edad calculada, mostrar todos los tipos
+      return [
+        { value: "CC", label: "Cédula de Ciudadanía" },
+        { value: "TI", label: "Tarjeta de Identidad" },
+        { value: "CE", label: "Cédula de Extranjería" },
+        { value: "PP", label: "Pasaporte" }
+      ];
+    }
+    
+    if (age >= 0 && age <= 17) {
+      // Menores de 18: Solo TI, CE, PP
+      return [
+        { value: "TI", label: "Tarjeta de Identidad" },
+        { value: "CE", label: "Cédula de Extranjería" },
+        { value: "PP", label: "Pasaporte" }
+      ];
+    } else {
+      // Mayores de 18: Solo CC, CE, PP (No TI)
+      return [
+        { value: "CC", label: "Cédula de Ciudadanía" },
+        { value: "CE", label: "Cédula de Extranjería" },
+        { value: "PP", label: "Pasaporte" }
+      ];
+    }
+  };
+
   // Función para calcular progreso
   const calculateProgress = () => {
     const requiredFields = [
@@ -107,7 +145,12 @@ const RegisterPatient = () => {
 
     // Contar campos del paciente completados
     requiredFields.forEach(field => {
-      if (formData[field] && String(formData[field]).trim() !== '') {
+      if (field === 'has_disability') {
+        // Para has_disability, considerar válido si es "true" o "false" (no cadena vacía)
+        if (formData[field] === "true" || formData[field] === "false" || formData[field] === true || formData[field] === false) {
+          completedFields++;
+        }
+      } else if (formData[field] && String(formData[field]).trim() !== '') {
         completedFields++;
       }
     });
@@ -297,15 +340,26 @@ const RegisterPatient = () => {
           const calculatedAge = calculateAge(value);
           if (calculatedAge < 0 || calculatedAge > 120) {
             newErrors.birthdate = 'Edad inválida - debe estar entre 0 y 120 años';
-          } else if (formData.document_type === 'TI') {
-            // Validar TI con edad
-            if (calculatedAge >= 18) {
-              newErrors.document_type = 'La Tarjeta de Identidad es solo para menores de 18 años';
-            } else if (calculatedAge <= 7) {
-              newErrors.document_type = 'La Tarjeta de Identidad es solo para mayores de 7 años';
+          } else {
+            // Validar tipo de documento según la edad y resetear si no es válido
+            if (formData.document_type === 'TI' && calculatedAge >= 18) {
+              // TI no válido para mayores de 18 años - resetear tipo de documento
+              setFormData(prev => ({ ...prev, document_type: "" }));
+              if (newErrors.document_type) {
+                delete newErrors.document_type;
+              }
+            } else if (formData.document_type === 'CC' && calculatedAge < 18) {
+              // CC no válido para menores de 18 años - resetear tipo de documento
+              setFormData(prev => ({ ...prev, document_type: "" }));
+              if (newErrors.document_type) {
+                delete newErrors.document_type;
+              }
             } else {
-              // Si la edad está en el rango correcto, limpiar error de document_type
-              if (newErrors.document_type && newErrors.document_type.includes('Tarjeta de Identidad')) {
+              // Si el tipo de documento es válido, limpiar cualquier error relacionado
+              if (newErrors.document_type && (
+                newErrors.document_type.includes('Tarjeta de Identidad') ||
+                newErrors.document_type.includes('Cédula de Ciudadanía')
+              )) {
                 delete newErrors.document_type;
               }
             }
@@ -381,7 +435,7 @@ const RegisterPatient = () => {
       setFormErrors({ ...newErrors, _timestamp: Date.now() });
     }
 
-    // Validación en tiempo real para TI y edad
+    // Validación en tiempo real para tipo de documento y edad
     if (name === 'document_type') {
       const newErrors = { ...formErrors };
       
@@ -390,9 +444,24 @@ const RegisterPatient = () => {
         if (age !== null && age >= 18) {
           newErrors.document_type = 'La Tarjeta de Identidad es solo para menores de 18 años';
           setFormErrors({ ...newErrors, _timestamp: Date.now() });
-        } else if (age !== null && age <= 7) {
-          newErrors.document_type = 'La Tarjeta de Identidad es solo para mayores de 7 años';
+        } else {
+          // Limpiar cualquier error previo de TI
+          if (newErrors.document_type && newErrors.document_type.includes('Tarjeta de Identidad')) {
+            delete newErrors.document_type;
+            setFormErrors({ ...newErrors, _timestamp: Date.now() });
+          }
+        }
+      } else if (value === 'CC' && formData.birthdate) {
+        const age = calculateAge(formData.birthdate);
+        if (age !== null && age < 18) {
+          newErrors.document_type = 'La Cédula de Ciudadanía es solo para mayores de 18 años';
           setFormErrors({ ...newErrors, _timestamp: Date.now() });
+        } else {
+          // Limpiar cualquier error previo de CC
+          if (newErrors.document_type && newErrors.document_type.includes('Cédula de Ciudadanía')) {
+            delete newErrors.document_type;
+            setFormErrors({ ...newErrors, _timestamp: Date.now() });
+          }
         }
       }
     }
@@ -503,9 +572,12 @@ const RegisterPatient = () => {
       }
     }
 
-    // Validar restricciones específicas del paciente
-    if (formData.document_type === 'TI' && age !== null && age <= 7) {
-      errors.document_type = 'La Tarjeta de Identidad es solo para mayores de 7 años';
+    // Validar restricciones específicas del tipo de documento según edad
+    if (formData.document_type === 'TI' && age !== null && age >= 18) {
+      errors.document_type = 'La Tarjeta de Identidad es solo para menores de 18 años';
+    }
+    if (formData.document_type === 'CC' && age !== null && age < 18) {
+      errors.document_type = 'La Cédula de Ciudadanía es solo para mayores de 18 años';
     }
 
     // Validar teléfono siempre que se ingrese
@@ -879,6 +951,25 @@ const RegisterPatient = () => {
           </h2>
         </div>
         
+        {/* Fecha de nacimiento - PRIMERO para calcular edad */}
+        <div className="flex flex-col items-center md:items-start w-full">
+          <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">
+            Fecha de nacimiento *
+          </label>
+          <DateInput
+            name="birthdate"
+            value={formData.birthdate}
+            onChange={handleChange}
+            error={!!formErrors.birthdate}
+          />
+          {formErrors.birthdate && (
+            <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.birthdate}</p>
+          )}
+        </div>
+
+        {/* Campo vacío para mantener grid */}
+        <div></div>
+        
         {/* Tipo de documento */}
         <div className="flex flex-col items-center md:items-start w-full">
           <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">
@@ -891,10 +982,11 @@ const RegisterPatient = () => {
             error={!!formErrors.document_type}
             placeholder="Seleccione tipo de documento"
           >
-            <option value="CC">Cédula de Ciudadanía</option>
-            <option value="TI">Tarjeta de Identidad</option>
-            <option value="CE">Cédula de Extranjería</option>
-            <option value="PP">Pasaporte</option>
+            {getValidDocumentTypes(age).map(docType => (
+              <option key={docType.value} value={docType.value}>
+                {docType.label}
+              </option>
+            ))}
           </Select>
           {formErrors.document_type && (
             <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.document_type}</p>
@@ -1011,22 +1103,6 @@ const RegisterPatient = () => {
           )}
         </div>
 
-        {/* Fecha de nacimiento */}
-        <div className="flex flex-col items-center md:items-start w-full">
-          <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">
-            Fecha de nacimiento *
-          </label>
-          <DateInput
-            name="birthdate"
-            value={formData.birthdate}
-            onChange={handleChange}
-            error={!!formErrors.birthdate}
-          />
-          {formErrors.birthdate && (
-            <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.birthdate}</p>
-          )}
-        </div>
-
         {/* ¿Tiene discapacidad? */}
         <div className="flex flex-col items-center md:items-start w-full">
           <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">
@@ -1034,12 +1110,11 @@ const RegisterPatient = () => {
           </label>
           <Select
             name="has_disability"
-            value={formData.has_disability || ""}
+            value={formData.has_disability}
             onChange={handleChange}
             error={!!formErrors.has_disability}
-            placeholder="Seleccione una opción"
+            placeholder="¿Tiene alguna discapacidad?"
           >
-            <option value="">Seleccione una opción</option>
             <option value="false">No</option>
             <option value="true">Sí</option>
           </Select>
@@ -1098,9 +1173,11 @@ const RegisterPatient = () => {
                 error={!!formErrors.guardian_document_type}
                 placeholder="Seleccione tipo de documento"
               >
-                <option value="CC">Cédula de Ciudadanía</option>
-                <option value="CE">Cédula de Extranjería</option>
-                <option value="PP">Pasaporte</option>
+                {getValidDocumentTypes(25).map(docType => ( // Asumimos que los tutores son adultos
+                  <option key={docType.value} value={docType.value}>
+                    {docType.label}
+                  </option>
+                ))}
               </Select>
               {formErrors.guardian_document_type && (
                 <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.guardian_document_type}</p>
@@ -1191,6 +1268,8 @@ const RegisterPatient = () => {
               >
                 <option value="Father">Padre</option>
                 <option value="Mother">Madre</option>
+                <option value="Son">Hijo</option>
+                <option value="Daughter">Hija</option>
                 <option value="Grandfather">Abuelo</option>
                 <option value="Grandmother">Abuela</option>
                 <option value="Legal_Guardian">Tutor Legal</option>
