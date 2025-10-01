@@ -5,7 +5,7 @@ import TextArea from "../../components/TextArea";
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useAuth } from "../../contexts/AuthContext";
-import { createDentalService } from "../../services/dentalServiceService";
+import { createDentalService, getDentalServices } from "../../services/dentalServiceService";
 
 function cn(...args) {
   return twMerge(clsx(args));
@@ -22,7 +22,23 @@ const RegisterDentalService = () => {
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [existingServices, setExistingServices] = useState([]);
   const { userRole, token } = useAuth();
+
+  // Cargar servicios existentes para validar unicidad
+  useEffect(() => {
+    const loadExistingServices = async () => {
+      if (token) {
+        try {
+          const services = await getDentalServices(token, { limit: 1000 });
+          setExistingServices(services);
+        } catch (error) {
+          console.error("Error loading existing services:", error);
+        }
+      }
+    };
+    loadExistingServices();
+  }, [token]);
 
   // Limpiar mensajes después de un tiempo
   useEffect(() => {
@@ -74,7 +90,17 @@ const RegisterDentalService = () => {
     
     // Validar campos obligatorios
     if (!formData.name.trim()) errors.name = 'El nombre del servicio es obligatorio';
+    if (!formData.description.trim()) errors.description = 'La descripción del servicio es obligatoria';
     if (!formData.value) errors.value = 'El valor del servicio es obligatorio';
+    
+    // Validar unicidad del nombre
+    const nameExists = existingServices.some(service => 
+      service.name.toLowerCase().trim() === formData.name.toLowerCase().trim()
+    );
+    
+    if (nameExists) {
+      errors.name = 'Ya existe un servicio con este nombre. Por favor, elija un nombre diferente.';
+    }
     
     // Validar formato del valor
     const numValue = parseFloat(formData.value);
@@ -102,7 +128,7 @@ const RegisterDentalService = () => {
     setFormError('');
 
     if (!validateForm()) {
-      setFormError('Por favor, complete todos los campos obligatorios.');
+      setFormError('Por favor, complete todos los campos obligatorios (Nombre, Descripción y Valor).');
       return;
     }
 
@@ -111,7 +137,7 @@ const RegisterDentalService = () => {
       
       const servicePayload = {
         name: formData.name.trim(),
-        description: formData.description.trim() || null,
+        description: formData.description.trim(),
         value: parseFloat(formData.value),
         is_active: true,
       };
@@ -119,6 +145,14 @@ const RegisterDentalService = () => {
       await createDentalService(servicePayload, token);
       
       setSuccessMessage("¡Servicio odontológico registrado con éxito!");
+      
+      // Recargar servicios existentes para futuras validaciones
+      try {
+        const updatedServices = await getDentalServices(token, { limit: 1000 });
+        setExistingServices(updatedServices);
+      } catch (error) {
+        console.error("Error reloading services:", error);
+      }
       
       // Resetear el formulario después del éxito
       setFormData({
@@ -130,7 +164,15 @@ const RegisterDentalService = () => {
       
     } catch (error) {
       console.error('Error al registrar el servicio:', error);
-      setFormError(error.message || 'Error al registrar el servicio odontológico.');
+      
+      // Manejar errores específicos del backend
+      const errorMessage = error.message || 'Error al registrar el servicio odontológico.';
+      
+      if (errorMessage.includes("nombre") && errorMessage.includes("existe")) {
+        setFormErrors({ name: "Ya existe un servicio con este nombre. Por favor, elija un nombre diferente." });
+      } else {
+        setFormError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -258,11 +300,11 @@ const RegisterDentalService = () => {
                 {/* Descripción */}
                 <div className="md:col-span-2">
                   <label className="block font-poppins font-semibold text-gray-700 mb-2 text-18">
-                    Descripción
+                    Descripción *
                   </label>
                   <TextArea
                     name="description"
-                    placeholder="Descripción detallada del servicio odontológico (opcional)"
+                    placeholder="Descripción detallada del servicio odontológico"
                     value={formData.description}
                     onChange={handleChange}
                     error={!!formErrors.description}

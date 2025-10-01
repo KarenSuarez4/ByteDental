@@ -6,7 +6,7 @@ from decimal import Decimal
 class DentalServiceBase(BaseModel):
     """Schema base para servicios odontológicos"""
     name: str = Field(..., min_length=1, max_length=100, description="Nombre del servicio odontológico")
-    description: Optional[str] = Field(None, max_length=1000, description="Descripción detallada del servicio")
+    description: str = Field(..., min_length=1, max_length=1000, description="Descripción detallada del servicio")
     value: Decimal = Field(..., gt=0, decimal_places=2, description="Valor del servicio en pesos colombianos")
     is_active: bool = Field(True, description="Si el servicio está activo o no")
 
@@ -16,6 +16,13 @@ class DentalServiceBase(BaseModel):
         if not v or not v.strip():
             raise ValueError('El nombre del servicio no puede estar vacío')
         return v.strip().title()
+
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v):
+        if not v or not v.strip():
+            raise ValueError('La descripción del servicio no puede estar vacía')
+        return v.strip()
 
     @field_validator('value')
     @classmethod
@@ -29,7 +36,7 @@ class DentalServiceBase(BaseModel):
 
 class DentalServiceCreate(DentalServiceBase):
     """Schema para crear un nuevo servicio odontológico"""
-    pass
+    description: str = Field(..., min_length=1, max_length=1000, description="Descripción detallada del servicio (obligatoria)")
 
 
 class DentalServiceUpdate(BaseModel):
@@ -48,6 +55,15 @@ class DentalServiceUpdate(BaseModel):
             return v.strip().title()
         return v
 
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v):
+        if v is not None:
+            if not v.strip():
+                raise ValueError('La descripción del servicio no puede estar vacía')
+            return v.strip()
+        return v
+
     @field_validator('value')
     @classmethod
     def validate_value(cls, v):
@@ -59,9 +75,13 @@ class DentalServiceUpdate(BaseModel):
         return v
 
 
-class DentalServiceResponse(DentalServiceBase):
+class DentalServiceResponse(BaseModel):
     """Schema de respuesta para servicios odontológicos"""
     id: int
+    name: str = Field(..., min_length=1, max_length=100, description="Nombre del servicio odontológico")
+    description: Optional[str] = Field(None, max_length=1000, description="Descripción detallada del servicio")
+    value: Decimal = Field(..., gt=0, decimal_places=2, description="Valor del servicio en pesos colombianos")
+    is_active: bool = Field(True, description="Si el servicio está activo o no")
 
     class Config:
         from_attributes = True

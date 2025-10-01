@@ -171,6 +171,17 @@ function DentalServiceManagement() {
   const handleSaveEdit = async () => {
     if (!validateEditForm()) return;
     
+    // Verificar si el nombre ya existe en otro servicio (validación de unicidad frontend)
+    const nameExists = services.some(service => 
+      service.id !== editService.id && 
+      service.name.toLowerCase().trim() === editForm.name.toLowerCase().trim()
+    );
+    
+    if (nameExists) {
+      setEditFormErrors({ name: "Ya existe un servicio con este nombre. Por favor, elija un nombre diferente." });
+      return;
+    }
+    
     setEditLoading(true);
     try {
       const updateData = {
@@ -187,7 +198,14 @@ function DentalServiceManagement() {
       await loadServices();
       setEditFormErrors({});
     } catch (err) {
-      setEditFormErrors({ general: err.message || "Error al actualizar servicio" });
+      // Manejar errores específicos del backend
+      const errorMessage = err.message || "Error al actualizar servicio";
+      
+      if (errorMessage.includes("nombre") && errorMessage.includes("existe")) {
+        setEditFormErrors({ name: "Ya existe un servicio con este nombre. Por favor, elija un nombre diferente." });
+      } else {
+        setEditFormErrors({ general: errorMessage });
+      }
     } finally {
       setEditLoading(false);
     }
@@ -414,8 +432,8 @@ function DentalServiceManagement() {
                             onClick={() => setConfirmDialog({ 
                               open: true, 
                               service, 
-                              action: 'toggle',
-                              message: `¿Seguro que deseas deshabilitar el servicio "${service.name}"?`
+                              action: 'disable',
+                              message: `¿Está seguro que desea deshabilitar el servicio "${service.name}"?\n\nEsta acción cambiará el estado del servicio a "Deshabilitado" y no estará disponible para nuevos registros.`
                             })}
                           >
                             Deshabilitar
@@ -435,8 +453,10 @@ function DentalServiceManagement() {
               ))}
               {currentServices.length === 0 && (
                 <tr>
-                  <td colSpan="7" className="text-center py-8 text-gray-500 font-poppins text-16">
-                    {searchName ? "La información proporcionada no corresponde a ningún registro existente" : "No hay servicios odontológicos registrados"}
+                  <td colSpan="6" className="text-center py-8 text-gray-500 font-poppins text-16">
+                    {(searchName || filterStatus !== "ALL" || minPrice || maxPrice) ? 
+                      "La información proporcionada no corresponde a ningún registro existente" : 
+                      "No hay servicios odontológicos registrados"}
                   </td>
                 </tr>
               )}
