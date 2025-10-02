@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 from typing import Optional
 from app.schemas.person_schema import PersonResponse, PersonCreate, PersonUpdate
 from app.models.guardian_models import PatientRelationshipEnum
