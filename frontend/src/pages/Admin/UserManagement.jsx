@@ -19,6 +19,7 @@ function UserManagement() {
   const [editFormErrors, setEditFormErrors] = useState({});
   const [editError, setEditError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, user: null });
   const [phoneEditError, setPhoneEditError] = useState("");
 
@@ -171,6 +172,8 @@ function UserManagement() {
   // Guardar cambios
   const handleSaveEdit = async () => {
     if (!validateEditForm()) return;
+    
+    setEditLoading(true);
     try {
       await updateUser(editUser.uid, editForm, token);
       setSuccessMsg("Usuario actualizado correctamente");
@@ -182,6 +185,8 @@ function UserManagement() {
       setEditFormErrors({});
     } catch (err) {
       setEditFormErrors({ general: err.message || "Error al actualizar usuario" });
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -190,6 +195,7 @@ function UserManagement() {
     setEditUser(null);
     setEditError("");
     setSuccessMsg("");
+    setEditLoading(false);
   };
 
   // Desactivar usuario
@@ -212,7 +218,7 @@ function UserManagement() {
     const roleMatch = filterRole === "ALL" || user.role_id === parseInt(filterRole);
     const statusMatch = filterStatus === "ALL" || (filterStatus === "ACTIVO" ? user.is_active : !user.is_active);
     return docMatch && roleMatch && statusMatch;
-  });
+  }).sort((a, b) => a.uid - b.uid); // Ordenar por ID ascendente
 
   // Calcular total de páginas
   const totalPagesCount = Math.ceil(filteredUsers.length / itemsPerPage);
@@ -544,7 +550,7 @@ function UserManagement() {
 
         {/* Modal de edición */}
         {editUser && (
-          <div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{backgroundColor: 'rgba(255, 255, 255, 0.3)'}}>
             <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[1000px] max-h-[90vh] overflow-y-auto">
               {/* Header del modal */}
               <div className="bg-gradient-to-br from-primary-blue to-header-blue text-white p-6 rounded-t-[24px] relative overflow-hidden">
@@ -672,6 +678,7 @@ function UserManagement() {
                     <div>
                       <label className="block font-poppins font-medium text-gray-700 mb-2">Rol</label>
                       <Select
+                        name="role_id"
                         value={editForm.role_id}
                         onChange={handleEditFormChange}
                         className="w-full"
@@ -717,14 +724,26 @@ function UserManagement() {
                   <Button
                     className="bg-header-blue hover:bg-header-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-16 shadow-md"
                     onClick={handleCancelEdit}
+                    disabled={editLoading}
                   >
                     Cancelar
                   </Button>
                   <Button
                     className="bg-primary-blue hover:bg-primary-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-16 shadow-md"
                     onClick={handleSaveEdit}
+                    disabled={editLoading}
                   >
-                    Guardar cambios
+                    {editLoading ? (
+                      <div className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Guardando...
+                      </div>
+                    ) : (
+                      'Guardar cambios'
+                    )}
                   </Button>
                 </div>
               </div>

@@ -8,7 +8,7 @@ import { auth } from "../Firebase/client";
 
 const ForcePasswordChange = () => {
   const navigate = useNavigate();
-  const { updatePasswordChangeStatus, signOut } = useAuth();
+  const { signOut } = useAuth();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [newPasswordError, setNewPasswordError] = useState("");
@@ -115,7 +115,6 @@ const ForcePasswordChange = () => {
       });
 
       if (response.ok) {
-        const result = await response.json();
         
         // Mostrar mensaje de éxito y iniciar redirección
         setPasswordChangeSuccess(true);

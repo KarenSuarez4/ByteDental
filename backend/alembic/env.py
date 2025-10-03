@@ -13,11 +13,6 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app.database import Base
 from app.config import settings
 
-# Importar todos los modelos SQLAlchemy para que sean detectados por Alembic
-from app.models.user_models import User
-from app.models.rol_models import Role
-from app.models.auditoria_models import Audit
-
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

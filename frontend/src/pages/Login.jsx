@@ -21,7 +21,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
   const navigate = useNavigate();
-  const { currentUser, isAuthenticated, userRole, mustChangePassword } = useAuth();
+  const { isAuthenticated, userRole, mustChangePassword } = useAuth();
 
   // Redirigir si el usuario ya está autenticado
   useEffect(() => {

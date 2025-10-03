@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, validator, Field
+from pydantic import BaseModel, EmailStr, field_validator, Field
 from typing import Optional
 from datetime import date
 from app.models.person_models import DocumentTypeEnum
@@ -14,13 +14,15 @@ class PersonBase(BaseModel):
     phone: Optional[str] = Field(None, max_length=20, description="Teléfono")
     birthdate: date = Field(..., description="Fecha de nacimiento")
     
-    @validator('birthdate')
+    @field_validator('birthdate')
+    @classmethod
     def validate_birthdate(cls, v):
         if v > date.today():
             raise ValueError('La fecha de nacimiento no puede ser futura')
         return v
     
-    @validator('phone')
+    @field_validator('phone')
+    @classmethod
     def validate_phone(cls, v):
         if v and not v.replace('+', '').replace('-', '').replace(' ', '').isdigit():
             raise ValueError('El teléfono debe contener solo números, espacios, guiones y el símbolo +')
@@ -46,13 +48,15 @@ class PersonUpdate(BaseModel):
     # Fecha de nacimiento
     birthdate: Optional[date] = Field(None, description="Fecha de nacimiento")
     
-    @validator('phone')
+    @field_validator('phone')
+    @classmethod
     def validate_phone(cls, v):
         if v and not v.replace('+', '').replace('-', '').replace(' ', '').isdigit():
             raise ValueError('El teléfono debe contener solo números, espacios, guiones y el símbolo +')
         return v
     
-    @validator('birthdate')
+    @field_validator('birthdate')
+    @classmethod
     def validate_birthdate(cls, v):
         if v and v > date.today():
             raise ValueError('La fecha de nacimiento no puede ser futura')

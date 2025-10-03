@@ -1,7 +1,6 @@
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 from typing import Optional, List
-from datetime import date, datetime
 from app.models.person_models import Person
 from app.models.patient_models import Patient
 from app.models.guardian_models import Guardian
@@ -232,7 +231,7 @@ class PatientService:
         try:
             # Actualizar datos de la persona si se proporcionan
             if patient_data.person:
-                updated_person = self.person_service.update_person(patient.person.id, patient_data.person)
+                _unused_updated_person = self.person_service.update_person(patient.person.id, patient_data.person)
             
             # Actualizar datos específicos del paciente
             patient_fields = patient_data.model_dump(exclude_unset=True, exclude={'person', 'guardian'})
@@ -251,15 +250,9 @@ class PatientService:
                 if not has_disability and disability_description:
                     raise ValueError("No debe proporcionar descripción de discapacidad cuando has_disability=False")
                     
-                # Si se actualiza has_disability, asegurar que disability_description se actualice apropiadamente
-                if 'has_disability' in patient_fields:
-                    if has_disability and not disability_description:
-                        # Si cambia a has_disability=True pero no hay descripción, debe proporcionarla
-                        if 'disability_description' not in patient_fields:
-                            raise ValueError("Debe proporcionar disability_description cuando cambia has_disability a True")
-                    elif not has_disability and disability_description:
-                        # Si cambia a has_disability=False, limpiar la descripción automáticamente
-                        patient_fields['disability_description'] = None
+                # Si se actualiza has_disability a False, limpiar automáticamente la descripción
+                if 'has_disability' in patient_fields and not has_disability:
+                    patient_fields['disability_description'] = None
             
             # VALIDACIONES DE ESTADO Y MOTIVO DE DESACTIVACIÓN
             if 'is_active' in patient_fields or 'deactivation_reason' in patient_fields:
@@ -307,7 +300,7 @@ class PatientService:
                         person=person_update_data,
                         relationship_type=patient_data.guardian.relationship_type
                     )
-                    updated_guardian = guardian_service.update_guardian(
+                    _unused_updated_guardian = guardian_service.update_guardian(
                         current_guardian_id, 
                         guardian_update_data,
                         allow_duplicate_contact=True
@@ -647,11 +640,13 @@ class PatientService:
         if patient.person and patient.person.birthdate:
             age = self.person_service.calculate_age(patient.person.birthdate)
             has_disability = getattr(patient, 'has_disability', False)
-            if not (age < 18 or age > 64 or has_disability):
+            is_minor = age < 18
+            is_elderly = age > 64
+            if not (is_minor or is_elderly or has_disability):
                 reasons = []
-                if not (age < 18):
+                if not (is_minor):
                     reasons.append("no es menor de 18 años")
-                if not (age > 64):
+                if not (is_elderly):
                     reasons.append("no es mayor de 64 años") 
                 if not has_disability:
                     reasons.append("no tiene discapacidades")

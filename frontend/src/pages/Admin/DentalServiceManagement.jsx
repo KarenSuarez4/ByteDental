@@ -23,9 +23,9 @@ function DentalServiceManagement() {
   const [editFormErrors, setEditFormErrors] = useState({});
   const [editError, setEditError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, service: null, action: null });
 
-  // Filtros y búsqueda
   const [searchName, setSearchName] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [minPrice, setMinPrice] = useState("");
@@ -171,6 +171,18 @@ function DentalServiceManagement() {
   const handleSaveEdit = async () => {
     if (!validateEditForm()) return;
     
+    // Verificar si el nombre ya existe en otro servicio (validación de unicidad frontend)
+    const nameExists = services.some(service => 
+      service.id !== editService.id && 
+      service.name.toLowerCase().trim() === editForm.name.toLowerCase().trim()
+    );
+    
+    if (nameExists) {
+      setEditFormErrors({ name: "Ya existe un servicio con este nombre. Por favor, elija un nombre diferente." });
+      return;
+    }
+    
+    setEditLoading(true);
     try {
       const updateData = {
         name: editForm.name.trim(),
@@ -186,7 +198,16 @@ function DentalServiceManagement() {
       await loadServices();
       setEditFormErrors({});
     } catch (err) {
-      setEditFormErrors({ general: err.message || "Error al actualizar servicio" });
+      // Manejar errores específicos del backend
+      const errorMessage = err.message || "Error al actualizar servicio";
+      
+      if (errorMessage.includes("nombre") && errorMessage.includes("existe")) {
+        setEditFormErrors({ name: "Ya existe un servicio con este nombre. Por favor, elija un nombre diferente." });
+      } else {
+        setEditFormErrors({ general: errorMessage });
+      }
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -196,6 +217,7 @@ function DentalServiceManagement() {
     setEditError("");
     setSuccessMsg("");
     setEditFormErrors({});
+    setEditLoading(false);
   };
 
   // Cambiar estado del servicio
@@ -227,7 +249,7 @@ function DentalServiceManagement() {
     const maxPriceMatch = maxPrice === "" || service.value <= parseFloat(maxPrice);
     
     return nameMatch && statusMatch && minPriceMatch && maxPriceMatch;
-  });
+  }).sort((a, b) => a.id - b.id); // Ordenar por ID ascendente
   
   // Obtener servicios para la página actual
   const currentServices = filteredServices.slice(
@@ -410,8 +432,8 @@ function DentalServiceManagement() {
                             onClick={() => setConfirmDialog({ 
                               open: true, 
                               service, 
-                              action: 'toggle',
-                              message: `¿Seguro que deseas deshabilitar el servicio "${service.name}"?`
+                              action: 'disable',
+                              message: `¿Está seguro que desea deshabilitar el servicio "${service.name}"?\n\nEsta acción cambiará el estado del servicio a "Deshabilitado" y no estará disponible para nuevos registros.`
                             })}
                           >
                             Deshabilitar
@@ -431,8 +453,10 @@ function DentalServiceManagement() {
               ))}
               {currentServices.length === 0 && (
                 <tr>
-                  <td colSpan="7" className="text-center py-8 text-gray-500 font-poppins text-16">
-                    {searchName ? "La información proporcionada no corresponde a ningún registro existente" : "No hay servicios odontológicos registrados"}
+                  <td colSpan="6" className="text-center py-8 text-gray-500 font-poppins text-16">
+                    {(searchName || filterStatus !== "ALL" || minPrice || maxPrice) ? 
+                      "La información proporcionada no corresponde a ningún registro existente" : 
+                      "No hay servicios odontológicos registrados"}
                   </td>
                 </tr>
               )}
@@ -509,7 +533,7 @@ function DentalServiceManagement() {
 
         {/* Modal de edición */}
         {editService && (
-          <div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{backgroundColor: 'rgba(255, 255, 255, 0.3)'}}>
             <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[700px] max-h-[90vh] overflow-y-auto">
               {/* Header del modal */}
               <div className="bg-gradient-to-br from-primary-blue to-header-blue text-white p-6 rounded-t-[24px] relative overflow-hidden">
@@ -622,14 +646,26 @@ function DentalServiceManagement() {
                   <Button
                     className="bg-header-blue hover:bg-header-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-16 shadow-md"
                     onClick={handleCancelEdit}
+                    disabled={editLoading}
                   >
                     Cancelar
                   </Button>
                   <Button
                     className="bg-primary-blue hover:bg-primary-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-16 shadow-md"
                     onClick={handleSaveEdit}
+                    disabled={editLoading}
                   >
-                    Guardar cambios
+                    {editLoading ? (
+                      <div className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Guardando...
+                      </div>
+                    ) : (
+                      'Guardar cambios'
+                    )}
                   </Button>
                 </div>
               </div>

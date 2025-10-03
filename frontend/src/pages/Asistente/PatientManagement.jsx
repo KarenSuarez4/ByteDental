@@ -19,10 +19,11 @@ function PatientManagement() {
   const [editFormErrors, setEditFormErrors] = useState({});
   const [editError, setEditError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-  const [confirmDialog, setConfirmDialog] = useState({ open: false, patient: null });
+  const [editLoading, setEditLoading] = useState(false);
+
   const [phoneEditError, setPhoneEditError] = useState("");
-  const [guardianModal, setGuardianModal] = useState({ open: false, guardian: null });
-  const [disabilityModal, setDisabilityModal] = useState({ open: false, description: '', patientName: '' });
+  const [patientInfoModal, setPatientInfoModal] = useState({ open: false, patient: null });
+  const [deactivationModal, setDeactivationModal] = useState({ open: false, patient: null, reason: '', loading: false });
 
   // Filtros y búsqueda
   const [searchDoc, setSearchDoc] = useState("");
@@ -48,6 +49,33 @@ function PatientManagement() {
     return age;
   };
 
+  // Función para obtener tipos de documento válidos según la edad
+  const getValidDocumentTypes = (age) => {
+    if (age === null || age === undefined) {
+      // Si no hay edad, mostrar todos los tipos
+      return [
+        { value: 'CC', label: 'Cédula de Ciudadanía' },
+        { value: 'TI', label: 'Tarjeta de Identidad' },
+        { value: 'CE', label: 'Cédula de Extranjería' },
+        { value: 'PP', label: 'Pasaporte' }
+      ];
+    }
+    
+    if (age < 18) {
+      // Menores de edad: Solo TI
+      return [
+        { value: 'TI', label: 'Tarjeta de Identidad' }
+      ];
+    } else {
+      // Mayores de edad: CC, CE, PP (no TI)
+      return [
+        { value: 'CC', label: 'Cédula de Ciudadanía' },
+        { value: 'CE', label: 'Cédula de Extranjería' },
+        { value: 'PP', label: 'Pasaporte' }
+      ];
+    }
+  };
+
   // Función para obtener el texto legible del tipo de relación
   const getRelationshipText = (relationshipType) => {
     const relationships = {
@@ -71,18 +99,9 @@ function PatientManagement() {
     return nameRegex.test(name);
   };
 
-  // Función para abrir modal de información del tutor
-  const handleShowGuardian = (guardian) => {
-    setGuardianModal({ open: true, guardian });
-  };
-
-  // Función para abrir modal de descripción de discapacidad
-  const handleShowDisability = (patient) => {
-    setDisabilityModal({ 
-      open: true, 
-      description: patient.disability_description || 'Sin descripción disponible',
-      patientName: `${patient.person.first_name} ${patient.person.first_surname}`
-    });
+  // Función para mostrar información completa del paciente
+  const handlePatientInfo = (patient) => {
+    setPatientInfoModal({ open: true, patient });
   };
 
   useEffect(() => {
@@ -139,7 +158,7 @@ function PatientManagement() {
       phone: patient.person.phone || "",
       birthdate: patient.person.birthdate,
       occupation: patient.occupation || "",
-      has_disability: patient.has_disability || false,
+      has_disability: patient.has_disability === true ? true : patient.has_disability === false ? false : "",
       disability_description: patient.disability_description || "",
     });
 
@@ -243,8 +262,11 @@ function PatientManagement() {
 
     // Validación para discapacidad
     if (name === "has_disability") {
+      // Convertir el valor del select a booleano
+      const hasDisability = value === "true" || value === true;
+      
       // Limpiar descripción de discapacidad si se marca como false
-      if (!value) {
+      if (!hasDisability) {
         setEditForm(prev => ({ ...prev, has_disability: false, disability_description: "" }));
         const newErrors = { ...editFormErrors };
         if (newErrors.disability_description) {
@@ -257,7 +279,7 @@ function PatientManagement() {
       
       // Recalcular si necesita tutor considerando la discapacidad
       const age = calculateAge(editForm.birthdate);
-      const requiresGuardian = (age !== null && (age < 18 || age > 64)) || value;
+      const requiresGuardian = (age !== null && (age < 18 || age > 64)) || hasDisability;
       setNeedsGuardian(requiresGuardian);
       
       return;
@@ -572,6 +594,8 @@ function PatientManagement() {
   // Guardar cambios
   const handleSaveEdit = async () => {
     if (!validateEditForm()) return;
+    
+    setEditLoading(true);
     try {
       // Separar los nombres y apellidos del paciente
       const namesArray = editForm.full_names.trim().split(/\s+/);
@@ -628,6 +652,8 @@ function PatientManagement() {
       setGuardianFormErrors({});
     } catch (err) {
       setEditFormErrors({ general: err.message || "Error al actualizar paciente" });
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -636,6 +662,7 @@ function PatientManagement() {
     setEditPatient(null);
     setEditError("");
     setSuccessMsg("");
+    setEditLoading(false);
     setNeedsGuardian(false);
     setGuardianForm({
       guardian_document_type: "",
@@ -650,17 +677,36 @@ function PatientManagement() {
     setGuardianFormErrors({});
   };
 
-  // Desactivar paciente
-  const handleDeactivate = async (patient) => {
+  // Abrir modal de desactivación
+  const handleDeactivateClick = (patient) => {
+    setDeactivationModal({ open: true, patient, reason: '', loading: false });
+  };
+
+  // Desactivar paciente con motivo
+  const handleDeactivate = async () => {
+    if (!deactivationModal.reason.trim()) {
+      setEditError("El motivo de desactivación es obligatorio");
+      return;
+    }
+
+    setDeactivationModal(prev => ({ ...prev, loading: true }));
+    
     try {
-      await deactivatePatient(patient.id, token);
+      await deactivatePatient(deactivationModal.patient.id, deactivationModal.reason.trim(), token);
       setSuccessMsg("Paciente desactivado correctamente");
+      
+      // Cerrar modal
+      setDeactivationModal({ open: false, patient: null, reason: '', loading: false });
+      
+      // Actualizar lista
       setLoading(true);
       const updatedPatients = await getAllPatients(token);
       setPatients(updatedPatients);
       setLoading(false);
     } catch (err) {
+      console.error('Error al desactivar paciente:', err);
       setEditError(err.message || "Error al desactivar paciente");
+      setDeactivationModal(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -683,7 +729,7 @@ function PatientManagement() {
     const docMatch = searchDoc === "" || patient.person.document_number.includes(searchDoc);
     const statusMatch = filterStatus === "ALL" || (filterStatus === "ACTIVO" ? patient.is_active : !patient.is_active);
     return docMatch && statusMatch;
-  });
+  }).sort((a, b) => a.id - b.id); // Ordenar por ID ascendente
 
   // Calcular total de páginas
   const totalPagesCount = Math.ceil(filteredPatients.length / itemsPerPage);
@@ -781,16 +827,15 @@ function PatientManagement() {
             <thead className="sticky top-0 z-10 h-10">
               <tr>
                 <th className={tableHeaderClass}>Documento</th>
-                <th className={tableHeaderClass}>Tipo</th>
+                <th className={tableHeaderClass}>Tipo de Documento</th>
                 <th className={tableHeaderClass}>Nombres</th>
                 <th className={tableHeaderClass}>Apellidos</th>
                 <th className={tableHeaderClass}>Correo</th>
                 <th className={tableHeaderClass}>Teléfono</th>
                 <th className={tableHeaderClass}>Edad</th>
                 <th className={tableHeaderClass}>Ocupación</th>
-                <th className={tableHeaderClass}>Discapacidad</th>
-                <th className={tableHeaderClass}>Tutor</th>
                 <th className={tableHeaderClass}>Estado</th>
+                <th className={tableHeaderClass}>Información</th>
                 <th className={tableHeaderClass}>Acciones</th>
               </tr>
             </thead>
@@ -812,40 +857,20 @@ function PatientManagement() {
                   <td className={tableCellClass}>{calculateAge(patient.person.birthdate)} años</td>
                   <td className={tableCellClass}>{patient.occupation || "-"}</td>
                   <td className={tableCellClass}>
-                    {patient.has_disability ? (
-                      <button 
-                        className="text-orange-600 font-bold hover:text-orange-800 hover:underline cursor-pointer bg-transparent border-none"
-                        onClick={() => handleShowDisability(patient)}
-                        title="Haga clic para ver la descripción de la discapacidad"
-                      >
-                        Sí
-                      </button>
-                    ) : (
-                      <span className="text-gray-500">No</span>
-                    )}
-                  </td>
-                  <td className={tableCellClass}>
-                    {patient.requires_guardian ? (
-                      patient.guardian ? (
-                        <button 
-                          className="text-blue-600 font-bold hover:text-blue-800 hover:underline cursor-pointer bg-transparent border-none"
-                          onClick={() => handleShowGuardian(patient.guardian)}
-                        >
-                          {patient.guardian.person.first_name} {patient.guardian.person.first_surname}
-                        </button>
-                      ) : (
-                        <span className="text-orange-600 font-bold">Pendiente</span>
-                      )
-                    ) : (
-                      <span className="text-gray-500">No requerido</span>
-                    )}
-                  </td>
-                  <td className={tableCellClass}>
                     {patient.is_active ? (
                       <span className="text-green-600 font-bold">Activo</span>
                     ) : (
                       <span className="text-red-600 font-bold">Inactivo</span>
                     )}
+                  </td>
+                  <td className={tableCellClass}>
+                    <span 
+                      className="text-blue-600 font-semibold hover:text-blue-800 hover:underline cursor-pointer"
+                      onClick={() => handlePatientInfo(patient)}
+                      title="Haga clic para ver la información completa del paciente"
+                    >
+                      Ver Información
+                    </span>
                   </td>
                   <td className={tableCellClass}>
                     <div className="flex flex-col items-center justify-center gap-2">
@@ -862,7 +887,7 @@ function PatientManagement() {
                             </Button>
                             <Button
                               className="bg-header-blue hover:bg-header-blue-hover text-white px-4 py-2 rounded-[40px] font-poppins text-16 font-bold w-[130px] h-[35px]"
-                              onClick={() => setConfirmDialog({ open: true, patient })}
+                              onClick={() => handleDeactivateClick(patient)}
                             >
                               Desactivar
                             </Button>
@@ -1028,7 +1053,7 @@ function PatientManagement() {
 
         {/* Modal de edición */}
         {editPatient && (
-          <div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{backgroundColor: 'rgba(255, 255, 255, 0.3)'}}>
             <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[900px] max-h-[90vh] overflow-y-auto">
               {/* Header del modal */}
               <div className="bg-gradient-to-br from-primary-blue to-header-blue text-white p-6 rounded-t-[24px] relative overflow-hidden">
@@ -1068,6 +1093,23 @@ function PatientManagement() {
 
                 <form className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Fecha de nacimiento - PRIMERO para calcular edad */}
+                    <div>
+                      <label className="block font-poppins font-medium text-gray-700 mb-2">Fecha de nacimiento</label>
+                      <DateInput
+                        name="birthdate"
+                        value={editForm.birthdate}
+                        onChange={handleEditFormChange}
+                        className="w-full"
+                        error={!!editFormErrors.birthdate}
+                      />
+                      {editFormErrors.birthdate && (
+                        <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.birthdate}</p>
+                      )}
+                    </div>
+                    {/* Campo vacío para mantener grid */}
+                    <div></div>
+                    
                     <div>
                       <label className="block font-poppins font-medium text-gray-700 mb-2">Tipo de documento</label>
                       <Select
@@ -1077,10 +1119,11 @@ function PatientManagement() {
                         className="w-full"
                         error={!!editFormErrors.document_type}
                       >
-                        <option value="CC">Cédula de Ciudadanía</option>
-                        <option value="TI">Tarjeta de Identidad</option>
-                        <option value="CE">Cédula de Extranjería</option>
-                        <option value="PP">Pasaporte</option>
+                        {getValidDocumentTypes(calculateAge(editForm.birthdate)).map(docType => (
+                          <option key={docType.value} value={docType.value}>
+                            {docType.label}
+                          </option>
+                        ))}
                       </Select>
                       {editFormErrors.document_type && (
                         <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.document_type}</p>
@@ -1129,19 +1172,6 @@ function PatientManagement() {
                       )}
                     </div>
                     <div>
-                      <label className="block font-poppins font-medium text-gray-700 mb-2">Fecha de nacimiento</label>
-                      <DateInput
-                        name="birthdate"
-                        value={editForm.birthdate}
-                        onChange={handleEditFormChange}
-                        className="w-full"
-                        error={!!editFormErrors.birthdate}
-                      />
-                      {editFormErrors.birthdate && (
-                        <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.birthdate}</p>
-                      )}
-                    </div>
-                    <div>
                       <label className="block font-poppins font-medium text-gray-700 mb-2">Correo electrónico</label>
                       <Input
                         name="email"
@@ -1186,9 +1216,10 @@ function PatientManagement() {
                         onChange={handleEditFormChange}
                         className="w-full"
                         error={!!editFormErrors.has_disability}
+                        placeholder="¿Tiene alguna discapacidad?"
                       >
-                        <option value={false}>No</option>
-                        <option value={true}>Sí</option>
+                        <option value="false">No</option>
+                        <option value="true">Sí</option>
                       </Select>
                       {editFormErrors.has_disability && (
                         <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.has_disability}</p>
@@ -1253,10 +1284,11 @@ function PatientManagement() {
                             error={!!guardianFormErrors.guardian_document_type}
                           >
                             <option value="">Seleccionar tipo</option>
-                            <option value="CC">Cédula de Ciudadanía</option>
-                            <option value="TI">Tarjeta de Identidad</option>
-                            <option value="CE">Cédula de Extranjería</option>
-                            <option value="PP">Pasaporte</option>
+                            {getValidDocumentTypes(25).map(docType => ( // Asumimos que los tutores son adultos
+                              <option key={docType.value} value={docType.value}>
+                                {docType.label}
+                              </option>
+                            ))}
                           </Select>
                           {guardianFormErrors.guardian_document_type && (
                             <p className="text-red-500 text-sm font-poppins mt-1">{guardianFormErrors.guardian_document_type}</p>
@@ -1377,14 +1409,26 @@ function PatientManagement() {
                   <Button
                     className="bg-header-blue hover:bg-header-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-16 shadow-md"
                     onClick={handleCancelEdit}
+                    disabled={editLoading}
                   >
                     Cancelar
                   </Button>
                   <Button
                     className="bg-primary-blue hover:bg-primary-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-16 shadow-md"
                     onClick={handleSaveEdit}
+                    disabled={editLoading}
                   >
-                    Guardar cambios
+                    {editLoading ? (
+                      <div className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Guardando...
+                      </div>
+                    ) : (
+                      'Guardar cambios'
+                    )}
                   </Button>
                 </div>
               </div>
@@ -1393,26 +1437,29 @@ function PatientManagement() {
         )}
 
         {/* Modal de información del tutor */}
-        {guardianModal.open && guardianModal.guardian && (
-          <div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[700px] max-h-[90vh] overflow-y-auto">
-              {/* Header del modal con diseño único */}
+        {/* Modal unificado de información del paciente */}
+        {patientInfoModal.open && patientInfoModal.patient && (
+          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{backgroundColor: 'rgba(255, 255, 255, 0.3)'}}>
+            <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[900px] max-h-[90vh] overflow-y-auto">
+              {/* Header del modal */}
               <div className="bg-gradient-to-br from-primary-blue to-header-blue text-white p-6 rounded-t-[24px] relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-16 -mt-16"></div>
                 <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full -ml-12 -mb-12"></div>
                 <div className="relative z-10 flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="bg-white bg-opacity-20 p-3 rounded-full">
-                      🛡️
+                      👤
                     </div>
                     <div>
-                      <h2 className="text-26 font-bold font-poppins">Información del Tutor Legal</h2>
-                      <p className="text-16 opacity-90 font-poppins">Detalles del responsable legal</p>
+                      <h2 className="text-26 font-bold font-poppins">Información Completa del Paciente</h2>
+                      <p className="text-16 opacity-90 font-poppins">
+                        {patientInfoModal.patient.person.first_name} {patientInfoModal.patient.person.first_surname}
+                      </p>
                     </div>
                   </div>
                   <button
                     className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-full transition-all duration-200"
-                    onClick={() => setGuardianModal({ open: false, guardian: null })}
+                    onClick={() => setPatientInfoModal({ open: false, patient: null })}
                   >
                     ✖️
                   </button>
@@ -1421,11 +1468,11 @@ function PatientManagement() {
 
               {/* Contenido del modal */}
               <div className="p-6">
-                {/* Información principal del tutor */}
-                <div className="bg-gradient-to-r from-green-50 to-teal-50 rounded-[16px] p-6 mb-6">
+                {/* Información personal del paciente */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-[16px] p-6 mb-6">
                   <div className="flex items-center mb-4">
-                    <div className="bg-green-100 p-2 rounded-full mr-3">
-                      👤
+                    <div className="bg-blue-100 p-2 rounded-full mr-3">
+                      📋
                     </div>
                     <h3 className="text-20 font-semibold font-poppins text-gray-800">Datos Personales</h3>
                   </div>
@@ -1433,54 +1480,54 @@ function PatientManagement() {
                     <div className="bg-white rounded-[12px] p-4 shadow-sm">
                       <label className="block text-sm font-medium text-gray-600 mb-1">Nombre Completo</label>
                       <p className="text-18 font-semibold text-gray-900 font-poppins">
-                        {guardianModal.guardian.person.first_name} {guardianModal.guardian.person.first_surname}
-                        {guardianModal.guardian.person.second_surname && ` ${guardianModal.guardian.person.second_surname}`}
+                        {patientInfoModal.patient.person.first_name} {patientInfoModal.patient.person.first_surname}
+                        {patientInfoModal.patient.person.second_surname && ` ${patientInfoModal.patient.person.second_surname}`}
                       </p>
                     </div>
                     <div className="bg-white rounded-[12px] p-4 shadow-sm">
                       <label className="block text-sm font-medium text-gray-600 mb-1">Documento</label>
                       <p className="text-16 font-medium text-gray-900 font-poppins">
-                        {guardianModal.guardian.person.document_type} - {guardianModal.guardian.person.document_number}
+                        {patientInfoModal.patient.person.document_type} - {patientInfoModal.patient.person.document_number}
                       </p>
-                    </div>
-                    <div className="bg-white rounded-[12px] p-4 shadow-sm">
-                      <label className="block text-sm font-medium text-gray-600 mb-1">Relación</label>
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                        {getRelationshipText(guardianModal.guardian.relationship_type)}
-                      </span>
                     </div>
                     <div className="bg-white rounded-[12px] p-4 shadow-sm">
                       <label className="block text-sm font-medium text-gray-600 mb-1">Edad</label>
                       <p className="text-16 font-medium text-gray-900 font-poppins">
-                        {calculateAge(guardianModal.guardian.person.birthdate)} años
+                        {calculateAge(patientInfoModal.patient.person.birthdate)} años
+                      </p>
+                    </div>
+                    <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Ocupación</label>
+                      <p className="text-16 font-medium text-gray-900 font-poppins">
+                        {patientInfoModal.patient.occupation || 'No especificada'}
                       </p>
                     </div>
                   </div>
                 </div>
 
                 {/* Información de contacto */}
-                {(guardianModal.guardian.person.email || guardianModal.guardian.person.phone) && (
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-[16px] p-6 mb-6">
+                {(patientInfoModal.patient.person.email || patientInfoModal.patient.person.phone) && (
+                  <div className="bg-gradient-to-r from-green-50 to-teal-50 rounded-[16px] p-6 mb-6">
                     <div className="flex items-center mb-4">
-                      <div className="bg-blue-100 p-2 rounded-full mr-3">
+                      <div className="bg-green-100 p-2 rounded-full mr-3">
                         📧
                       </div>
                       <h3 className="text-20 font-semibold font-poppins text-gray-800">Información de Contacto</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {guardianModal.guardian.person.email && (
+                      {patientInfoModal.patient.person.email && (
                         <div className="bg-white rounded-[12px] p-4 shadow-sm">
                           <label className="block text-sm font-medium text-gray-600 mb-1">Correo Electrónico</label>
                           <p className="text-16 font-medium text-gray-900 font-poppins break-all">
-                            {guardianModal.guardian.person.email}
+                            {patientInfoModal.patient.person.email}
                           </p>
                         </div>
                       )}
-                      {guardianModal.guardian.person.phone && (
+                      {patientInfoModal.patient.person.phone && (
                         <div className="bg-white rounded-[12px] p-4 shadow-sm">
                           <label className="block text-sm font-medium text-gray-600 mb-1">Teléfono</label>
                           <p className="text-16 font-medium text-gray-900 font-poppins">
-                            {guardianModal.guardian.person.phone}
+                            {patientInfoModal.patient.person.phone}
                           </p>
                         </div>
                       )}
@@ -1488,32 +1535,90 @@ function PatientManagement() {
                   </div>
                 )}
 
-                {/* Información adicional */}
-                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-[16px] p-6">
+                {/* Información de discapacidad */}
+                <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-[16px] p-6 mb-6">
                   <div className="flex items-center mb-4">
-                    <div className="bg-purple-100 p-2 rounded-full mr-3">
-                      📅
+                    <div className="bg-orange-100 p-2 rounded-full mr-3">
+                      ♿
                     </div>
-                    <h3 className="text-20 font-semibold font-poppins text-gray-800">Detalles Adicionales</h3>
+                    <h3 className="text-20 font-semibold font-poppins text-gray-800">Información de Discapacidad</h3>
                   </div>
                   <div className="bg-white rounded-[12px] p-4 shadow-sm">
-                    <label className="block text-sm font-medium text-gray-600 mb-1">Fecha de Nacimiento</label>
-                    <p className="text-16 font-medium text-gray-900 font-poppins">
-                      {new Date(guardianModal.guardian.person.birthdate).toLocaleDateString('es-CO', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
+                    <label className="block text-sm font-medium text-gray-600 mb-1">¿Tiene discapacidad?</label>
+                    <p className="text-16 font-medium text-gray-900 font-poppins mb-3">
+                      {patientInfoModal.patient.has_disability ? 'Sí' : 'No'}
                     </p>
+                    {patientInfoModal.patient.has_disability && patientInfoModal.patient.disability_description && (
+                      <>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Descripción de la discapacidad</label>
+                        <p className="text-16 font-medium text-gray-900 font-poppins">
+                          {patientInfoModal.patient.disability_description}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
+
+                {/* Información del tutor */}
+                {patientInfoModal.patient.guardian && (
+                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-[16px] p-6 mb-6">
+                    <div className="flex items-center mb-4">
+                      <div className="bg-purple-100 p-2 rounded-full mr-3">
+                        🛡️
+                      </div>
+                      <h3 className="text-20 font-semibold font-poppins text-gray-800">Información del Tutor Legal</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Nombre Completo</label>
+                        <p className="text-16 font-medium text-gray-900 font-poppins">
+                          {patientInfoModal.patient.guardian.person.first_name} {patientInfoModal.patient.guardian.person.first_surname}
+                          {patientInfoModal.patient.guardian.person.second_surname && ` ${patientInfoModal.patient.guardian.person.second_surname}`}
+                        </p>
+                      </div>
+                      <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Documento</label>
+                        <p className="text-16 font-medium text-gray-900 font-poppins">
+                          {patientInfoModal.patient.guardian.person.document_type} - {patientInfoModal.patient.guardian.person.document_number}
+                        </p>
+                      </div>
+                      <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Relación</label>
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                          {getRelationshipText(patientInfoModal.patient.guardian.relationship_type)}
+                        </span>
+                      </div>
+                      <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Edad</label>
+                        <p className="text-16 font-medium text-gray-900 font-poppins">
+                          {calculateAge(patientInfoModal.patient.guardian.person.birthdate)} años
+                        </p>
+                      </div>
+                      {patientInfoModal.patient.guardian.person.email && (
+                        <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Correo Electrónico</label>
+                          <p className="text-16 font-medium text-gray-900 font-poppins break-all">
+                            {patientInfoModal.patient.guardian.person.email}
+                          </p>
+                        </div>
+                      )}
+                      {patientInfoModal.patient.guardian.person.phone && (
+                        <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Teléfono</label>
+                          <p className="text-16 font-medium text-gray-900 font-poppins">
+                            {patientInfoModal.patient.guardian.person.phone}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Botón de cerrar */}
                 <div className="flex justify-center mt-8 pt-6 border-t border-gray-200">
                   <Button
                     className="bg-primary-blue hover:bg-primary-blue-hover text-white px-8 py-3 font-bold rounded-[40px] text-16 shadow-md"
-                    onClick={() => setGuardianModal({ open: false, guardian: null })}
+                    onClick={() => setPatientInfoModal({ open: false, patient: null })}
                   >
                     Cerrar
                   </Button>
@@ -1523,27 +1628,30 @@ function PatientManagement() {
           </div>
         )}
 
-        {/* Modal de descripción de discapacidad */}
-        {disabilityModal.open && (
-          <div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[600px] max-h-[90vh] overflow-y-auto">
+        {/* Modal de desactivación con motivo */}
+        {deactivationModal.open && (
+          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{backgroundColor: 'rgba(255, 255, 255, 0.3)'}}>
+            <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[500px] max-h-[90vh] overflow-y-auto">
               {/* Header del modal */}
-              <div className="bg-gradient-to-br from-orange-500 to-red-500 text-white p-6 rounded-t-[24px] relative overflow-hidden">
+              <div className="bg-gradient-to-br from-red-500 to-red-600 text-white p-6 rounded-t-[24px] relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-16 -mt-16"></div>
                 <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full -ml-12 -mb-12"></div>
                 <div className="relative z-10 flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="bg-white bg-opacity-20 p-3 rounded-full">
-                      ♿
+                      ⚠️
                     </div>
                     <div>
-                      <h2 className="text-26 font-bold font-poppins">Información de Discapacidad</h2>
-                      <p className="text-16 opacity-90 font-poppins">{disabilityModal.patientName}</p>
+                      <h2 className="text-26 font-bold font-poppins">Desactivar Paciente</h2>
+                      <p className="text-16 opacity-90 font-poppins">
+                        {deactivationModal.patient?.person.first_name} {deactivationModal.patient?.person.first_surname}
+                      </p>
                     </div>
                   </div>
                   <button
                     className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-full transition-all duration-200"
-                    onClick={() => setDisabilityModal({ open: false, description: '', patientName: '' })}
+                    onClick={() => setDeactivationModal({ open: false, patient: null, reason: '', loading: false })}
+                    disabled={deactivationModal.loading}
                   >
                     ✖️
                   </button>
@@ -1552,27 +1660,56 @@ function PatientManagement() {
 
               {/* Contenido del modal */}
               <div className="p-6">
-                <div className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-[16px] p-6">
+                <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-[16px] p-6 mb-6">
                   <div className="flex items-center mb-4">
-                    <div className="bg-orange-100 p-2 rounded-full mr-3">
-                      📋
+                    <div className="bg-red-100 p-2 rounded-full mr-3">
+                      📝
                     </div>
-                    <h3 className="text-20 font-semibold font-poppins text-gray-800">Descripción de la Discapacidad</h3>
+                    <h3 className="text-20 font-semibold font-poppins text-gray-800">Motivo de Desactivación</h3>
                   </div>
-                  <div className="bg-white rounded-[12px] p-6 shadow-sm">
-                    <p className="text-16 text-gray-700 font-poppins leading-relaxed whitespace-pre-wrap">
-                      {disabilityModal.description}
-                    </p>
+                  <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                    <label className="block text-sm font-medium text-gray-600 mb-2">
+                      Ingrese el motivo de desactivación *
+                    </label>
+                    <textarea
+                      className="w-full px-4 py-3 border border-gray-300 rounded-[12px] resize-none font-poppins text-16 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      rows="4"
+                      placeholder="Ej: Paciente se trasladó a otra ciudad, duplicado en el sistema, etc."
+                      value={deactivationModal.reason}
+                      onChange={(e) => setDeactivationModal(prev => ({ ...prev, reason: e.target.value }))}
+                      disabled={deactivationModal.loading}
+                    />
+                    {!deactivationModal.reason.trim() && (
+                      <p className="text-sm text-red-500 mt-2 font-poppins">Este campo es obligatorio</p>
+                    )}
                   </div>
                 </div>
 
-                {/* Botón de cerrar */}
-                <div className="flex justify-center mt-8 pt-6 border-t border-gray-200">
+                {/* Botones */}
+                <div className="flex justify-center space-x-4 pt-6 border-t border-gray-200">
                   <Button
-                    className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 font-bold rounded-[40px] text-16 shadow-md"
-                    onClick={() => setDisabilityModal({ open: false, description: '', patientName: '' })}
+                    className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 font-bold rounded-[40px] text-16 shadow-md"
+                    onClick={() => setDeactivationModal({ open: false, patient: null, reason: '', loading: false })}
+                    disabled={deactivationModal.loading}
                   >
-                    Cerrar
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 font-bold rounded-[40px] text-16 shadow-md"
+                    onClick={handleDeactivate}
+                    disabled={deactivationModal.loading || !deactivationModal.reason.trim()}
+                  >
+                    {deactivationModal.loading ? (
+                      <div className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Desactivando...
+                      </div>
+                    ) : (
+                      'Desactivar'
+                    )}
                   </Button>
                 </div>
               </div>
@@ -1580,16 +1717,7 @@ function PatientManagement() {
           </div>
         )}
 
-        <ConfirmDialog
-          open={confirmDialog.open}
-          title="Confirmar desactivación"
-          message={`¿Seguro que deseas desactivar al paciente ${confirmDialog.patient?.person.first_name} ${confirmDialog.patient?.person.first_surname}?`}
-          onConfirm={async () => {
-            await handleDeactivate(confirmDialog.patient);
-            setConfirmDialog({ open: false, patient: null });
-          }}
-          onCancel={() => setConfirmDialog({ open: false, patient: null })}
-        />
+
       </section>
     </main>
   );

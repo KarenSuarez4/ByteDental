@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -24,7 +24,6 @@ function AppContent() {
 
   if (loading) return <div>Cargando...</div>;
 
-  // Si el usuario está autenticado pero debe cambiar contraseña y no está en la página de cambio
   if (isAuthenticated && mustChangePassword && location.pathname !== '/force-password-change') {
     return <Navigate to="/force-password-change" replace />;
   }
@@ -35,104 +34,42 @@ function AppContent() {
   return (
     <div className="min-h-screen w-full flex flex-col">
       {!isLoginPage && !isForcePasswordChangePage && (isAuthenticated ? <UserHeader userRole={userRole} /> : <Header />)}
-
       <Routes>
-        {/* Rutas públicas */}
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/PasswordReset" element={<PasswordReset />} />
         <Route path="/PasswordReset2" element={<PasswordReset2 />} />
         <Route path="/PasswordReset3" element={<PasswordReset3 />} />
         <Route path="/force-password-change" element={<ForcePasswordChange />} />
-
-        {/* Rutas protegidas por rol */}
         {isAuthenticated && userRole === "Administrador" && (
           <>
-            <Route path="/users/register" element={
-              <ProtectedRoute>
-                <RegisterUser />
-              </ProtectedRoute>
-            } />
-            <Route path="/users/manage" element={
-              <ProtectedRoute>
-                <UserManagement />
-              </ProtectedRoute>
-            } />
-            <Route path="/dental-services/register" element={
-              <ProtectedRoute>
-                <RegisterDentalService />
-              </ProtectedRoute>
-            } />
-            <Route path="/dental-services/manage" element={
-              <ProtectedRoute>
-                <DentalServiceManagement />
-              </ProtectedRoute>
-            } />
-            <Route path="/reports" element={
-              <ProtectedRoute>
-                <DummyPage title="Reportes" />
-              </ProtectedRoute>
-            } />
+            <Route path="/users/register" element={<ProtectedRoute><RegisterUser /></ProtectedRoute>} />
+            <Route path="/users/manage" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
+            <Route path="/dental-services/register" element={<ProtectedRoute><RegisterDentalService /></ProtectedRoute>} />
+            <Route path="/dental-services/manage" element={<ProtectedRoute><DentalServiceManagement /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute><DummyPage title="Reportes" /></ProtectedRoute>} />
           </>
         )}
         {isAuthenticated && userRole === "Asistente" && (
           <>
-            <Route path="/patients" element={
-              <ProtectedRoute>
-                <PatientManagement />
-              </ProtectedRoute>
-            } />
-            <Route path="/patients/register" element={
-              <ProtectedRoute>
-                <RegisterPatient />
-              </ProtectedRoute>
-            } />
+            <Route path="/patients" element={<ProtectedRoute><PatientManagement /></ProtectedRoute>} />
+            <Route path="/patients/register" element={<ProtectedRoute><RegisterPatient /></ProtectedRoute>} />
           </>
         )}
         {isAuthenticated && userRole === "Doctor" && (
           <>
-            <Route path="/patients" element={
-              <ProtectedRoute>
-                <PatientManagement />
-              </ProtectedRoute>
-            } />
-            <Route path="/clinical-history" element={
-              <ProtectedRoute>
-                <DummyPage title="Historial Clínico" />
-              </ProtectedRoute>
-            } />
-            <Route path="/appointments" element={
-              <ProtectedRoute>
-                <DummyPage title="Seguimiento de citas" />
-              </ProtectedRoute>
-            } />
+            <Route path="/patients" element={<ProtectedRoute><PatientManagement /></ProtectedRoute>} />
+            <Route path="/clinical-history" element={<ProtectedRoute><DummyPage title="Historial Clínico" /></ProtectedRoute>} />
+            <Route path="/appointments" element={<ProtectedRoute><DummyPage title="Seguimiento de citas" /></ProtectedRoute>} />
           </>
         )}
         {isAuthenticated && userRole === "Auditor" && (
           <>
-            <Route path="/audit-logs" element={
-              <ProtectedRoute>
-                <AuditLog />
-              </ProtectedRoute>
-            } />
-            <Route path="/user-activity" element={
-              <ProtectedRoute>
-                <DummyPage title="Actividad de Usuarios" />
-              </ProtectedRoute>
-            } />
+            <Route path="/audit-logs" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />
+            <Route path="/user-activity" element={<ProtectedRoute><DummyPage title="Actividad de Usuarios" /></ProtectedRoute>} />
           </>
         )}
-
-        {/* Redirección por defecto */}
-        <Route path="*" element={<Navigate to={
-          isAuthenticated ? (
-            mustChangePassword ? "/force-password-change" : 
-            userRole === "Administrador" ? "/users/register" :
-            userRole === "Doctor" || userRole === "Asistente" ? "/patients" :
-            userRole === "Auditor" ? "/audit-logs" :
-            "/login"
-          ) : "/login"
-        } replace />} />
+        <Route path="*" element={<Navigate to={isAuthenticated ? (mustChangePassword ? "/force-password-change" : userRole === "Administrador" ? "/users/register" : userRole === "Doctor" || userRole === "Asistente" ? "/patients" : userRole === "Auditor" ? "/audit-logs" : "/login") : "/login"} replace />} />
       </Routes>
     </div>
   );

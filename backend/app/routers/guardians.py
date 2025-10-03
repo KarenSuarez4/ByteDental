@@ -73,11 +73,6 @@ def get_guardian(
     if not guardian:
         raise HTTPException(status_code=404, detail="Guardian no encontrado")
     return guardian
-    
-    if not guardian:
-        raise HTTPException(status_code=404, detail="Guardian no encontrado")
-    
-    return guardian
 
 @router.put("/{guardian_id}", response_model=GuardianResponse)
 def update_guardian(
