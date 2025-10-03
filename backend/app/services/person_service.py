@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import or_
 from typing import Optional, List
 from datetime import date, datetime
 from app.models.person_models import Person, DocumentTypeEnum
