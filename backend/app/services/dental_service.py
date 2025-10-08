@@ -12,14 +12,15 @@ from app.schemas.dental_service_schema import (
     DentalServiceUpdate, 
     DentalServiceStatusChange
 )
+from app.services.auditoria_service import AuditoriaService
 
 
 class DentalServiceService:
     """Servicio para operaciones CRUD de servicios odontológicos"""
     
-    def __init__(self, db: Session, user_id: Optional[int] = None, user_ip: str = "unknown"):
+    def __init__(self, db: Session, user_id: Optional[str] = None, user_ip: str = "unknown"):
         self.db = db
-        self.user_id = user_id
+        self.user_id = user_id or "system"
         self.user_ip = user_ip
 
     def create_dental_service(self, service_data: DentalServiceCreate) -> DentalService:
@@ -44,6 +45,26 @@ class DentalServiceService:
         self.db.add(dental_service)
         self.db.commit()
         self.db.refresh(dental_service)
+        
+        # Registrar evento de auditoría usando método genérico
+        AuditoriaService.registrar_evento(
+            db=self.db,
+            usuario_id=self.user_id,
+            tipo_evento="CREATE",
+            registro_afectado_id=str(dental_service.id),
+            registro_afectado_tipo="dental_services",
+            descripcion_evento=f"Servicio odontológico creado: {dental_service.name}",
+            detalles_cambios={
+                "accion": "crear_servicio_dental",
+                "datos_nuevos": {
+                    "name": dental_service.name,
+                    "description": dental_service.description,
+                    "value": float(dental_service.value),
+                    "is_active": dental_service.is_active
+                }
+            },
+            ip_origen=self.user_ip
+        )
         
         return dental_service
 
@@ -131,6 +152,14 @@ class DentalServiceService:
             if existing_service:
                 raise ValueError(f"Ya existe otro servicio odontológico con el nombre '{service_data.name}'")
         
+        # Guardar datos anteriores para auditoría
+        datos_anteriores = {
+            "name": dental_service.name,
+            "description": dental_service.description,
+            "value": float(dental_service.value),
+            "is_active": dental_service.is_active
+        }
+        
         # Actualizar campos proporcionados
         update_data = service_data.dict(exclude_unset=True)
         
@@ -144,6 +173,31 @@ class DentalServiceService:
         
         self.db.commit()
         self.db.refresh(dental_service)
+        
+        # Preparar datos nuevos para auditoría
+        datos_nuevos = {
+            "name": dental_service.name,
+            "description": dental_service.description,
+            "value": float(dental_service.value),
+            "is_active": dental_service.is_active
+        }
+        
+        # Registrar evento de auditoría usando método genérico
+        AuditoriaService.registrar_evento(
+            db=self.db,
+            usuario_id=self.user_id,
+            tipo_evento="UPDATE",
+            registro_afectado_id=str(dental_service.id),
+            registro_afectado_tipo="dental_services",
+            descripcion_evento=f"Servicio odontológico actualizado: {dental_service.name}",
+            detalles_cambios={
+                "accion": "actualizar_servicio_dental",
+                "datos_anteriores": datos_anteriores,
+                "datos_nuevos": datos_nuevos,
+                "campos_actualizados": list(update_data.keys())
+            },
+            ip_origen=self.user_ip
+        )
         
         return dental_service
 
@@ -165,6 +219,26 @@ class DentalServiceService:
         dental_service.is_active = False
         
         self.db.commit()
+        
+        # Registrar evento de auditoría usando método genérico
+        AuditoriaService.registrar_evento(
+            db=self.db,
+            usuario_id=self.user_id,
+            tipo_evento="DELETE",
+            registro_afectado_id=str(dental_service.id),
+            registro_afectado_tipo="dental_services",
+            descripcion_evento=f"Servicio odontológico eliminado (soft delete): {dental_service.name}",
+            detalles_cambios={
+                "accion": "eliminar_servicio_dental",
+                "is_active": {"antes": True, "despues": False},
+                "datos_servicio": {
+                    "name": dental_service.name,
+                    "description": dental_service.description,
+                    "value": float(dental_service.value)
+                }
+            },
+            ip_origen=self.user_ip
+        )
         
         return {
             "success": True,
@@ -198,6 +272,38 @@ class DentalServiceService:
         self.db.commit()
         self.db.refresh(dental_service)
         
+        # Registrar evento de auditoría usando método genérico
+        event_type = "REACTIVATE" if new_status else "DEACTIVATE"
+        action_text = "reactivado" if new_status else "desactivado"
+        
+        descripcion_evento = f"Servicio odontológico {action_text}: {dental_service.name}"
+        if status_data.reason:
+            descripcion_evento += f" - Razón: {status_data.reason}"
+        
+        detalles_cambios = {
+            "accion": f"{action_text}_servicio_dental",
+            "is_active": {"antes": previous_status, "despues": new_status},
+            "datos_servicio": {
+                "name": dental_service.name,
+                "description": dental_service.description,
+                "value": float(dental_service.value)
+            }
+        }
+        
+        if status_data.reason:
+            detalles_cambios["razon"] = status_data.reason
+        
+        AuditoriaService.registrar_evento(
+            db=self.db,
+            usuario_id=self.user_id,
+            tipo_evento=event_type,
+            registro_afectado_id=str(dental_service.id),
+            registro_afectado_tipo="dental_services",
+            descripcion_evento=descripcion_evento,
+            detalles_cambios=detalles_cambios,
+            ip_origen=self.user_ip
+        )
+        
         # Determinar mensaje de éxito
         action = "activado" if new_status else "desactivado"
         message = f"Servicio '{dental_service.name}' {action} exitosamente"
@@ -219,6 +325,6 @@ class DentalServiceService:
 
 
 
-def get_dental_service_service(db: Session, user_id: Optional[int] = None, user_ip: str = "unknown") -> DentalServiceService:
+def get_dental_service_service(db: Session, user_id: Optional[str] = None, user_ip: str = "unknown") -> DentalServiceService:
     """Factory function para crear instancia del servicio"""
     return DentalServiceService(db, user_id, user_ip)
