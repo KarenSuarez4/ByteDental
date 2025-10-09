@@ -20,6 +20,7 @@ from app.schemas.dental_service_schema import (
     DentalServiceDeleteResponse,
     DentalServiceStatusResponse
 )
+from app.models.dental_service_models import DentalService
 
 router = APIRouter(
     prefix="/dental-services",
@@ -159,5 +160,20 @@ def delete_dental_service(
         return service.delete_dental_service(service_id)
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
+
+
+@router.get("/active", response_model=List[DentalServiceResponse])
+def get_active_dental_services(
+    db: Session = Depends(get_db),
+    current_user = Depends(require_dental_service_read)  # Solo ADMIN y ASSISTANT
+):
+    """
+    Obtener lista de servicios odontológicos activos.
+    """
+    try:
+        services = db.query(DentalService).filter(DentalService.is_active == True).all()
+        return services
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
