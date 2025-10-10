@@ -70,7 +70,7 @@ const Select = ({
                 'pr-12'
               )}
             >
-              <span className="block truncate">{displayValue}</span>
+              <span className="block truncate pr-2">{displayValue}</span>
 
               {/* Flecha personalizada */}
               <span className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
@@ -103,8 +103,8 @@ const Select = ({
                   'py-2',
                   'shadow-lg ring-1 ring-black ring-opacity-5',
                   'focus:outline-none',
-                  'text-18 font-poppins',
-                  'hide-scrollbar' // Usar la clase de tu CSS
+                  'text-18 font-poppins', // Reducido de text-18 a text-16
+                  'hide-scrollbar'
                 )}
               >
                 {options.map((option, optionIdx) => (
@@ -116,6 +116,7 @@ const Select = ({
                       cn(
                         'relative cursor-pointer select-none py-3 px-8',
                         'transition-colors duration-150',
+                        'min-h-[44px]', // Altura mínima para opciones largas
                         {
                           'bg-primary-blue/10 text-primary-blue': active && !selected,
                           'bg-primary-blue text-white font-semibold': selected,
@@ -126,13 +127,17 @@ const Select = ({
                     }
                   >
                     {({ selected, active }) => (
-                      <div className="flex items-center justify-between">
-                        <span className={cn('block truncate', selected ? 'font-semibold' : 'font-normal')}>
+                      <div className="flex items-start justify-between gap-3">
+                        <span className={cn(
+                          'block flex-1 leading-snug', // Cambiado de truncate a leading-snug
+                          'break-words', // Permite el salto de línea
+                          selected ? 'font-semibold' : 'font-normal'
+                        )}>
                           {option.label}
                         </span>
                         {selected && (
                           <svg
-                            className="w-5 h-5"
+                            className="w-5 h-5 flex-shrink-0 mt-0.5"
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
