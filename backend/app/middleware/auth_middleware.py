@@ -46,7 +46,7 @@ class RolePermissions:
     PERSON_READ = [ASSISTANT, DENTIST]  # ASSISTANT y DENTIST pueden leer información de personas
 
     # Permisos para servicios dentales
-    DENTAL_SERVICE_READ = [ADMIN, ASSISTANT]  # Solo ADMIN y ASSISTANT pueden leer servicios dentales
+    DENTAL_SERVICE_READ = [ADMIN, ASSISTANT, DENTIST]  # Solo ADMIN, ASSISTANT y DENTIST pueden leer servicios dentales
     DENTAL_SERVICE_WRITE = [ADMIN]  # Solo ADMIN puede crear, actualizar, eliminar servicios dentales
 
 def get_current_user_from_header(request: Request, db: Session = Depends(get_db)) -> Optional[User]:
@@ -181,7 +181,7 @@ async def require_user_management(request: Request, db: Session = Depends(get_db
 
 # Dependencies específicas para servicios dentales
 async def require_dental_service_read(request: Request, db: Session = Depends(get_db)) -> User:
-    """Require permissions to read dental services (only ADMIN and ASSISTANT)"""
+    """Require permissions to read dental services (only ADMIN and ASSISTANT and DOCTOR)"""
     return await require_roles(RolePermissions.DENTAL_SERVICE_READ)(request, db)
 
 async def require_dental_service_write(request: Request, db: Session = Depends(get_db)) -> User:
