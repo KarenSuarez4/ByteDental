@@ -60,11 +60,11 @@ const RegisterPatient = () => {
     const birth = new Date(birthDate);
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
       age--;
     }
-    
+
     return age;
   };
 
@@ -84,7 +84,7 @@ const RegisterPatient = () => {
         { value: "PP", label: "Pasaporte" }
       ];
     }
-    
+
     if (age === null) {
       // Si no hay edad calculada, mostrar todos los tipos
       return [
@@ -94,7 +94,7 @@ const RegisterPatient = () => {
         { value: "PP", label: "Pasaporte" }
       ];
     }
-    
+
     if (age >= 0 && age <= 17) {
       // Menores de 18: Solo TI, CE, PP
       return [
@@ -115,26 +115,26 @@ const RegisterPatient = () => {
   // Función para calcular progreso
   const calculateProgress = () => {
     const requiredFields = [
-      'document_type', 
-      'document_number', 
-      'nombres', 
-      'apellidos', 
-      'email', 
-      'phone', 
-      'occupation', 
+      'document_type',
+      'document_number',
+      'nombres',
+      'apellidos',
+      'email',
+      'phone',
+      'occupation',
       'birthdate',
       'has_disability'
     ];
-    
+
     // Si tiene discapacidad, incluir la descripción como campo requerido
     const disabilityFields = formData.has_disability === true || formData.has_disability === "true" ? ['disability_description'] : [];
-    
+
     const guardianFields = [
       'guardian_document_type',
-      'guardian_document_number', 
-      'guardian_nombres', 
-      'guardian_apellidos', 
-      'guardian_email', 
+      'guardian_document_number',
+      'guardian_nombres',
+      'guardian_apellidos',
+      'guardian_email',
       'guardian_phone',
       'guardian_birthdate',
       'guardian_relationship_type'
@@ -185,7 +185,7 @@ const RegisterPatient = () => {
     if (formData.birthdate) {
       const calculatedAge = calculateAge(formData.birthdate);
       setAge(calculatedAge);
-      
+
       // Determinar si necesita tutor legal (menor de 18 O mayor de 64 O tiene discapacidad)
       if (calculatedAge !== null && (calculatedAge < 18 || calculatedAge > 64) || (formData.has_disability === true || formData.has_disability === "true")) {
         setNeedsGuardian(true);
@@ -217,26 +217,26 @@ const RegisterPatient = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
+
     // Validaciones específicas para teléfono
     if (name === 'phone' || name === 'guardian_phone') {
       // Solo permitir números
       if (!/^\d*$/.test(value)) return;
-      
+
       setFormData((prev) => ({ ...prev, [name]: value }));
-      
+
       const newErrors = { ...formErrors };
-      
+
       // Limpiar error anterior primero
       if (newErrors[name]) {
         delete newErrors[name];
       }
-      
+
       // Validar longitud del teléfono
       if (value && value.length !== 10) {
         newErrors[name] = 'El teléfono debe tener exactamente 10 dígitos';
       }
-      
+
       setFormErrors({ ...newErrors, _timestamp: Date.now() });
       return;
     }
@@ -245,7 +245,7 @@ const RegisterPatient = () => {
     if (name === 'document_number' || name === 'guardian_document_number') {
       const docTypeField = name === 'document_number' ? 'document_type' : 'guardian_document_type';
       const docType = formData[docTypeField];
-      
+
       // Validar según el tipo de documento
       if (docType === 'PP') {
         // Pasaporte: alfanumérico, entre 6 y 10 caracteres, puede contener letras y números
@@ -255,16 +255,16 @@ const RegisterPatient = () => {
         // Otros documentos: solo números
         if (!/^\d*$/.test(value)) return;
       }
-      
+
       setFormData((prev) => ({ ...prev, [name]: value }));
-      
+
       const newErrors = { ...formErrors };
-      
+
       // Limpiar error anterior primero
       if (newErrors[name]) {
         delete newErrors[name];
       }
-      
+
       // Validar longitud según tipo de documento
       if (value) {
         if (docType === 'PP') {
@@ -273,7 +273,7 @@ const RegisterPatient = () => {
           }
         }
       }
-      
+
       if (Object.keys(newErrors).length !== Object.keys(formErrors).length || newErrors[name]) {
         setFormErrors({ ...newErrors, _timestamp: Date.now() });
       }
@@ -283,12 +283,12 @@ const RegisterPatient = () => {
     // Validación inmediata para nombres y apellidos
     if (name === 'nombres' || name === 'apellidos' || name === 'guardian_nombres' || name === 'guardian_apellidos') {
       const newErrors = { ...formErrors };
-      
+
       // Limpiar error anterior primero
       if (newErrors[name]) {
         delete newErrors[name];
       }
-      
+
       if (value && !isValidName(value)) {
         const fieldNames = {
           nombres: 'Los nombres solo pueden contener letras y espacios',
@@ -306,19 +306,19 @@ const RegisterPatient = () => {
         };
         newErrors[name] = requiredMessages[name];
       }
-      
+
       setFormErrors({ ...newErrors, _timestamp: Date.now() });
     }
 
     // Validación inmediata para fecha de nacimiento
     if (name === 'birthdate') {
       const newErrors = { ...formErrors };
-      
+
       // Limpiar error anterior primero para forzar re-render
       if (newErrors.birthdate) {
         delete newErrors.birthdate;
       }
-      
+
       if (value === '') {
         newErrors.birthdate = 'Fecha de nacimiento es obligatoria';
       } else if (value.length < 10) {
@@ -329,7 +329,7 @@ const RegisterPatient = () => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const birthDate = new Date(value);
-        
+
         // Verificar que la fecha sea válida
         if (isNaN(birthDate.getTime())) {
           newErrors.birthdate = 'Fecha de nacimiento inválida';
@@ -367,7 +367,7 @@ const RegisterPatient = () => {
           // Si no hay errores, no agregar nada (ya se limpió arriba)
         }
       }
-      
+
       // Forzar actualización usando una clave temporal para asegurar re-render
       setFormErrors({ ...newErrors, _timestamp: Date.now() });
     }
@@ -375,12 +375,12 @@ const RegisterPatient = () => {
     // Validación inmediata para fecha de nacimiento del tutor
     if (name === 'guardian_birthdate') {
       const newErrors = { ...formErrors };
-      
+
       // Limpiar error anterior primero para forzar re-render
       if (newErrors.guardian_birthdate) {
         delete newErrors.guardian_birthdate;
       }
-      
+
       if (value === '') {
         newErrors.guardian_birthdate = 'Fecha de nacimiento del tutor es obligatoria';
       } else if (value.length < 10) {
@@ -391,7 +391,7 @@ const RegisterPatient = () => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const birthDate = new Date(value);
-        
+
         // Verificar que la fecha sea válida
         if (isNaN(birthDate.getTime())) {
           newErrors.guardian_birthdate = 'Fecha de nacimiento inválida';
@@ -408,7 +408,7 @@ const RegisterPatient = () => {
           // Si no hay errores, no agregar nada (ya se limpió arriba)
         }
       }
-      
+
       // Forzar actualización usando una clave temporal para asegurar re-render
       setFormErrors({ ...newErrors, _timestamp: Date.now() });
     }
@@ -416,29 +416,29 @@ const RegisterPatient = () => {
     // Validación inmediata para campos obligatorios
     if (['document_type', 'occupation', 'guardian_document_type', 'guardian_relationship_type'].includes(name)) {
       const newErrors = { ...formErrors };
-      
+
       // Limpiar error anterior primero
       if (newErrors[name]) {
         delete newErrors[name];
       }
-      
+
       if (!value) {
         const requiredMessages = {
           document_type: 'Tipo de documento es obligatorio',
-          occupation: 'Ocupación es obligatoria', 
+          occupation: 'Ocupación es obligatoria',
           guardian_document_type: 'Tipo de documento del tutor es obligatorio',
           guardian_relationship_type: 'La relación con el paciente es obligatoria'
         };
         newErrors[name] = requiredMessages[name];
       }
-      
+
       setFormErrors({ ...newErrors, _timestamp: Date.now() });
     }
 
     // Validación en tiempo real para tipo de documento y edad
     if (name === 'document_type') {
       const newErrors = { ...formErrors };
-      
+
       if (value === 'TI' && formData.birthdate) {
         const age = calculateAge(formData.birthdate);
         if (age !== null && age >= 18) {
@@ -468,16 +468,19 @@ const RegisterPatient = () => {
 
     // Validación para discapacidad
     if (name === 'has_disability') {
-      // Limpiar descripción de discapacidad si se marca como false
-      if (value === "false" || value === false) {
-        setFormData(prev => ({ ...prev, has_disability: false, disability_description: "" }));
-        const newErrors = { ...formErrors };
-        if (newErrors.disability_description) {
-          delete newErrors.disability_description;
-          setFormErrors({ ...newErrors, _timestamp: Date.now() });
-        }
-      } else if (value === "true" || value === true) {
-        setFormData(prev => ({ ...prev, has_disability: true }));
+      // Guardar como string consistentemente
+      const boolValue = value === "true" ? "true" : "false";
+      setFormData(prev => ({
+        ...prev,
+        has_disability: boolValue,
+        // Limpiar descripción si se marca como false
+        disability_description: value === "false" ? "" : prev.disability_description
+      }));
+
+      const newErrors = { ...formErrors };
+      if (newErrors.disability_description && value === "false") {
+        delete newErrors.disability_description;
+        setFormErrors({ ...newErrors, _timestamp: Date.now() });
       }
       return;
     }
@@ -485,21 +488,21 @@ const RegisterPatient = () => {
     // Validación para descripción de discapacidad
     if (name === 'disability_description') {
       const newErrors = { ...formErrors };
-      
+
       // Limpiar error anterior primero
       if (newErrors[name]) {
         delete newErrors[name];
       }
-      
+
       if ((formData.has_disability === true || formData.has_disability === "true") && !value.trim()) {
         newErrors[name] = 'La descripción de la discapacidad es obligatoria';
       }
-      
+
       setFormErrors({ ...newErrors, _timestamp: Date.now() });
     }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
-    
+
     // Limpiar error específico del campo para otros campos que no tienen validación especial
     const specialFields = ['nombres', 'apellidos', 'guardian_nombres', 'guardian_apellidos', 'document_type', 'occupation', 'guardian_document_type', 'guardian_relationship_type', 'birthdate', 'guardian_birthdate', 'phone', 'guardian_phone', 'document_number', 'guardian_document_number', 'has_disability', 'disability_description'];
     if (formErrors[name] && !specialFields.includes(name)) {
@@ -515,31 +518,31 @@ const RegisterPatient = () => {
 
     // Validación inmediata de email
     const newErrors = { ...formErrors };
-    
+
     // Limpiar error anterior primero
     if (newErrors[name]) {
       delete newErrors[name];
     }
-    
+
     if (!value) {
       newErrors[name] = name === 'email' ? 'Correo electrónico es obligatorio' : 'Correo del tutor es obligatorio';
     } else if (!value.includes('@') || !value.includes('.')) {
       newErrors[name] = 'Ingrese un correo electrónico válido';
     }
-    
+
     setFormErrors({ ...newErrors, _timestamp: Date.now() });
   };
 
   const validateForm = () => {
     const errors = {};
-    
+
     // Validar campos obligatorios del paciente
     if (!formData.document_type) errors.document_type = 'Tipo de documento es obligatorio';
     if (!formData.document_number) errors.document_number = 'Número de documento es obligatorio';
     if (!formData.nombres) errors.nombres = 'Nombres son obligatorios';
     if (!formData.apellidos) errors.apellidos = 'Apellidos son obligatorios';
     if (formData.has_disability === null || formData.has_disability === "") errors.has_disability = '¿Tiene discapacidad? es obligatorio';
-    
+
     // Validar formato de nombres y apellidos
     if (formData.nombres && !isValidName(formData.nombres)) {
       errors.nombres = 'Los nombres solo pueden contener letras y espacios';
@@ -557,7 +560,7 @@ const RegisterPatient = () => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const birthDate = new Date(formData.birthdate);
-      
+
       // Verificar que la fecha sea válida
       if (isNaN(birthDate.getTime())) {
         errors.birthdate = 'Fecha de nacimiento inválida';
@@ -608,7 +611,7 @@ const RegisterPatient = () => {
       if (!formData.guardian_document_number) errors.guardian_document_number = 'Número de documento del tutor es obligatorio';
       if (!formData.guardian_nombres) errors.guardian_nombres = 'Nombres del tutor son obligatorios';
       if (!formData.guardian_apellidos) errors.guardian_apellidos = 'Apellidos del tutor son obligatorios';
-      
+
       // Validar formato de nombres y apellidos del tutor
       if (formData.guardian_nombres && !isValidName(formData.guardian_nombres)) {
         errors.guardian_nombres = 'Los nombres del tutor solo pueden contener letras y espacios';
@@ -643,7 +646,7 @@ const RegisterPatient = () => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const guardianBirthDate = new Date(formData.guardian_birthdate);
-        
+
         // Verificar que la fecha sea válida
         if (isNaN(guardianBirthDate.getTime())) {
           errors.guardian_birthdate = 'Fecha de nacimiento inválida';
@@ -772,7 +775,7 @@ const RegisterPatient = () => {
       console.log('🚀 Payload being sent:', JSON.stringify(patientPayload, null, 2));
       await createPatient(patientPayload, token);
       setSuccessMessage("¡Paciente registrado con éxito!");
-      
+
       // Resetear el formulario después del éxito
       setFormData({
         document_type: "",
@@ -802,9 +805,9 @@ const RegisterPatient = () => {
       console.error('❌ Error al registrar el paciente:', error);
       console.error('❌ Error response:', error.response);
       console.error('❌ Error response data:', error.response?.data);
-      
+
       let errorMessage = 'Error al registrar el paciente.';
-      
+
       if (error.response?.data) {
         const errorData = error.response.data;
         if (errorData.detail) {
@@ -826,7 +829,7 @@ const RegisterPatient = () => {
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       setFormError(errorMessage);
     } finally {
       setLoading(false);
@@ -868,26 +871,24 @@ const RegisterPatient = () => {
       <h1 className="text-header-blue text-46 font-bold font-poppins mb-8 text-center">
         REGISTRO DE PACIENTES
       </h1>
-      
+
       {/* Barra de progreso */}
       <ProgressBar progress={progress} />
 
       {/* Mostrar información de fecha y edad */}
       {formData.birthdate && formData.birthdate.length > 0 && (
-        <div className={`mb-6 p-4 rounded-lg ${
-          (age !== null && (age < 0 || age > 120)) || formErrors.birthdate
-            ? 'bg-red-50 border border-red-200' 
-            : formData.birthdate.length === 10 && age !== null
+        <div className={`mb-6 p-4 rounded-lg ${(age !== null && (age < 0 || age > 120)) || formErrors.birthdate
+          ? 'bg-red-50 border border-red-200'
+          : formData.birthdate.length === 10 && age !== null
             ? 'bg-blue-50 border border-blue-200'
             : 'bg-yellow-50 border border-yellow-200'
-        }`}>
-          <p className={`font-poppins ${
-            (age !== null && (age < 0 || age > 120)) || formErrors.birthdate
-              ? 'text-red-700' 
-              : formData.birthdate.length === 10 && age !== null
+          }`}>
+          <p className={`font-poppins ${(age !== null && (age < 0 || age > 120)) || formErrors.birthdate
+            ? 'text-red-700'
+            : formData.birthdate.length === 10 && age !== null
               ? 'text-blue-700'
               : 'text-yellow-700'
-          }`}>
+            }`}>
             {formData.birthdate.length < 10 ? (
               <>
                 <span className="font-semibold">📅 Ingresando fecha...</span>
@@ -927,20 +928,20 @@ const RegisterPatient = () => {
           </p>
         </div>
       )}
-      
+
       {formError && (
         <div className="mb-4 w-full max-w-[700px] p-3 bg-red-100 border border-red-400 text-red-700 rounded text-center">
           {formError}
         </div>
       )}
-      
+
       {successMessage && (
         <div className="mb-4 w-full max-w-[700px] p-3 bg-green-100 border border-green-400 text-green-700 rounded text-center">
           {successMessage}
         </div>
       )}
 
-      <form 
+      <form
         onSubmit={handleSubmit}
         className="w-full max-w-[700px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-x-[80px] gap-y-4 justify-center"
       >
@@ -950,7 +951,7 @@ const RegisterPatient = () => {
             Datos del Paciente
           </h2>
         </div>
-        
+
         {/* Fecha de nacimiento - PRIMERO para calcular edad */}
         <div className="flex flex-col items-center md:items-start w-full">
           <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">
@@ -969,7 +970,7 @@ const RegisterPatient = () => {
 
         {/* Campo vacío para mantener grid */}
         <div></div>
-        
+
         {/* Tipo de documento */}
         <div className="flex flex-col items-center md:items-start w-full">
           <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">
@@ -1118,6 +1119,8 @@ const RegisterPatient = () => {
             <option value="false">No</option>
             <option value="true">Sí</option>
           </Select>
+
+
           {formErrors.has_disability && (
             <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.has_disability}</p>
           )}
@@ -1134,11 +1137,10 @@ const RegisterPatient = () => {
               value={formData.disability_description}
               onChange={handleChange}
               placeholder="Describa la discapacidad del paciente"
-              className={`w-full px-4 py-3 border rounded-[25px] text-16 font-poppins focus:outline-none focus:ring-2 focus:ring-primary-blue resize-none ${
-                formErrors.disability_description 
-                  ? 'border-red-500 focus:ring-red-500' 
-                  : 'border-gray-300 focus:border-primary-blue'
-              }`}
+              className={`w-full px-4 py-3 border rounded-[25px] text-16 font-poppins focus:outline-none focus:ring-2 focus:ring-primary-blue resize-none ${formErrors.disability_description
+                ? 'border-red-500 focus:ring-red-500'
+                : 'border-gray-300 focus:border-primary-blue'
+                }`}
               rows={3}
               maxLength={500}
             />
@@ -1160,7 +1162,7 @@ const RegisterPatient = () => {
                 Tutor Legal
               </h2>
             </div>
-            
+
             {/* Tipo de documento del tutor */}
             <div className="flex flex-col items-center md:items-start w-full">
               <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">
@@ -1322,8 +1324,8 @@ const RegisterPatient = () => {
 
       {/* Botones de acción */}
       <div className="flex flex-col md:flex-row justify-center items-center md:space-x-6 space-y-4 md:space-y-0 mt-10 w-full max-w-[700px] mx-auto">
-        <Button 
-          onClick={handleSubmit} 
+        <Button
+          onClick={handleSubmit}
           disabled={loading}
           className={cn(
             "w-full md:w-auto px-10 py-4 font-bold rounded-[40px] !text-18 shadow-md",
@@ -1336,7 +1338,7 @@ const RegisterPatient = () => {
             <div className="flex items-center justify-center">
               <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
               Guardando...
             </div>
@@ -1344,8 +1346,8 @@ const RegisterPatient = () => {
             "Guardar"
           )}
         </Button>
-        <Button 
-          onClick={handleCancel} 
+        <Button
+          onClick={handleCancel}
           className="bg-header-blue hover:bg-header-blue-hover text-white w-full md:w-auto px-10 py-4 font-bold rounded-[40px] text-18 shadow-md"
         >
           Cancelar

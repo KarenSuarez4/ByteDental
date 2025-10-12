@@ -14,10 +14,11 @@ class Patient(Base):
     disability_description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
     deactivation_reason = Column(Text, nullable=True)
-    
+
     # Relaciones
     person = relationship("Person", back_populates="patient")
     guardian = relationship("Guardian", back_populates="patients")  # Un paciente apunta a un guardian
+    clinical_histories = relationship("ClinicalHistory", back_populates="patient")  # Relación con ClinicalHistory
 
 # Índices para optimización
 Index('idx_patient_active', Patient.is_active)
