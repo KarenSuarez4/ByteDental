@@ -7,6 +7,17 @@ import StyledLogoutButton from './StyledLogoutButton';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUserCircle } from '@fortawesome/free-solid-svg-icons';
 
+// Estilos para ocultar la barra de scroll
+const scrollbarHideStyles = `
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;     /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;             /* Chrome, Safari and Opera */
+  }
+`;
+
 function cn(...args) {
   return twMerge(clsx(args));
 }
@@ -40,7 +51,7 @@ const UserHeader = ({ userRole }) => {
   };
 
   const getNavLinkClass = (path) => {
-    const baseClasses = "px-8 py-4 font-poppins text-18 rounded-[40px] transition-all duration-300";
+    const baseClasses = "px-4 sm:px-6 lg:px-8 py-2 sm:py-3 lg:py-4 font-poppins text-sm sm:text-16 lg:text-18 rounded-[30px] sm:rounded-[35px] lg:rounded-[40px] transition-all duration-300 whitespace-nowrap flex-shrink-0";
     const activeClasses = "bg-primary-blue text-white shadow-md";
     const inactiveClasses = "text-white hover:bg-white hover:bg-opacity-20";
     
@@ -68,32 +79,48 @@ const UserHeader = ({ userRole }) => {
   };
 
   return (
-    <header className="bg-header-blue w-full min-h-[70px] flex flex-col md:flex-row md:items-center px-2 md:px-10 py-2 relative z-10">
-      <div className="flex items-center justify-between w-full md:w-auto">
-        <Link to="/">
-          <img src="/images/bytedental-logo.png" alt="ByteDental Logo" className="w-[60px] md:w-[100px] h-auto mr-2 md:mr-6" />
+    <>
+      <style dangerouslySetInnerHTML={{ __html: scrollbarHideStyles }} />
+      <header className="bg-header-blue w-full min-h-[70px] flex flex-col lg:flex-row lg:items-center px-2 sm:px-4 lg:px-6 py-2 relative z-10">
+      {/* Logo y User info en móvil */}
+      <div className="flex items-center justify-between w-full lg:w-auto mb-2 lg:mb-0">
+        <Link to="/" className="flex-shrink-0">
+          <img src="/images/bytedental-logo.png" alt="ByteDental Logo" className="w-[50px] sm:w-[60px] lg:w-[80px] h-auto" />
         </Link>
+        
+        {/* User info - visible en móvil, oculto en desktop */}
+        <div className="flex items-center gap-2 text-white font-poppins lg:hidden">
+          <FontAwesomeIcon icon={faUserCircle} className="text-white text-xl" />
+          <span className="font-semibold text-15">{userRole}</span>
+          <StyledLogoutButton onClick={handleSignOut} />
+        </div>
       </div>
-      <nav
-        className="w-full min-w-0 max-w-full overflow-x-auto whitespace-nowrap flex items-center justify-center gap-2 md:gap-6 text-xs sm:text-sm md:text-16 font-poppins font-semibold mx-auto mt-2 md:mt-0 hide-scrollbar pl-12"
-        style={{ WebkitOverflowScrolling: "touch" }}
-      >
-        {currentNavLinks.map((link) => (
-          <Link
-            key={link.path}
-            to={link.path}
-            className={getNavLinkClass(link.path)}
-          >
-            {link.label}
-          </Link>
-        ))}
-      </nav>
-      <div className="flex items-center justify-center gap-1 md:gap-3 text-white font-poppins mt-2 md:mt-0 ml-0 md:ml-auto">
-        <FontAwesomeIcon icon={faUserCircle} className="text-white text-xl md:text-3xl" />
-        <span className="font-semibold text-[0.95rem] md:text-18">{userRole}</span>
+
+      {/* Navegación con scroll horizontal mejorado */}
+      <div className="flex-1 min-w-0 lg:mx-4">
+        <nav className="w-full overflow-x-auto scrollbar-hide">
+          <div className="flex items-center gap-1 sm:gap-2 lg:gap-4 min-w-max px-1 lg:justify-center">
+            {currentNavLinks.map((link) => (
+              <Link
+                key={link.path}
+                to={link.path}
+                className={getNavLinkClass(link.path)}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
+      </div>
+
+      {/* User info - visible solo en desktop */}
+      <div className="hidden lg:flex items-center gap-3 text-white font-poppins flex-shrink-0">
+        <FontAwesomeIcon icon={faUserCircle} className="text-white text-3xl" />
+        <span className="font-semibold text-18 whitespace-nowrap">{userRole}</span>
         <StyledLogoutButton onClick={handleSignOut} />
       </div>
     </header>
+    </>
   );
 };
 
