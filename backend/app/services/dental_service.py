@@ -20,8 +20,16 @@ class DentalServiceService:
     
     def __init__(self, db: Session, user_id: Optional[str] = None, user_ip: str = "unknown"):
         self.db = db
-        self.user_id = user_id or "system"
         self.user_ip = user_ip
+        
+        # Solo proceder si tenemos un user_id válido
+        if user_id:
+            self.user_id = user_id
+            # Obtener rol y email del usuario para auditoría
+            self.user_role, self.user_email = AuditoriaService._obtener_datos_usuario(db, self.user_id)
+        else:
+            # Si no hay usuario autenticado, no permitir operaciones de auditoría
+            raise ValueError("No se puede realizar operaciones sin usuario autenticado")
 
     def create_dental_service(self, service_data: DentalServiceCreate) -> DentalService:
         """Crear un nuevo servicio odontológico"""
@@ -42,29 +50,41 @@ class DentalServiceService:
             is_active=service_data.is_active
         )
         
-        self.db.add(dental_service)
-        self.db.commit()
-        self.db.refresh(dental_service)
-        
-        # Registrar evento de auditoría usando método genérico
-        AuditoriaService.registrar_evento(
-            db=self.db,
-            usuario_id=self.user_id,
-            tipo_evento="CREATE",
-            registro_afectado_id=str(dental_service.id),
-            registro_afectado_tipo="dental_services",
-            descripcion_evento=f"Servicio odontológico creado: {dental_service.name}",
-            detalles_cambios={
-                "accion": "crear_servicio_dental",
-                "datos_nuevos": {
-                    "name": dental_service.name,
-                    "description": dental_service.description,
-                    "value": float(dental_service.value),
-                    "is_active": dental_service.is_active
-                }
-            },
-            ip_origen=self.user_ip
-        )
+        # Registrar auditoría usando la misma transacción
+        try:
+            # Primero, agregamos el servicio y generamos el ID
+            self.db.add(dental_service)
+            self.db.flush()  # Genera el ID sin hacer commit
+            
+            # Registramos la auditoría en la MISMA transacción
+            AuditoriaService.registrar_evento_sin_commit(
+                db=self.db,
+                usuario_id=self.user_id,
+                tipo_evento="CREATE",
+                registro_afectado_id=str(dental_service.id),
+                registro_afectado_tipo="dental_services",
+                descripcion_evento=f"Servicio odontológico creado: {dental_service.name}",
+                detalles_cambios={
+                    "accion": "crear_servicio_dental",
+                    "datos_nuevos": {
+                        "name": dental_service.name,
+                        "description": dental_service.description,
+                        "value": float(dental_service.value),
+                        "is_active": dental_service.is_active
+                    }
+                },
+                ip_origen=self.user_ip,
+                usuario_rol=self.user_role,
+                usuario_email=self.user_email
+            )
+            
+            # Commit de TODO junto
+            self.db.commit()
+            self.db.refresh(dental_service)
+            
+        except Exception as e:
+            self.db.rollback()
+            raise
         
         return dental_service
 
@@ -171,9 +191,6 @@ class DentalServiceService:
             else:
                 setattr(dental_service, field, value)
         
-        self.db.commit()
-        self.db.refresh(dental_service)
-        
         # Preparar datos nuevos para auditoría
         datos_nuevos = {
             "name": dental_service.name,
@@ -182,22 +199,34 @@ class DentalServiceService:
             "is_active": dental_service.is_active
         }
         
-        # Registrar evento de auditoría usando método genérico
-        AuditoriaService.registrar_evento(
-            db=self.db,
-            usuario_id=self.user_id,
-            tipo_evento="UPDATE",
-            registro_afectado_id=str(dental_service.id),
-            registro_afectado_tipo="dental_services",
-            descripcion_evento=f"Servicio odontológico actualizado: {dental_service.name}",
-            detalles_cambios={
-                "accion": "actualizar_servicio_dental",
-                "datos_anteriores": datos_anteriores,
-                "datos_nuevos": datos_nuevos,
-                "campos_actualizados": list(update_data.keys())
-            },
-            ip_origen=self.user_ip
-        )
+        # Registrar auditoría usando la misma transacción
+        try:
+            # Registramos la auditoría en la MISMA transacción
+            AuditoriaService.registrar_evento_sin_commit(
+                db=self.db,
+                usuario_id=self.user_id,
+                tipo_evento="UPDATE",
+                registro_afectado_id=str(dental_service.id),
+                registro_afectado_tipo="dental_services",
+                descripcion_evento=f"Servicio odontológico actualizado: {dental_service.name}",
+                detalles_cambios={
+                    "accion": "actualizar_servicio_dental",
+                    "datos_anteriores": datos_anteriores,
+                    "datos_nuevos": datos_nuevos,
+                    "campos_actualizados": list(update_data.keys())
+                },
+                ip_origen=self.user_ip,
+                usuario_rol=self.user_role,
+                usuario_email=self.user_email
+            )
+            
+            # Commit de TODO junto
+            self.db.commit()
+            self.db.refresh(dental_service)
+            
+        except Exception as e:
+            self.db.rollback()
+            raise
         
         return dental_service
 
@@ -220,25 +249,37 @@ class DentalServiceService:
         
         self.db.commit()
         
-        # Registrar evento de auditoría usando método genérico
-        AuditoriaService.registrar_evento(
-            db=self.db,
-            usuario_id=self.user_id,
-            tipo_evento="DELETE",
-            registro_afectado_id=str(dental_service.id),
-            registro_afectado_tipo="dental_services",
-            descripcion_evento=f"Servicio odontológico eliminado (soft delete): {dental_service.name}",
-            detalles_cambios={
-                "accion": "eliminar_servicio_dental",
-                "is_active": {"antes": True, "despues": False},
-                "datos_servicio": {
-                    "name": dental_service.name,
-                    "description": dental_service.description,
-                    "value": float(dental_service.value)
-                }
-            },
-            ip_origen=self.user_ip
-        )
+        # Registrar evento de auditoría DESPUÉS del commit exitoso
+        try:
+            from app.database import SessionLocal
+            audit_db = SessionLocal()
+            try:
+                AuditoriaService.registrar_evento(
+                    db=audit_db,
+                    usuario_id=self.user_id,
+                    tipo_evento="DELETE",
+                    registro_afectado_id=str(dental_service.id),
+                    registro_afectado_tipo="dental_services",
+                    descripcion_evento=f"Servicio odontológico eliminado (soft delete): {dental_service.name}",
+                    detalles_cambios={
+                        "accion": "eliminar_servicio_dental",
+                        "is_active": {"antes": True, "despues": False},
+                        "datos_servicio": {
+                            "name": dental_service.name,
+                            "description": dental_service.description,
+                            "value": float(dental_service.value)
+                        }
+                    },
+                    ip_origen=self.user_ip,
+                    usuario_rol=self.user_role,
+                    usuario_email=self.user_email
+                )
+            finally:
+                audit_db.close()
+        except Exception as audit_error:
+            print(f"ERROR: Fallo al registrar auditoría DELETE: {audit_error}")
+            import traceback
+            traceback.print_exc()
         
         return {
             "success": True,
@@ -301,7 +342,9 @@ class DentalServiceService:
             registro_afectado_tipo="dental_services",
             descripcion_evento=descripcion_evento,
             detalles_cambios=detalles_cambios,
-            ip_origen=self.user_ip
+            ip_origen=self.user_ip,
+            usuario_rol=self.user_role,
+            usuario_email=self.user_email
         )
         
         # Determinar mensaje de éxito
