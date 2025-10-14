@@ -12,10 +12,19 @@ class PatientService:
     
     def __init__(self, db: Session, user_id: Optional[str] = None, user_ip: Optional[str] = None):
         self.db = db
-        self.user_id = user_id or "system"
         self.user_ip = user_ip
-        self.person_service = PersonService(db, user_id, user_ip)
         self.auditoria_service = AuditoriaService()
+        
+        # Solo proceder si tenemos un user_id válido
+        if user_id:
+            self.user_id = user_id
+            # Obtener rol y email del usuario para auditoría
+            self.user_role, self.user_email = AuditoriaService._obtener_datos_usuario(db, self.user_id)
+        else:
+            # Si no hay usuario autenticado, no permitir operaciones de auditoría
+            raise ValueError("No se puede realizar operaciones sin usuario autenticado")
+            
+        self.person_service = PersonService(db, user_id, user_ip)
     
     def create_patient(self, patient_data: PatientCreate) -> Patient:
         """Crear un nuevo paciente (incluye crear la persona)"""
@@ -138,7 +147,9 @@ class PatientService:
                     },
                     "guardian_created": guardian_created
                 },
-                ip_origen=self.user_ip
+                ip_origen=self.user_ip,
+                usuario_rol=self.user_role,
+                usuario_email=self.user_email
             )
             
             # Cargar la relación con person y guardian
@@ -383,6 +394,27 @@ class PatientService:
                 print(f"DEBUG: Estableciendo {field} = {value}")
                 setattr(patient, field, value)
             
+            # Registrar evento de auditoría
+            person_updates = patient_data.person.model_dump(exclude_unset=True) if patient_data.person else {}
+            self.auditoria_service.registrar_evento(
+                db=self.db,
+                usuario_id=self.user_id,
+                tipo_evento="UPDATE",
+                registro_afectado_id=str(patient_id),
+                registro_afectado_tipo="patients",
+                descripcion_evento=f"Paciente actualizado: {patient.person.first_name} {patient.person.first_surname}",
+                detalles_cambios={
+                    "data_anterior": "Datos anteriores no capturados en este método",
+                    "data_nueva": {
+                        "person_data": person_updates,
+                        "patient_data": patient_fields
+                    }
+                },
+                ip_origen=self.user_ip,
+                usuario_rol=self.user_role,
+                usuario_email=self.user_email
+            )
+            
             self.db.commit()
             self.db.refresh(patient)
             
@@ -447,7 +479,9 @@ class PatientService:
                         "trigger": "automatic_age_verification",
                         "age": current_age
                     },
-                    ip_origen=self.user_ip
+                    ip_origen=self.user_ip,
+                    usuario_rol=self.user_role,
+                    usuario_email=self.user_email
                 )
             
             # 2. Desasignar guardián automáticamente si ya no es necesario
@@ -486,7 +520,9 @@ class PatientService:
                         "age": current_age,
                         "reason": "Paciente alcanzó mayoría de edad"
                     },
-                    ip_origen=self.user_ip
+                    ip_origen=self.user_ip,
+                    usuario_rol=self.user_role,
+                    usuario_email=self.user_email
                 )
         
         # Confirmar cambios en la base de datos
@@ -591,7 +627,9 @@ class PatientService:
                 registro_afectado_tipo="patients",
                 descripcion_evento=event_description,
                 detalles_cambios=change_details,
-                ip_origen=self.user_ip
+                ip_origen=self.user_ip,
+                usuario_rol=self.user_role,
+                usuario_email=self.user_email
             )
             
             result = {
@@ -671,7 +709,9 @@ class PatientService:
             registro_afectado_tipo="patients",
             descripcion_evento=f"Guardian asignado al paciente {patient.person.first_name} {patient.person.first_surname}",
             detalles_cambios={"guardian_id": {"antes": old_guardian_id, "despues": guardian_id}},
-            ip_origen=self.user_ip
+            ip_origen=self.user_ip,
+            usuario_rol=self.user_role,
+            usuario_email=self.user_email
         )
         
         return True
@@ -701,7 +741,9 @@ class PatientService:
             registro_afectado_tipo="patients",
             descripcion_evento=f"Guardian desasignado del paciente {patient.person.first_name} {patient.person.first_surname}",
             detalles_cambios={"guardian_id": {"antes": old_guardian_id, "despues": None}},
-            ip_origen=self.user_ip
+            ip_origen=self.user_ip,
+            usuario_rol=self.user_role,
+            usuario_email=self.user_email
         )
         
         return True
@@ -752,7 +794,9 @@ class PatientService:
                     "trigger": "automatic_read_verification",
                     "age": current_age
                 },
-                ip_origen=self.user_ip
+                ip_origen=self.user_ip,
+                usuario_rol=self.user_role,
+                usuario_email=self.user_email
             )
         
         # 2. Desasignar guardián automáticamente si ya no es necesario
@@ -790,7 +834,9 @@ class PatientService:
                     "age": current_age,
                     "reason": "Paciente alcanzó mayoría de edad"
                 },
-                ip_origen=self.user_ip
+                ip_origen=self.user_ip,
+                usuario_rol=self.user_role,
+                usuario_email=self.user_email
             )
         
         # Confirmar cambios si se hicieron
@@ -861,7 +907,9 @@ class PatientService:
                             "trigger": "patient_deactivation",
                             "trigger_reason": deactivation_reason
                         },
-                        ip_origen=self.user_ip
+                        ip_origen=self.user_ip,
+                        usuario_rol=self.user_role,
+                        usuario_email=self.user_email
                     )
                     
                     changes.append({
@@ -895,7 +943,9 @@ class PatientService:
                         "is_active": {"antes": False, "despues": True},
                         "trigger": "patient_reactivation"
                     },
-                    ip_origen=self.user_ip
+                    ip_origen=self.user_ip,
+                    usuario_rol=self.user_role,
+                    usuario_email=self.user_email
                 )
                 
                 changes.append({

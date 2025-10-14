@@ -111,6 +111,55 @@ class AuditoriaService:
         return auditoria
     
     @staticmethod
+    def registrar_evento_sin_commit(
+        db: Session,
+        usuario_id: str,
+        tipo_evento: str,
+        registro_afectado_id: str,
+        registro_afectado_tipo: str,
+        descripcion_evento: Optional[str] = None,
+        detalles_cambios: Optional[Dict[str, Any]] = None,
+        ip_origen: Optional[str] = None,
+        usuario_rol: Optional[str] = None,
+        usuario_email: Optional[str] = None
+    ) -> Audit:
+        """
+        Registrar un evento de auditoría SIN hacer commit automático
+        El commit será responsabilidad del llamador
+        """
+        
+        # Generar UUID para el evento
+        evento_id = str(uuid.uuid4())
+        
+        # Obtener hora actual de Colombia
+        hora_colombia = datetime.now(COLOMBIA_TZ)
+        
+        # Crear hash de integridad usando hora de Colombia
+        datos_hash = f"{usuario_id}:{tipo_evento}:{registro_afectado_id}:{hora_colombia.isoformat()}"
+        hash_integridad = hashlib.sha256(datos_hash.encode()).hexdigest()
+        
+        # Crear registro de auditoría con timestamp explícito de Colombia
+        auditoria = Audit(
+            id=evento_id,
+            user_id=usuario_id,
+            user_role=usuario_rol,
+            user_email=usuario_email,
+            event_type=tipo_evento,
+            event_description=descripcion_evento,
+            affected_record_id=registro_afectado_id,
+            affected_record_type=registro_afectado_tipo,
+            change_details=detalles_cambios,
+            integrity_hash=hash_integridad,
+            source_ip=ip_origen,
+            event_timestamp=hora_colombia
+        )
+        
+        db.add(auditoria)
+        # NO hacemos commit - responsabilidad del llamador
+        
+        return auditoria
+    
+    @staticmethod
     def registrar_creacion_usuario(
         db: Session,
         usuario_admin_id: str,

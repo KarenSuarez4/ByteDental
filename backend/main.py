@@ -1,10 +1,8 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import email_router, otp_router, users, auditoria, auth, patients, guardians, persons, dental_services, clinical_histories
 from app.config import settings
-from app.database import get_db, engine, Base  # Asegúrate de importar Base y engine
-from sqlalchemy.orm import Session
-from sqlalchemy import text
+from app.database import engine, Base  # Asegúrate de importar Base y engine
 import logging
 
 # Configurar logging

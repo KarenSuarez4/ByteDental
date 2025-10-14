@@ -87,6 +87,4 @@ class GuardianBasicInfo(BaseModel):
     class Config:
         from_attributes = True
 
-# Importación diferida para evitar circular imports
-from app.schemas.guardian_schema import GuardianResponse
 PatientWithGuardian.model_rebuild()

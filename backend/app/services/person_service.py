@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import or_
 from typing import Optional, List
 from datetime import date, datetime
 from app.models.person_models import Person, DocumentTypeEnum
@@ -33,9 +33,17 @@ class PersonService:
     
     def __init__(self, db: Session, user_id: Optional[str] = None, user_ip: Optional[str] = None):
         self.db = db
-        self.user_id = user_id or "system"
         self.user_ip = user_ip
         self.auditoria_service = AuditoriaService()
+        
+        # Solo proceder si tenemos un user_id válido
+        if user_id:
+            self.user_id = user_id
+            # Obtener rol y email del usuario para auditoría
+            self.user_role, self.user_email = AuditoriaService._obtener_datos_usuario(db, self.user_id)
+        else:
+            # Si no hay usuario autenticado, no permitir operaciones de auditoría
+            raise ValueError("No se puede realizar operaciones sin usuario autenticado")
     
     def create_person(self, person_data: PersonCreate, allow_duplicate_email: bool = False, allow_duplicate_phone: bool = False) -> Person:
         """
@@ -85,7 +93,9 @@ class PersonService:
                     registro_afectado_tipo="persons",
                     descripcion_evento=f"Nueva persona creada: {person.first_name} {person.first_surname}",
                     detalles_cambios=audit_data,
-                    ip_origen=self.user_ip
+                    ip_origen=self.user_ip,
+                    usuario_rol=self.user_role,
+                    usuario_email=self.user_email
                 )
             except Exception as audit_error:
                 print(f"Error en auditoría: {audit_error}")
@@ -229,7 +239,9 @@ class PersonService:
                     "antes": datos_anteriores,
                     "despues": serialize_for_audit(update_data)
                 },
-                ip_origen=self.user_ip
+                ip_origen=self.user_ip,
+                usuario_rol=self.user_role,
+                usuario_email=self.user_email
             )
             
             return person
