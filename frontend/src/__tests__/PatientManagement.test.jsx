@@ -1,19 +1,23 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import PatientManagement from '../pages/Asistente/PatientManagement';
 import * as patientService from '../services/patientService';
 
-// Mock de import.meta para Jest
-Object.defineProperty(globalThis, 'import', {
-  value: {
-    meta: {
-      env: {
-        VITE_API_URL: 'http://localhost:8000'
-      }
-    }
+// Mock del contexto de autenticación
+const mockAuthContext = {
+  token: 'mock-token',
+  userRole: 'Asistente',
+  user: {
+    id: 1,
+    email: 'test@test.com',
+    role: 'assistant'
   }
-});
+};
+
+jest.mock('../contexts/AuthContext', () => ({
+  useAuth: () => mockAuthContext,
+  AuthProvider: ({ children }) => children,
+}));
 
 // Mock de react-router-dom
 jest.mock('react-router-dom', () => {
@@ -33,21 +37,14 @@ jest.mock('../services/patientService', () => ({
   changePatientStatus: jest.fn()
 }));
 
-// Mock del contexto de autenticación
-const mockAuthContext = {
-  token: 'mock-token',
-  userRole: 'Asistente',
-  user: {
-    id: 1,
-    email: 'test@test.com',
-    role: 'assistant'
-  }
-};
-
-jest.mock('../contexts/AuthContext', () => ({
-  AuthProvider: ({ children }) => children,
-  useAuth: () => mockAuthContext
+// Mock del historyPatientService
+jest.mock('../services/historyPatientService', () => ({
+  getClinicalHistoriesByPatient: jest.fn(),
+  checkPatientHasHistory: jest.fn(),
 }));
+
+// Importar después de los mocks
+import PatientManagement from '../pages/Asistente/PatientManagement';
 
 const MockAuthProvider = ({ children }) => children;
 
