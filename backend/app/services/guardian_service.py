@@ -12,10 +12,19 @@ class GuardianService:
     
     def __init__(self, db: Session, user_id: Optional[str] = None, user_ip: Optional[str] = None):
         self.db = db
-        self.user_id = user_id or "system"
         self.user_ip = user_ip
-        self.person_service = PersonService(db, user_id, user_ip)
         self.auditoria_service = AuditoriaService()
+        
+        # Solo proceder si tenemos un user_id válido
+        if user_id:
+            self.user_id = user_id
+            # Obtener rol y email del usuario para auditoría
+            self.user_role, self.user_email = AuditoriaService._obtener_datos_usuario(db, self.user_id)
+        else:
+            # Si no hay usuario autenticado, no permitir operaciones de auditoría
+            raise ValueError("No se puede realizar operaciones sin usuario autenticado")
+            
+        self.person_service = PersonService(db, user_id, user_ip)
     
     def create_guardian(self, guardian_data: GuardianCreate, allow_duplicate_contact: bool = False) -> Guardian:
         """
@@ -87,7 +96,9 @@ class GuardianService:
                     },
                     "allow_duplicate_contact": allow_duplicate_contact
                 },
-                ip_origen=self.user_ip
+                ip_origen=self.user_ip,
+                usuario_rol=self.user_role,
+                usuario_email=self.user_email
             )
             
             # Cargar las relaciones básicas para evitar problemas
@@ -235,7 +246,9 @@ class GuardianService:
             registro_afectado_tipo="guardians",
             descripcion_evento=f"Guardian desactivado: {person_info}",
             detalles_cambios={"is_active": {"antes": True, "despues": False}},
-            ip_origen=self.user_ip
+            ip_origen=self.user_ip,
+            usuario_rol=self.user_role,
+            usuario_email=self.user_email
         )
         
         return True
@@ -264,7 +277,9 @@ class GuardianService:
             registro_afectado_tipo="guardians",
             descripcion_evento=f"Guardian reactivado: {person_info}",
             detalles_cambios={"is_active": {"antes": False, "despues": True}},
-            ip_origen=self.user_ip
+            ip_origen=self.user_ip,
+            usuario_rol=self.user_role,
+            usuario_email=self.user_email
         )
         
         return True

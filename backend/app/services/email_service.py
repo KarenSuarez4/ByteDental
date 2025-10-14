@@ -3,12 +3,11 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from jinja2 import Environment, FileSystemLoader
 import os
-from typing import List, Optional
+from typing import Optional
 import logging
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from app.config import settings
-from app.models.email_models import EmailType
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)

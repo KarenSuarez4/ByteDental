@@ -19,7 +19,10 @@ def get_user_context(request: Request, db: Session = Depends(get_db)) -> Tuple[O
     user_id = None
     try:
         user = get_current_user_from_header(request, db)
-        user_id = user.id if user else None
+        # Usar uid si existe, sino id, sino None
+        user_id = getattr(user, 'uid', None) if user else None
+        if not user_id and user:
+            user_id = getattr(user, 'id', None)
     except Exception:
         # Si no se puede obtener el usuario, continuar con None
         pass
