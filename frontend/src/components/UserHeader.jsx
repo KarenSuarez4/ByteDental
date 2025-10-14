@@ -42,7 +42,7 @@ const UserHeader = ({ userRole }) => {
     'Doctor': [
       { path: "/patients", label: "Gestión de pacientes" },
       { path: "/clinical-history", label: "Historial Clínico" },
-      { path: "/appointments", label: "Seguimiento de citas" },
+      // { path: "/appointments", label: "Seguimiento de citas" },
     ],
     'Auditor': [
       { path: "/audit-logs", label: "Registros de Auditoría" },

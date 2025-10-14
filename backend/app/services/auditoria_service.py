@@ -3,14 +3,14 @@ import hashlib
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
+import pytz  # ✅ Agregar esta importación
 
 from ..models.auditoria_models import Audit
 from ..models.user_models import User
 from ..models.rol_models import Role
 
-# Zona horaria de Colombia (UTC-5)
-COLOMBIA_TZ = timezone(timedelta(hours=-5))
-
+# ✅ Zona horaria de Colombia usando pytz (más confiable)
+COLOMBIA_TZ = pytz.timezone('America/Bogota')
 
 class AuditoriaService:
     """Servicio para gestionar auditoría de cambios en el sistema"""
@@ -26,9 +26,22 @@ class AuditoriaService:
         Returns:
             datetime object en zona horaria de Colombia
         """
-        if timestamp_utc and hasattr(timestamp_utc, 'astimezone'):
+        if timestamp_utc:
+            if timestamp_utc.tzinfo is None:
+                # Si no tiene timezone, asumir que es UTC
+                timestamp_utc = pytz.utc.localize(timestamp_utc)
             return timestamp_utc.astimezone(COLOMBIA_TZ)
         return timestamp_utc
+
+    @staticmethod
+    def obtener_hora_colombia_actual():
+        """
+        Obtener la hora actual de Colombia
+        
+        Returns:
+            datetime object con zona horaria de Colombia
+        """
+        return datetime.now(COLOMBIA_TZ)
     
     @staticmethod
     def _obtener_datos_usuario(db: Session, usuario_id: str) -> tuple[Optional[str], Optional[str]]:
@@ -390,3 +403,33 @@ class AuditoriaService:
         except Exception as e:
             print(f"Error al contar eventos de auditoría: {str(e)}")
             return 0
+    @staticmethod
+    def registrar_creacion_historia_clinica(
+        db: Session,
+        usuario_id: str,
+        clinical_history_id: int,
+        ip_origen: Optional[str] = None
+    ) -> Audit:
+        """Registrar creación de historia clínica"""
+        # ✅ Obtener datos del usuario
+        usuario_rol, usuario_email = AuditoriaService._obtener_datos_usuario(db, usuario_id)
+        hora_colombia = AuditoriaService.obtener_hora_colombia_actual()
+        audit_record = AuditoriaService.registrar_evento(
+                db=db,
+                usuario_id=usuario_id,
+                tipo_evento="CREACION_HISTORIA_CLINICA",
+                registro_afectado_id=str(clinical_history_id),
+                registro_afectado_tipo="clinical_histories",
+                descripcion_evento="Creación de historia clínica",
+                detalles_cambios={
+                    "accion": "crear",
+                    "historia_clinica_id": clinical_history_id,
+                    "timestamp_colombia": hora_colombia.isoformat()
+                },
+                ip_origen=ip_origen,
+                usuario_rol=usuario_rol,
+                usuario_email=usuario_email
+            )
+            
+        print(f"✅ Auditoría registrada exitosamente: {audit_record.id}")
+        return audit_record

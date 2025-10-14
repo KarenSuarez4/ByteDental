@@ -307,7 +307,7 @@ function AuditLog() {
     const campos = [];
     for (const key in datos_nuevos) {
       if (
-        key !== "updated_at" && 
+        key !== "updated_at" &&
         datos_anteriores[key] !== datos_nuevos[key]
       ) {
         campos.push(key);
@@ -363,6 +363,7 @@ function AuditLog() {
               <label className="mr-3 font-poppins text-16 font-semibold">Filtrar por tipo:</label>
               <Select
                 value={loginFilter}
+                size="small"
                 onChange={e => {
                   setLoginFilter(e.target.value);
                   setLoginPagination(prev => ({ ...prev, currentPage: 1 })); // Reiniciar a primera página
@@ -381,6 +382,7 @@ function AuditLog() {
               <label className="mr-3 font-poppins text-18 font-semibold">Filtrar por tipo:</label>
               <Select
                 value={userFilter}
+                size="small"
                 onChange={e => {
                   setUserFilter(e.target.value);
                   setUserPagination(prev => ({ ...prev, currentPage: 1 })); // Reiniciar a primera página
@@ -401,6 +403,7 @@ function AuditLog() {
               <label className="mr-3 font-poppins text-18 font-semibold">Filtrar por tipo:</label>
               <Select
                 value={serviceFilter}
+                size="small"
                 onChange={e => {
                   setServiceFilter(e.target.value);
                   setServicePagination(prev => ({ ...prev, currentPage: 1 })); // Reiniciar a primera página
