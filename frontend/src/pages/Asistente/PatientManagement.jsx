@@ -5,7 +5,11 @@ import Input from "../../components/Input";
 import Select from "../../components/Select";
 import DateInput from "../../components/DateInput";
 import ConfirmDialog from "../../components/ConfirmDialog";
+import SearchInput from "../../components/SearchInput"; 
+import FilterBar from "../../components/FilterBar"; 
+import { useNavigate } from "react-router-dom";
 import { getAllPatients, updatePatient, deactivatePatient, activatePatient } from "../../services/patientService";
+import { getClinicalHistoriesByPatient, checkPatientHasHistory } from "../../services/historyPatientService";
 
 const tableHeaderClass = "bg-header-blue text-white font-semibold text-center font-poppins text-18";
 const tableCellClass = "text-center font-poppins text-16 py-2";
@@ -20,19 +24,43 @@ function PatientManagement() {
   const [editError, setEditError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [editLoading, setEditLoading] = useState(false);
+  const [historyCheckLoading, setHistoryCheckLoading] = useState(false);
 
   const [phoneEditError, setPhoneEditError] = useState("");
   const [patientInfoModal, setPatientInfoModal] = useState({ open: false, patient: null });
   const [deactivationModal, setDeactivationModal] = useState({ open: false, patient: null, reason: '', loading: false });
 
   // Filtros y búsqueda
-  const [searchDoc, setSearchDoc] = useState("");
+  const [searchTerm, setSearchTerm] = useState(""); // Cambiar de searchDoc a searchTerm
   const [filterStatus, setFilterStatus] = useState("ALL");
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(4);
   const [totalPages, setTotalPages] = useState(1);
+
+  const navigate = useNavigate();
+
+  // ✅ Configuración de filtros para FilterBar
+  const filterConfig = [
+    {
+      key: 'status',
+      value: filterStatus,
+      onChange: (e) => setFilterStatus(e.target.value),
+      options: [
+        { value: 'ALL', label: 'Todos' },
+        { value: 'ACTIVO', label: 'Activo' },
+        { value: 'INACTIVO', label: 'Inactivo' }
+      ],
+      ariaLabel: 'Filtrar por estado del paciente',
+      className: 'w-[180px]'
+    }
+  ];
+
+  // ✅ Función para resetear página (usada por FilterBar)
+  const resetToFirstPage = () => {
+    setCurrentPage(1);
+  };
 
   // Función para calcular edad
   const calculateAge = (birthDate) => {
@@ -41,11 +69,11 @@ function PatientManagement() {
     const birth = new Date(birthDate);
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
       age--;
     }
-    
+
     return age;
   };
 
@@ -60,7 +88,7 @@ function PatientManagement() {
         { value: 'PP', label: 'Pasaporte' }
       ];
     }
-    
+
     if (age < 18) {
       // Menores de edad: Solo TI
       return [
@@ -104,10 +132,32 @@ function PatientManagement() {
     setPatientInfoModal({ open: true, patient });
   };
 
+  const handleViewHistory = async (patient) => {
+    setHistoryCheckLoading(true);
+
+    try {
+      const response = await checkPatientHasHistory(patient.id, token);
+
+      if (response.has_history && response.history_id) {
+        navigate(`/doctor/history-management/${response.history_id}`);
+      } else {
+        navigate(`/doctor/register-first-history/${patient.id}`);
+      }
+    } catch (error) {
+      setEditError(`Error al verificar historias: ${error.message}`);
+
+      setTimeout(() => {
+        navigate(`/doctor/register-first-history/${patient.id}`);
+      }, 2000);
+    } finally {
+      setHistoryCheckLoading(false);
+    }
+  };
+
   useEffect(() => {
     if ((userRole !== "Asistente" && userRole !== "Doctor") || !token) return;
     setLoading(true);
-    
+
     getAllPatients(token)
       .then(setPatients)
       .catch(() => setEditError("Error cargando pacientes"))
@@ -148,7 +198,7 @@ function PatientManagement() {
     // Combinar nombres y apellidos para mostrarlos en los campos
     const fullNames = [patient.person.first_name, patient.person.middle_name].filter(Boolean).join(' ');
     const fullSurnames = [patient.person.first_surname, patient.person.second_surname].filter(Boolean).join(' ');
-    
+
     setEditForm({
       document_type: patient.person.document_type,
       document_number: patient.person.document_number,
@@ -171,7 +221,7 @@ function PatientManagement() {
     if (patient.guardian) {
       const guardianFullNames = [patient.guardian.person.first_name, patient.guardian.person.middle_name].filter(Boolean).join(' ');
       const guardianFullSurnames = [patient.guardian.person.first_surname, patient.guardian.person.second_surname].filter(Boolean).join(' ');
-      
+
       setGuardianForm({
         guardian_document_type: patient.guardian.person.document_type,
         guardian_document_number: patient.guardian.person.document_number,
@@ -207,7 +257,7 @@ function PatientManagement() {
     // Validaciones específicas para número de documento
     if (name === "document_number") {
       const docType = editForm.document_type;
-      
+
       // Validar según el tipo de documento
       if (docType === 'PP') {
         // Pasaporte: alfanumérico, entre 6 y 10 caracteres, puede contener letras y números
@@ -217,16 +267,16 @@ function PatientManagement() {
         // Otros documentos: solo números
         if (!/^\d*$/.test(value)) return;
       }
-      
+
       setEditForm(prev => ({ ...prev, [name]: value }));
-      
+
       const newErrors = { ...editFormErrors };
-      
+
       // Limpiar error anterior primero
       if (newErrors[name]) {
         delete newErrors[name];
       }
-      
+
       // Validar longitud según tipo de documento
       if (value) {
         if (docType === 'PP') {
@@ -235,7 +285,7 @@ function PatientManagement() {
           }
         }
       }
-      
+
       setEditFormErrors(newErrors);
       return;
     }
@@ -264,7 +314,7 @@ function PatientManagement() {
     if (name === "has_disability") {
       // Convertir el valor del select a booleano
       const hasDisability = value === "true" || value === true;
-      
+
       // Limpiar descripción de discapacidad si se marca como false
       if (!hasDisability) {
         setEditForm(prev => ({ ...prev, has_disability: false, disability_description: "" }));
@@ -276,28 +326,28 @@ function PatientManagement() {
       } else {
         setEditForm(prev => ({ ...prev, has_disability: true }));
       }
-      
+
       // Recalcular si necesita tutor considerando la discapacidad
       const age = calculateAge(editForm.birthdate);
       const requiresGuardian = (age !== null && (age < 18 || age > 64)) || hasDisability;
       setNeedsGuardian(requiresGuardian);
-      
+
       return;
     }
 
     // Validación para descripción de discapacidad
     if (name === "disability_description") {
       const newErrors = { ...editFormErrors };
-      
+
       // Limpiar error anterior primero
       if (newErrors[name]) {
         delete newErrors[name];
       }
-      
+
       if (editForm.has_disability && !value.trim()) {
         newErrors[name] = 'La descripción de la discapacidad es obligatoria';
       }
-      
+
       setEditFormErrors(newErrors);
       setEditForm(prev => ({ ...prev, [name]: value }));
       return;
@@ -306,39 +356,39 @@ function PatientManagement() {
     // Si se cambia la fecha de nacimiento, recalcular si necesita tutor
     if (name === "birthdate") {
       setEditForm(prev => ({ ...prev, [name]: value }));
-      
+
       // Validación inmediata de fecha de nacimiento solo si la fecha está completa
       if (value && value.length === 10) { // formato YYYY-MM-DD
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const birthDate = new Date(value);
-        
+
         // Verificar que la fecha sea válida
         if (isNaN(birthDate.getTime())) {
           setEditFormErrors(prev => ({ ...prev, birthdate: 'Fecha de nacimiento inválida' }));
           return;
         }
-        
+
         // Verificar que la fecha no sea futura
         if (birthDate > today) {
           setEditFormErrors(prev => ({ ...prev, birthdate: 'La fecha de nacimiento no puede ser en el futuro' }));
           return;
         }
-        
+
         // Calcular edad y verificar límites
         const age = calculateAge(value);
         if (age > 120) {
           setEditFormErrors(prev => ({ ...prev, birthdate: 'La edad no puede ser mayor a 120 años' }));
           return;
         }
-        
+
         // Si la fecha es válida, limpiar error
         setEditFormErrors(prev => ({ ...prev, birthdate: '' }));
-        
+
         // Considerar discapacidad también en el cálculo del tutor
         const requiresGuardian = age < 18 || age > 64 || editForm.has_disability;
         setNeedsGuardian(requiresGuardian);
-        
+
         // Si ya no necesita tutor, limpiar datos del tutor
         if (!requiresGuardian) {
           setGuardianForm({
@@ -359,7 +409,7 @@ function PatientManagement() {
         // Si la fecha está incompleta, limpiar error temporal
         setEditFormErrors(prev => ({ ...prev, birthdate: '' }));
       }
-      
+
       return;
     }
 
@@ -371,7 +421,7 @@ function PatientManagement() {
 
     if (name === "guardian_document_number") {
       const docType = guardianForm.guardian_document_type;
-      
+
       // Validar según el tipo de documento
       if (docType === 'PP') {
         // Pasaporte: alfanumérico, entre 6 y 10 caracteres, puede contener letras y números
@@ -381,16 +431,16 @@ function PatientManagement() {
         // Otros documentos: solo números
         if (!/^\d*$/.test(value)) return;
       }
-      
+
       setGuardianForm(prev => ({ ...prev, [name]: value }));
-      
+
       const newErrors = { ...guardianFormErrors };
-      
+
       // Limpiar error anterior primero
       if (newErrors[name]) {
         delete newErrors[name];
       }
-      
+
       // Validar longitud según tipo de documento
       if (value) {
         if (docType === 'PP') {
@@ -399,7 +449,7 @@ function PatientManagement() {
           }
         }
       }
-      
+
       setGuardianFormErrors(newErrors);
       return;
     }
@@ -422,37 +472,37 @@ function PatientManagement() {
     // Validación inmediata para fecha de nacimiento del tutor
     if (name === "guardian_birthdate") {
       setGuardianForm(prev => ({ ...prev, [name]: value }));
-      
+
       // Validación solo si la fecha está completa
       if (value && value.length === 10) { // formato YYYY-MM-DD
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const birthDate = new Date(value);
-        
+
         // Verificar que la fecha sea válida
         if (isNaN(birthDate.getTime())) {
           setGuardianFormErrors(prev => ({ ...prev, guardian_birthdate: 'Fecha de nacimiento inválida' }));
           return;
         }
-        
+
         // Verificar que la fecha no sea futura
         if (birthDate > today) {
           setGuardianFormErrors(prev => ({ ...prev, guardian_birthdate: 'La fecha de nacimiento no puede ser en el futuro' }));
           return;
         }
-        
+
         // Calcular edad y verificar límites
         const age = calculateAge(value);
         if (age > 120) {
           setGuardianFormErrors(prev => ({ ...prev, guardian_birthdate: 'La edad no puede ser mayor a 120 años' }));
           return;
         }
-        
+
         if (age < 18) {
           setGuardianFormErrors(prev => ({ ...prev, guardian_birthdate: 'El tutor legal debe ser mayor de 18 años' }));
           return;
         }
-        
+
         // Si la fecha es válida, limpiar error
         setGuardianFormErrors(prev => ({ ...prev, guardian_birthdate: '' }));
       } else if (value === '') {
@@ -461,7 +511,7 @@ function PatientManagement() {
         // Si la fecha está incompleta, limpiar error temporal
         setGuardianFormErrors(prev => ({ ...prev, guardian_birthdate: '' }));
       }
-      
+
       return;
     }
 
@@ -500,7 +550,7 @@ function PatientManagement() {
     if (!editForm.full_names) errors.full_names = "Los nombres son obligatorios.";
     if (!editForm.full_surnames) errors.full_surnames = "Los apellidos son obligatorios.";
     if (!editForm.birthdate) errors.birthdate = "La fecha de nacimiento es obligatoria.";
-    
+
     // Validar restricciones específicas del paciente
     const patientAge = calculateAge(editForm.birthdate);
     if (editForm.document_type === 'TI' && patientAge !== null && patientAge <= 7) {
@@ -511,7 +561,7 @@ function PatientManagement() {
     if (editForm.email && (!editForm.email.includes('@') || !editForm.email.includes('.'))) {
       errors.email = "Ingrese un correo electrónico válido.";
     }
-    
+
     // Validar teléfono del paciente siempre que se ingrese
     if (editForm.phone && editForm.phone.length !== 10) {
       errors.phone = "El teléfono debe tener exactamente 10 dígitos.";
@@ -544,12 +594,12 @@ function PatientManagement() {
       if (!guardianForm.guardian_phone) guardianErrors.guardian_phone = "El teléfono del tutor es obligatorio.";
       if (!guardianForm.guardian_birthdate) guardianErrors.guardian_birthdate = "La fecha de nacimiento del tutor es obligatoria.";
       if (!guardianForm.guardian_relationship_type) guardianErrors.guardian_relationship_type = "La relación con el paciente es obligatoria.";
-      
+
       // Validar email del tutor
       if (guardianForm.guardian_email && (!guardianForm.guardian_email.includes('@') || !guardianForm.guardian_email.includes('.'))) {
         guardianErrors.guardian_email = "Ingrese un correo electrónico válido.";
       }
-      
+
       // Validar teléfono del tutor siempre que se ingrese
       if (guardianForm.guardian_phone && guardianForm.guardian_phone.length !== 10) {
         guardianErrors.guardian_phone = "El teléfono del tutor debe tener exactamente 10 dígitos.";
@@ -587,20 +637,20 @@ function PatientManagement() {
     setEditFormErrors(errors);
     setGuardianFormErrors(guardianErrors);
     setPhoneEditError(errors.phone || "");
-    
+
     return Object.keys(errors).length === 0 && Object.keys(guardianErrors).length === 0;
   };
 
   // Guardar cambios
   const handleSaveEdit = async () => {
     if (!validateEditForm()) return;
-    
+
     setEditLoading(true);
     try {
       // Separar los nombres y apellidos del paciente
       const namesArray = editForm.full_names.trim().split(/\s+/);
       const surnamesArray = editForm.full_surnames.trim().split(/\s+/);
-      
+
       // Preparar los datos del paciente para el backend
       const updateData = {
         person: {
@@ -624,7 +674,7 @@ function PatientManagement() {
         // Separar nombres y apellidos del tutor
         const guardianNamesArray = guardianForm.guardian_full_names.trim().split(/\s+/);
         const guardianSurnamesArray = guardianForm.guardian_full_surnames.trim().split(/\s+/);
-        
+
         updateData.guardian = {
           person: {
             document_type: guardianForm.guardian_document_type,
@@ -690,14 +740,14 @@ function PatientManagement() {
     }
 
     setDeactivationModal(prev => ({ ...prev, loading: true }));
-    
+
     try {
       await deactivatePatient(deactivationModal.patient.id, deactivationModal.reason.trim(), token);
       setSuccessMsg("Paciente desactivado correctamente");
-      
+
       // Cerrar modal
       setDeactivationModal({ open: false, patient: null, reason: '', loading: false });
-      
+
       // Actualizar lista
       setLoading(true);
       const updatedPatients = await getAllPatients(token);
@@ -724,17 +774,57 @@ function PatientManagement() {
     }
   };
 
-  // Filtros y paginación
+
+  // ...existing code...
+
+  // Filtros y paginación - CORREGIR esta sección
   const filteredPatients = patients.filter(patient => {
-    const docMatch = searchDoc === "" || patient.person.document_number.includes(searchDoc);
+    // Función auxiliar para normalizar texto (quitar acentos y convertir a minúsculas)
+    const normalizeText = (text) => {
+      return text
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, ''); // Remover acentos
+    };
+
+    // Si no hay término de búsqueda, solo aplicar filtro de estado
+    if (searchTerm === "") {
+      const statusMatch = filterStatus === "ALL" || (filterStatus === "ACTIVO" ? patient.is_active : !patient.is_active);
+      return statusMatch;
+    }
+
+    // Normalizar término de búsqueda
+    const normalizedSearchTerm = normalizeText(searchTerm);
+
+    // Buscar en documento (exacto, no normalizado para números)
+    const docMatch = patient.person.document_number.includes(searchTerm);
+
+    // Crear texto completo para búsqueda (nombres + apellidos)
+    const fullSearchText = `${patient.person.first_name} ${patient.person.middle_name || ''} ${patient.person.first_surname} ${patient.person.second_surname || ''}`.trim();
+    const normalizedFullText = normalizeText(fullSearchText);
+
+    // Buscar el término normalizado en el texto completo normalizado
+    const nameMatch = normalizedFullText.includes(normalizedSearchTerm);
+
+    // También buscar términos individuales si el usuario busca por palabras separadas
+    const searchWords = normalizedSearchTerm.split(/\s+/).filter(word => word.length > 0);
+    const individualWordsMatch = searchWords.every(word =>
+      normalizedFullText.includes(word)
+    );
+
+    // El paciente coincide si encuentra el término en documento, nombre completo, o palabras individuales
+    const searchMatch = docMatch || nameMatch || individualWordsMatch;
+
+    // Aplicar también filtro de estado
     const statusMatch = filterStatus === "ALL" || (filterStatus === "ACTIVO" ? patient.is_active : !patient.is_active);
-    return docMatch && statusMatch;
+
+    return searchMatch && statusMatch;
   }).sort((a, b) => a.id - b.id); // Ordenar por ID ascendente
 
   // Calcular total de páginas
   const totalPagesCount = Math.ceil(filteredPatients.length / itemsPerPage);
-  
-  // Obtener pacientes para la página actual
+
+  // Obtener pacientes para la página current
   const currentPatients = filteredPatients.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -744,7 +834,7 @@ function PatientManagement() {
   useEffect(() => {
     const newTotalPages = Math.ceil(filteredPatients.length / itemsPerPage);
     setTotalPages(newTotalPages);
-    
+
     // Si la página actual es mayor al nuevo total, ir a la primera página
     if (currentPage > newTotalPages && newTotalPages > 0) {
       setCurrentPage(1);
@@ -771,7 +861,7 @@ function PatientManagement() {
   if (userRole !== "Asistente" && userRole !== "Doctor") {
     return <div className="font-poppins text-center mt-20 text-xl">No autorizado</div>;
   }
-  
+
   if (loading) {
     return <div className="font-poppins text-center mt-10 text-18">Cargando pacientes...</div>;
   }
@@ -782,6 +872,8 @@ function PatientManagement() {
         <h1 className="text-header-blue text-46 font-bold font-poppins mb-1 pt-6 text-center pb-6">
           GESTIÓN DE PACIENTES
         </h1>
+
+        {/* Error and Success Messages */}
         {editError && (
           <div className="mb-2 w-full max-w-[1200px] p-3 bg-red-100 border border-red-400 text-red-700 rounded text-center text-18">
             {editError}
@@ -793,41 +885,25 @@ function PatientManagement() {
           </div>
         )}
 
-        {/* Filtros y búsqueda */}
-        <div className="w-full max-w-[1200px] flex flex-wrap items-center justify-between mb-3 gap-4">
-          <div className="flex items-center gap-4">
-            <Input
-              className="w-[280px] h-[35px] font-poppins"
-              placeholder="Buscar por documento"
-              value={searchDoc}
-              onChange={(e) => {
-                setSearchDoc(e.target.value);
-                setCurrentPage(1); // Resetear a primera página al buscar
-              }}
-            />
-            <Select
-              className="w-[180px] h-[35px] font-poppins"
-              value={filterStatus}
-              onChange={(e) => {
-                setFilterStatus(e.target.value);
-                setCurrentPage(1); // Resetear a primera página al filtrar
-              }}
-            >
-              <option value="ALL">Todos</option>
-              <option value="ACTIVO">Activo</option>
-              <option value="INACTIVO">Inactivo</option>
-            </Select>
-          </div>
-        </div>
+        {/* ✅ Usar FilterBar con configuración correcta */}
+        <FilterBar
+          searchValue={searchTerm} // Cambiar de searchDoc a searchTerm
+          onSearchChange={(e) => setSearchTerm(e.target.value)} // Cambiar función
+          filters={filterConfig}
+          onPageReset={resetToFirstPage}
+          searchPlaceholder="Buscar por documento, nombres o apellidos" // Actualizar placeholder
+          searchAriaLabel="Buscar paciente por documento, nombres o apellidos" // Actualizar aria-label
+          className="max-w-[1200px]"
+        />
 
-        {/* Tabla de pacientes con scroll vertical */}
+        {/* Tabla de pacientes - no changes to this section */}
         <div className="w-full max-w-[1200px] bg-white rounded-[12px] shadow-md overflow-x-auto"
-             style={{ maxHeight: "calc(100vh - 226px)", overflowY: "auto" }}>
+          style={{ maxHeight: "calc(100vh - 226px)", overflowY: "auto" }}>
           <table className="w-full border-collapse">
             <thead className="sticky top-0 z-10 h-10">
               <tr>
-                <th className={tableHeaderClass}>Documento</th>
                 <th className={tableHeaderClass}>Tipo de Documento</th>
+                <th className={tableHeaderClass}>Documento</th>
                 <th className={tableHeaderClass}>Nombres</th>
                 <th className={tableHeaderClass}>Apellidos</th>
                 <th className={tableHeaderClass}>Correo</th>
@@ -842,8 +918,8 @@ function PatientManagement() {
             <tbody className="divide-y divide-gray-200">
               {currentPatients.map(patient => (
                 <tr key={patient.id}>
-                  <td className={tableCellClass}>{patient.person.document_number}</td>
                   <td className={tableCellClass}>{patient.person.document_type}</td>
+                  <td className={tableCellClass}>{patient.person.document_number}</td>
                   <td className={tableCellClass}>
                     {patient.person.first_name}
                     {patient.person.middle_name && ` ${patient.person.middle_name}`}
@@ -864,7 +940,7 @@ function PatientManagement() {
                     )}
                   </td>
                   <td className={tableCellClass}>
-                    <span 
+                    <span
                       className="text-blue-600 font-semibold hover:text-blue-800 hover:underline cursor-pointer"
                       onClick={() => handlePatientInfo(patient)}
                       title="Haga clic para ver la información completa del paciente"
@@ -875,7 +951,12 @@ function PatientManagement() {
                   <td className={tableCellClass}>
                     <div className="flex flex-col items-center justify-center gap-2">
                       {userRole === "Doctor" ? (
-                        <span className="text-gray-500 font-poppins text-14">Solo lectura</span>
+                        <Button
+                          className="bg-primary-blue hover:bg-primary-blue-hover text-white px-4 py-2 rounded-[40px] font-poppins text-16 font-bold w-[130px] h-[35px]"
+                          onClick={() => handleViewHistory(patient)}
+                        >
+                          Ver Historia clínica
+                        </Button>
                       ) : (
                         patient.is_active ? (
                           <>
@@ -908,7 +989,7 @@ function PatientManagement() {
               {currentPatients.length === 0 && (
                 <tr>
                   <td colSpan="11" className="text-center py-8 text-gray-500 font-poppins text-16">
-                    {searchDoc ? "La información proporcionada no corresponde a ningún registro existente" : "No hay pacientes registrados"}
+                    {searchTerm ? "No se encontraron pacientes que coincidan con la búsqueda" : "No hay pacientes registrados"}
                   </td>
                 </tr>
               )}
@@ -934,20 +1015,18 @@ function PatientManagement() {
 
             {/* Botón Anterior */}
             <button
-              className={`group flex items-center justify-center px-4 py-2 rounded-full font-poppins text-12 font-medium transition-all duration-200 shadow-sm ${
-                currentPage === 1 
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' 
-                  : 'bg-white text-gray-700 hover:bg-primary-blue hover:text-white border border-gray-300 hover:border-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
-              }`}
+              className={`group flex items-center justify-center px-4 py-2 rounded-full font-poppins text-12 font-medium transition-all duration-200 shadow-sm ${currentPage === 1
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                : 'bg-white text-gray-700 hover:bg-primary-blue hover:text-white border border-gray-300 hover:border-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
+                }`}
               onClick={goToPreviousPage}
               disabled={currentPage === 1}
             >
-              <svg 
-                className={`w-4 h-4 mr-2 transition-transform duration-200 ${
-                  currentPage === 1 ? '' : 'group-hover:-translate-x-0.5'
-                }`} 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                className={`w-4 h-4 mr-2 transition-transform duration-200 ${currentPage === 1 ? '' : 'group-hover:-translate-x-0.5'
+                  }`}
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -967,11 +1046,10 @@ function PatientManagement() {
                   return (
                     <button
                       key={pageNumber}
-                      className={`flex items-center justify-center w-10 h-10 rounded-full font-poppins text-12 font-medium transition-all duration-200 ${
-                        currentPage === pageNumber
-                          ? 'bg-primary-blue text-white shadow-lg transform scale-105 border-2 border-primary-blue'
-                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 hover:border-primary-blue hover:text-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
-                      }`}
+                      className={`flex items-center justify-center w-10 h-10 rounded-full font-poppins text-12 font-medium transition-all duration-200 ${currentPage === pageNumber
+                        ? 'bg-primary-blue text-white shadow-lg transform scale-105 border-2 border-primary-blue'
+                        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 hover:border-primary-blue hover:text-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
+                        }`}
                       onClick={() => goToPage(pageNumber)}
                     >
                       {pageNumber}
@@ -993,21 +1071,19 @@ function PatientManagement() {
 
             {/* Botón Siguiente */}
             <button
-              className={`group flex items-center justify-center px-4 py-2 rounded-full font-poppins text-12 font-medium transition-all duration-200 shadow-sm ${
-                currentPage === totalPages 
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' 
-                  : 'bg-white text-gray-700 hover:bg-primary-blue hover:text-white border border-gray-300 hover:border-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
-              }`}
+              className={`group flex items-center justify-center px-4 py-2 rounded-full font-poppins text-12 font-medium transition-all duration-200 shadow-sm ${currentPage === totalPages
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                : 'bg-white text-gray-700 hover:bg-primary-blue hover:text-white border border-gray-300 hover:border-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
+                }`}
               onClick={goToNextPage}
               disabled={currentPage === totalPages}
             >
               Siguiente
-              <svg 
-                className={`w-4 h-4 ml-2 transition-transform duration-200 ${
-                  currentPage === totalPages ? '' : 'group-hover:translate-x-0.5'
-                }`} 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                className={`w-4 h-4 ml-2 transition-transform duration-200 ${currentPage === totalPages ? '' : 'group-hover:translate-x-0.5'
+                  }`}
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -1053,7 +1129,7 @@ function PatientManagement() {
 
         {/* Modal de edición */}
         {editPatient && (
-          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{backgroundColor: 'rgba(255, 255, 255, 0.3)'}}>
+          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(255, 255, 255, 0.3)' }}>
             <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[900px] max-h-[90vh] overflow-y-auto">
               {/* Header del modal */}
               <div className="bg-gradient-to-br from-primary-blue to-header-blue text-white p-6 rounded-t-[24px] relative overflow-hidden">
@@ -1109,7 +1185,7 @@ function PatientManagement() {
                     </div>
                     {/* Campo vacío para mantener grid */}
                     <div></div>
-                    
+
                     <div>
                       <label className="block font-poppins font-medium text-gray-700 mb-2">Tipo de documento</label>
                       <Select
@@ -1238,11 +1314,10 @@ function PatientManagement() {
                         value={editForm.disability_description}
                         onChange={handleEditFormChange}
                         placeholder="Describa la discapacidad del paciente"
-                        className={`w-full px-4 py-3 border rounded-[16px] text-16 font-poppins focus:outline-none focus:ring-2 focus:ring-primary-blue resize-none ${
-                          editFormErrors.disability_description 
-                            ? 'border-red-500 focus:ring-red-500' 
-                            : 'border-gray-300 focus:border-primary-blue'
-                        }`}
+                        className={`w-full px-4 py-3 border rounded-[16px] text-16 font-poppins focus:outline-none focus:ring-2 focus:ring-primary-blue resize-none ${editFormErrors.disability_description
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-gray-300 focus:border-primary-blue'
+                          }`}
                         rows={3}
                         maxLength={500}
                       />
@@ -1265,14 +1340,14 @@ function PatientManagement() {
                         <div>
                           <h3 className="text-20 font-semibold font-poppins text-gray-800">Información del Tutor Legal</h3>
                           <p className="text-14 text-gray-600 font-poppins">
-                            El paciente requiere un tutor legal debido a su 
-                            {editForm.has_disability && (calculateAge(editForm.birthdate) >= 18 && calculateAge(editForm.birthdate) <= 64) ? 
-                              ' discapacidad' : 
+                            El paciente requiere un tutor legal debido a su
+                            {editForm.has_disability && (calculateAge(editForm.birthdate) >= 18 && calculateAge(editForm.birthdate) <= 64) ?
+                              ' discapacidad' :
                               ' edad'}
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                           <label className="block font-poppins font-medium text-gray-700 mb-2">Tipo de documento</label>
@@ -1439,7 +1514,7 @@ function PatientManagement() {
         {/* Modal de información del tutor */}
         {/* Modal unificado de información del paciente */}
         {patientInfoModal.open && patientInfoModal.patient && (
-          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{backgroundColor: 'rgba(255, 255, 255, 0.3)'}}>
+          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(255, 255, 255, 0.3)' }}>
             <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[900px] max-h-[90vh] overflow-y-auto">
               {/* Header del modal */}
               <div className="bg-gradient-to-br from-primary-blue to-header-blue text-white p-6 rounded-t-[24px] relative overflow-hidden">
@@ -1621,6 +1696,7 @@ function PatientManagement() {
                     onClick={() => setPatientInfoModal({ open: false, patient: null })}
                   >
                     Cerrar
+
                   </Button>
                 </div>
               </div>
@@ -1630,7 +1706,7 @@ function PatientManagement() {
 
         {/* Modal de desactivación con motivo */}
         {deactivationModal.open && (
-          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{backgroundColor: 'rgba(255, 255, 255, 0.3)'}}>
+          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(255, 255, 255, 0.3)' }}>
             <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[500px] max-h-[90vh] overflow-y-auto">
               {/* Header del modal */}
               <div className="bg-gradient-to-br from-red-500 to-red-600 text-white p-6 rounded-t-[24px] relative overflow-hidden">

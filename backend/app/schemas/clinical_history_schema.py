@@ -5,20 +5,20 @@ from datetime import datetime
 class TreatmentCreate(BaseModel):
     dental_service_id: int
     treatment_date: datetime
-    notes: Optional[str]
+    notes: Optional[str] = None
 
 class TreatmentResponse(BaseModel):
     date: datetime
     name: str
     doctor_name: str
-    notes: Optional[str]
+    notes: Optional[str] = None
 
 class ClinicalHistoryCreate(BaseModel):
     patient_id: int
     reason: str
     symptoms: str
     medical_history: dict
-    findings: Optional[str]  
+    findings: Optional[str] = None  
     doctor_signature: str
     treatments: List[TreatmentCreate]  
 
@@ -28,12 +28,18 @@ class ClinicalHistoryResponse(BaseModel):
     reason: str
     symptoms: str
     medical_history: dict
-    treatments: List[TreatmentResponse]
+    findings: Optional[str] = None
+    doctor_signature: str
+    treatments: List[TreatmentResponse] = []
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+class ClinicalHistoryCreateResponse(BaseModel):
+    message: str
+    clinical_history: ClinicalHistoryResponse
 
 class PaginatedResponse(BaseModel):
     total: int

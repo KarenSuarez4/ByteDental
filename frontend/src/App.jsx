@@ -17,6 +17,8 @@ import AuditLog from './pages/Auditor/AuditLog.jsx';
 import RegisterPatient from './pages/Asistente/RegisterPatient';
 import PatientManagement from './pages/Asistente/PatientManagement';
 import DummyPage from './pages/DummyPage';
+import RegisterPatientFirstHistory from './pages/Doctor/RegisterPatientFirstHistory.jsx';
+import HistoryManagement from './pages/Doctor/HistoryManagement.jsx';
 
 function AppContent() {
   const { isAuthenticated, userRole, mustChangePassword, loading } = useAuth();
@@ -59,8 +61,11 @@ function AppContent() {
         {isAuthenticated && userRole === "Doctor" && (
           <>
             <Route path="/patients" element={<ProtectedRoute><PatientManagement /></ProtectedRoute>} />
-            <Route path="/clinical-history" element={<ProtectedRoute><DummyPage title="Historial Clínico" /></ProtectedRoute>} />
-            <Route path="/appointments" element={<ProtectedRoute><DummyPage title="Seguimiento de citas" /></ProtectedRoute>} />
+            <Route path="/clinical-history" element={<ProtectedRoute><RegisterPatientFirstHistory /></ProtectedRoute>} />
+            <Route path="/appointments" element={<ProtectedRoute><HistoryManagement /></ProtectedRoute>} />
+            <Route path="/doctor/register-first-history/:patientId?" element={<ProtectedRoute><RegisterPatientFirstHistory /></ProtectedRoute>} />
+            <Route path="/history-management" element={<HistoryManagement />} />
+            <Route path="/doctor/history-management/:historyId" element={<HistoryManagement />} />
           </>
         )}
         {isAuthenticated && userRole === "Auditor" && (
@@ -80,6 +85,16 @@ function App() {
     <Router>
       <AuthProvider>
         <AppContent />
+        {/* <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: '#363636',
+              color: '#fff',
+            },
+          }}
+        /> */}
       </AuthProvider>
     </Router>
   );

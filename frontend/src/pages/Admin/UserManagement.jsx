@@ -42,7 +42,7 @@ function UserManagement() {
       .finally(() => setLoading(false));
     getRoles(token)
       .then(setRoles)
-      .catch(() => {});
+      .catch(() => { });
   }, [token, userRole]);
   useEffect(() => {
     if (successMsg) {
@@ -80,7 +80,7 @@ function UserManagement() {
 
     if (name === "document_number") {
       const docType = editForm.document_type;
-      
+
       // Validar según el tipo de documento
       if (docType === 'PP') {
         // Pasaporte: alfanumérico, entre 6 y 10 caracteres, puede contener letras y números
@@ -94,12 +94,12 @@ function UserManagement() {
       setEditForm(prev => ({ ...prev, [name]: value }));
       
       const newErrors = { ...editFormErrors };
-      
+
       // Limpiar error anterior primero
       if (newErrors[name]) {
         delete newErrors[name];
       }
-      
+
       // Validar longitud según tipo de documento
       if (value) {
         if (docType === 'PP') {
@@ -108,7 +108,7 @@ function UserManagement() {
           }
         }
       }
-      
+
       setEditFormErrors(newErrors);
       return;
     }
@@ -172,7 +172,7 @@ function UserManagement() {
   // Guardar cambios
   const handleSaveEdit = async () => {
     if (!validateEditForm()) return;
-    
+
     setEditLoading(true);
     try {
       await updateUser(editUser.uid, editForm, token);
@@ -222,7 +222,7 @@ function UserManagement() {
 
   // Calcular total de páginas
   const totalPagesCount = Math.ceil(filteredUsers.length / itemsPerPage);
-  
+
   // Obtener usuarios para la página actual
   const currentUsers = filteredUsers.slice(
     (currentPage - 1) * itemsPerPage,
@@ -233,7 +233,7 @@ function UserManagement() {
   useEffect(() => {
     const newTotalPages = Math.ceil(filteredUsers.length / itemsPerPage);
     setTotalPages(newTotalPages);
-    
+
     // Si la página actual es mayor al nuevo total, ir a la primera página
     if (currentPage > newTotalPages && newTotalPages > 0) {
       setCurrentPage(1);
@@ -299,7 +299,8 @@ function UserManagement() {
               }}
             />
             <Select
-              className="w-[210px] h-[35px]  font-poppins"
+              className="w-[210px]   font-poppins"
+              size="small"
               value={filterRole}
               onChange={(e) => {
                 setFilterRole(e.target.value);
@@ -312,8 +313,9 @@ function UserManagement() {
               ))}
             </Select>
             <Select
-              className="w-[180px] h-[35px] font-poppins"
+              className="w-[180px] font-poppins"
               value={filterStatus}
+              size="small"
               onChange={(e) => {
                 setFilterStatus(e.target.value);
                 setCurrentPage(1); // Resetear a primera página al filtrar
@@ -328,7 +330,7 @@ function UserManagement() {
 
         {/* Tabla de usuarios con scroll vertical */}
         <div className="w-full max-w-[1000px] bg-white rounded-[12px] shadow-md overflow-x-auto"
-             style={{ maxHeight: "calc(100vh - 226px)", overflowY: "auto" }}>
+          style={{ maxHeight: "calc(100vh - 226px)", overflowY: "auto" }}>
           <table className="w-full border-collapse">
             <thead className="sticky top-0 z-10 h-10">
               <tr>
@@ -431,20 +433,18 @@ function UserManagement() {
 
             {/* Botón Anterior */}
             <button
-              className={`group flex items-center justify-center px-4 py-2 rounded-full font-poppins text-12 font-medium transition-all duration-200 shadow-sm ${
-                currentPage === 1 
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' 
+              className={`group flex items-center justify-center px-4 py-2 rounded-full font-poppins text-12 font-medium transition-all duration-200 shadow-sm ${currentPage === 1
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
                   : 'bg-white text-gray-700 hover:bg-primary-blue hover:text-white border border-gray-300 hover:border-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
-              }`}
+                }`}
               onClick={goToPreviousPage}
               disabled={currentPage === 1}
             >
-              <svg 
-                className={`w-4 h-4 mr-2 transition-transform duration-200 ${
-                  currentPage === 1 ? '' : 'group-hover:-translate-x-0.5'
-                }`} 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                className={`w-4 h-4 mr-2 transition-transform duration-200 ${currentPage === 1 ? '' : 'group-hover:-translate-x-0.5'
+                  }`}
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -464,11 +464,10 @@ function UserManagement() {
                   return (
                     <button
                       key={pageNumber}
-                      className={`flex items-center justify-center w-10 h-10 rounded-full font-poppins text-12 font-medium transition-all duration-200 ${
-                        currentPage === pageNumber
+                      className={`flex items-center justify-center w-10 h-10 rounded-full font-poppins text-12 font-medium transition-all duration-200 ${currentPage === pageNumber
                           ? 'bg-primary-blue text-white shadow-lg transform scale-105 border-2 border-primary-blue'
                           : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 hover:border-primary-blue hover:text-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
-                      }`}
+                        }`}
                       onClick={() => goToPage(pageNumber)}
                     >
                       {pageNumber}
@@ -490,21 +489,19 @@ function UserManagement() {
 
             {/* Botón Siguiente */}
             <button
-              className={`group flex items-center justify-center px-4 py-2 rounded-full font-poppins text-12 font-medium transition-all duration-200 shadow-sm ${
-                currentPage === totalPages 
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' 
+              className={`group flex items-center justify-center px-4 py-2 rounded-full font-poppins text-12 font-medium transition-all duration-200 shadow-sm ${currentPage === totalPages
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
                   : 'bg-white text-gray-700 hover:bg-primary-blue hover:text-white border border-gray-300 hover:border-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
-              }`}
+                }`}
               onClick={goToNextPage}
               disabled={currentPage === totalPages}
             >
               Siguiente
-              <svg 
-                className={`w-4 h-4 ml-2 transition-transform duration-200 ${
-                  currentPage === totalPages ? '' : 'group-hover:translate-x-0.5'
-                }`} 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                className={`w-4 h-4 ml-2 transition-transform duration-200 ${currentPage === totalPages ? '' : 'group-hover:translate-x-0.5'
+                  }`}
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -550,7 +547,7 @@ function UserManagement() {
 
         {/* Modal de edición */}
         {editUser && (
-          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{backgroundColor: 'rgba(255, 255, 255, 0.3)'}}>
+          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(255, 255, 255, 0.3)' }}>
             <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[1000px] max-h-[90vh] overflow-y-auto">
               {/* Header del modal */}
               <div className="bg-gradient-to-br from-primary-blue to-header-blue text-white p-6 rounded-t-[24px] relative overflow-hidden">

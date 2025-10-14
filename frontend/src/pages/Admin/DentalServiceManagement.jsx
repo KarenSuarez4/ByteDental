@@ -5,10 +5,10 @@ import Input from "../../components/Input";
 import Select from "../../components/Select";
 import TextArea from "../../components/TextArea";
 import ConfirmDialog from "../../components/ConfirmDialog";
-import { 
-  getDentalServices, 
-  updateDentalService, 
-  changeServiceStatus 
+import {
+  getDentalServices,
+  updateDentalService,
+  changeServiceStatus
 } from "../../services/dentalServiceService";
 
 const tableHeaderClass = "bg-header-blue text-white font-semibold text-center font-poppins text-18";
@@ -39,7 +39,7 @@ function DentalServiceManagement() {
   useEffect(() => {
     if (userRole !== "Administrador") return;
     if (!token) return; // No ejecutar si no hay token disponible
-    
+
     loadServices();
   }, [token, userRole]);
 
@@ -52,7 +52,7 @@ function DentalServiceManagement() {
 
     try {
       setLoading(true);
-      
+
       const filters = {
         skip: 0,
         limit: 1000, // Cargar todos los servicios para el filtrado local
@@ -61,7 +61,7 @@ function DentalServiceManagement() {
         min_price: null,
         max_price: null
       };
-      
+
       const response = await getDentalServices(token, filters);
       setServices(response);
     } catch (err) {
@@ -117,9 +117,9 @@ function DentalServiceManagement() {
     if (name === 'value') {
       // Solo permitir números y punto decimal
       if (!/^\d*\.?\d*$/.test(value)) return;
-      
+
       setEditForm(prev => ({ ...prev, [name]: value }));
-      
+
       // Validar formato del valor
       const numValue = parseFloat(value);
       if (value && (isNaN(numValue) || numValue <= 0)) {
@@ -133,7 +133,7 @@ function DentalServiceManagement() {
     }
 
     setEditForm(prev => ({ ...prev, [name]: value }));
-    
+
     // Limpiar error específico del campo
     if (editFormErrors[name]) {
       setEditFormErrors(prev => ({ ...prev, [name]: '' }));
@@ -170,18 +170,18 @@ function DentalServiceManagement() {
   // Guardar cambios
   const handleSaveEdit = async () => {
     if (!validateEditForm()) return;
-    
+
     // Verificar si el nombre ya existe en otro servicio (validación de unicidad frontend)
-    const nameExists = services.some(service => 
-      service.id !== editService.id && 
+    const nameExists = services.some(service =>
+      service.id !== editService.id &&
       service.name.toLowerCase().trim() === editForm.name.toLowerCase().trim()
     );
-    
+
     if (nameExists) {
       setEditFormErrors({ name: "Ya existe un servicio con este nombre. Por favor, elija un nombre diferente." });
       return;
     }
-    
+
     setEditLoading(true);
     try {
       const updateData = {
@@ -192,7 +192,7 @@ function DentalServiceManagement() {
       };
 
       await updateDentalService(editService.id, updateData, token);
-      
+
       setSuccessMsg("Servicio actualizado correctamente");
       setEditService(null);
       await loadServices();
@@ -200,7 +200,7 @@ function DentalServiceManagement() {
     } catch (err) {
       // Manejar errores específicos del backend
       const errorMessage = err.message || "Error al actualizar servicio";
-      
+
       if (errorMessage.includes("nombre") && errorMessage.includes("existe")) {
         setEditFormErrors({ name: "Ya existe un servicio con este nombre. Por favor, elija un nombre diferente." });
       } else {
@@ -224,14 +224,14 @@ function DentalServiceManagement() {
   const handleToggleStatus = async (service) => {
     try {
       const newStatus = !service.is_active;
-      
+
       const statusData = {
         is_active: newStatus,
         reason: `Cambio de estado desde gestión de servicios`
       };
-      
+
       await changeServiceStatus(service.id, statusData, token);
-      
+
       setSuccessMsg(`Servicio ${newStatus ? 'habilitado' : 'deshabilitado'} correctamente`);
       await loadServices();
     } catch (err) {
@@ -247,10 +247,10 @@ function DentalServiceManagement() {
     const statusMatch = filterStatus === "ALL" || (filterStatus === "ACTIVO" ? service.is_active : !service.is_active);
     const minPriceMatch = minPrice === "" || service.value >= parseFloat(minPrice);
     const maxPriceMatch = maxPrice === "" || service.value <= parseFloat(maxPrice);
-    
+
     return nameMatch && statusMatch && minPriceMatch && maxPriceMatch;
   }).sort((a, b) => a.id - b.id); // Ordenar por ID ascendente
-  
+
   // Obtener servicios para la página actual
   const currentServices = filteredServices.slice(
     (currentPage - 1) * itemsPerPage,
@@ -261,7 +261,7 @@ function DentalServiceManagement() {
   useEffect(() => {
     const newTotalPages = Math.ceil(filteredServices.length / itemsPerPage);
     setTotalPages(newTotalPages);
-    
+
     // Si la página actual es mayor al nuevo total, ir a la primera página
     if (currentPage > newTotalPages && newTotalPages > 0) {
       setCurrentPage(1);
@@ -288,7 +288,7 @@ function DentalServiceManagement() {
   if (userRole !== "Administrador") {
     return <div className="font-poppins text-center mt-20 text-xl">No autorizado</div>;
   }
-  
+
   if (loading) {
     return <div className="font-poppins text-center mt-10 text-18">Cargando servicios odontológicos...</div>;
   }
@@ -299,13 +299,13 @@ function DentalServiceManagement() {
         <h1 className="text-header-blue text-46 font-bold font-poppins mb-1 pt-6 text-center pb-6">
           GESTIÓN DE SERVICIOS ODONTOLÓGICOS
         </h1>
-        
+
         {editError && (
           <div className="mb-2 w-full max-w-[1200px] p-3 bg-red-100 border border-red-400 text-red-700 rounded text-center text-18">
             {editError}
           </div>
         )}
-        
+
         {successMsg && (
           <div className="mb-2 w-full max-w-[1200px] p-3 bg-green-100 border border-green-400 text-green-700 rounded text-center transition-opacity duration-500 text-18">
             {successMsg}
@@ -325,7 +325,8 @@ function DentalServiceManagement() {
               }}
             />
             <Select
-              className="w-[150px] h-[35px] font-poppins"
+              className="w-[150px]  font-poppins"
+              size="small"
               value={filterStatus}
               onChange={(e) => {
                 setFilterStatus(e.target.value);
@@ -365,7 +366,7 @@ function DentalServiceManagement() {
 
         {/* Tabla de servicios con scroll vertical */}
         <div className="w-full max-w-[1200px] bg-white rounded-[12px] shadow-md overflow-x-auto"
-             style={{ maxHeight: "calc(100vh - 226px)", overflowY: "auto" }}>
+          style={{ maxHeight: "calc(100vh - 226px)", overflowY: "auto" }}>
           <table className="w-full border-collapse">
             <thead className="sticky top-0 z-10 h-10">
               <tr>
@@ -387,10 +388,10 @@ function DentalServiceManagement() {
                   <td className={tableCellClass}>
                     <div className="max-w-[400px] px-2">
                       {service.description ? (
-                        <div 
-                          className="cursor-help text-left leading-5 text-14" 
+                        <div
+                          className="cursor-help text-left leading-5 text-14"
                           title={service.description}
-                          style={{ 
+                          style={{
                             display: '-webkit-box',
                             WebkitLineClamp: 3,
                             WebkitBoxOrient: 'vertical',
@@ -429,9 +430,9 @@ function DentalServiceManagement() {
                           </Button>
                           <Button
                             className="bg-header-blue hover:bg-header-blue-hover text-white px-4 py-2 rounded-[40px] font-poppins text-14 font-bold w-[100px] h-[32px]"
-                            onClick={() => setConfirmDialog({ 
-                              open: true, 
-                              service, 
+                            onClick={() => setConfirmDialog({
+                              open: true,
+                              service,
                               action: 'disable',
                               message: `¿Está seguro que desea deshabilitar el servicio "${service.name}"?\n\nEsta acción cambiará el estado del servicio a "Deshabilitado" y no estará disponible para nuevos registros.`
                             })}
@@ -454,8 +455,8 @@ function DentalServiceManagement() {
               {currentServices.length === 0 && (
                 <tr>
                   <td colSpan="6" className="text-center py-8 text-gray-500 font-poppins text-16">
-                    {(searchName || filterStatus !== "ALL" || minPrice || maxPrice) ? 
-                      "La información proporcionada no corresponde a ningún registro existente" : 
+                    {(searchName || filterStatus !== "ALL" || minPrice || maxPrice) ?
+                      "La información proporcionada no corresponde a ningún registro existente" :
                       "No hay servicios odontológicos registrados"}
                   </td>
                 </tr>
@@ -468,11 +469,10 @@ function DentalServiceManagement() {
         {totalPages > 1 && (
           <div className="w-full max-w-[1200px] flex justify-center items-center mt-6 gap-3">
             <button
-              className={`group flex items-center justify-center px-4 py-2 rounded-full font-poppins text-12 font-medium transition-all duration-200 shadow-sm ${
-                currentPage === 1 
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' 
+              className={`group flex items-center justify-center px-4 py-2 rounded-full font-poppins text-12 font-medium transition-all duration-200 shadow-sm ${currentPage === 1
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
                   : 'bg-white text-gray-700 hover:bg-primary-blue hover:text-white border border-gray-300 hover:border-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
-              }`}
+                }`}
               onClick={goToPreviousPage}
               disabled={currentPage === 1}
             >
@@ -483,11 +483,10 @@ function DentalServiceManagement() {
               {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
                 <button
                   key={pageNumber}
-                  className={`flex items-center justify-center w-10 h-10 rounded-full font-poppins text-12 font-medium transition-all duration-200 ${
-                    currentPage === pageNumber
+                  className={`flex items-center justify-center w-10 h-10 rounded-full font-poppins text-12 font-medium transition-all duration-200 ${currentPage === pageNumber
                       ? 'bg-primary-blue text-white shadow-lg transform scale-105 border-2 border-primary-blue'
                       : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 hover:border-primary-blue hover:text-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
-                  }`}
+                    }`}
                   onClick={() => goToPage(pageNumber)}
                 >
                   {pageNumber}
@@ -496,11 +495,10 @@ function DentalServiceManagement() {
             </div>
 
             <button
-              className={`group flex items-center justify-center px-4 py-2 rounded-full font-poppins text-12 font-medium transition-all duration-200 shadow-sm ${
-                currentPage === totalPages 
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' 
+              className={`group flex items-center justify-center px-4 py-2 rounded-full font-poppins text-12 font-medium transition-all duration-200 shadow-sm ${currentPage === totalPages
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
                   : 'bg-white text-gray-700 hover:bg-primary-blue hover:text-white border border-gray-300 hover:border-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
-              }`}
+                }`}
               onClick={goToNextPage}
               disabled={currentPage === totalPages}
             >
@@ -533,7 +531,7 @@ function DentalServiceManagement() {
 
         {/* Modal de edición */}
         {editService && (
-          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{backgroundColor: 'rgba(255, 255, 255, 0.3)'}}>
+          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(255, 255, 255, 0.3)' }}>
             <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[700px] max-h-[90vh] overflow-y-auto">
               {/* Header del modal */}
               <div className="bg-gradient-to-br from-primary-blue to-header-blue text-white p-6 rounded-t-[24px] relative overflow-hidden">
