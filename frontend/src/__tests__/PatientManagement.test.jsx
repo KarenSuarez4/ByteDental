@@ -15,6 +15,12 @@ Object.defineProperty(globalThis, 'import', {
   } 
 });
 
+// Mock de react-router-dom
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
+  useNavigate: () => jest.fn(), // mock useNavigate as a no-op function
+}));
+
 // Mock del patientService
 jest.mock('../services/patientService', () => ({
   getAllPatients: jest.fn(),
