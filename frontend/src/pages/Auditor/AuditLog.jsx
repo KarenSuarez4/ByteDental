@@ -12,6 +12,7 @@ const TABS = [
   { key: "guardians", label: "Eventos de Guardianes" },
   { key: "persons", label: "Eventos de Personas" },
   { key: "services", label: "Eventos de Servicios" },
+  { key: "histories", label: "Eventos de Historias" },
 ];
 
 function AuditLog() {
@@ -23,6 +24,7 @@ function AuditLog() {
   const [guardianEvents, setGuardianEvents] = useState([]);
   const [personEvents, setPersonEvents] = useState([]);
   const [serviceEvents, setServiceEvents] = useState([]);
+  const [historyEvents, setHistoryEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filtros
@@ -32,6 +34,7 @@ function AuditLog() {
   const [guardianFilter, setGuardianFilter] = useState("ALL");
   const [personFilter, setPersonFilter] = useState("ALL");
   const [serviceFilter, setServiceFilter] = useState("ALL");
+  const [historyFilter, setHistoryFilter] = useState("ALL");
 
   // Estados de paginación
   const [loginPagination, setLoginPagination] = useState({ currentPage: 1, totalPages: 1, totalRecords: 0 });
@@ -40,7 +43,8 @@ function AuditLog() {
   const [guardianPagination, setGuardianPagination] = useState({ currentPage: 1, totalPages: 1, totalRecords: 0 });
   const [personPagination, setPersonPagination] = useState({ currentPage: 1, totalPages: 1, totalRecords: 0 });
   const [servicePagination, setServicePagination] = useState({ currentPage: 1, totalPages: 1, totalRecords: 0 });
-  
+  const [historyPagination, setHistoryPagination] = useState({ currentPage: 1, totalPages: 1, totalRecords: 0 });
+
   const RECORDS_PER_PAGE = 10;
 
   const fetchAuditEvents = async (params, page = 1) => {
@@ -59,19 +63,19 @@ function AuditLog() {
   const fetchAuditEventsWithCount = async (params, page = 1) => {
     // Obtener eventos paginados
     const events = await fetchAuditEvents(params, page);
-    
+
     // Para obtener el total, hacer una consulta sin límite (solo los primeros 1000)
     const countUrl = new URL(`${API_BASE_URL}/api/auditoria/`);
     Object.entries({ ...params, limit: 1000, skip: 0 }).forEach(([key, value]) => {
       if (value !== undefined && value !== null) countUrl.searchParams.append(key, value);
     });
-    
+
     const countResponse = await fetch(countUrl, {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!countResponse.ok) throw new Error("Error obteniendo total de registros");
     const totalEvents = await countResponse.json();
-    
+
     return {
       events,
       total: totalEvents.length,
@@ -81,7 +85,7 @@ function AuditLog() {
 
   useEffect(() => {
     if (userRole !== "Auditor" || !token) return;
-    
+
     const loadData = async () => {
       setLoading(true);
       try {
@@ -98,6 +102,8 @@ function AuditLog() {
           await loadPersonEvents(1);
         } else if (activeTab === "services") {
           await loadServiceEvents(1);
+        } else if (activeTab === "histories") {
+          await loadHistoryEvents(1);
         }
       } catch (error) {
         console.error("Error cargando datos:", error);
@@ -107,21 +113,21 @@ function AuditLog() {
     };
 
     loadData();
-  }, [token, userRole, loginFilter, userFilter, patientFilter, guardianFilter, personFilter, serviceFilter, activeTab]);
+  }, [token, userRole, loginFilter, userFilter, patientFilter, guardianFilter, personFilter, serviceFilter, historyFilter, activeTab]);
 
   const loadLoginEvents = async (page = 1) => {
     try {
       let loginTypes = [];
       if (loginFilter === "ALL") loginTypes = ["LOGIN_SUCCESS", "LOGIN_FAILED", "LOGOUT"];
       else loginTypes = [loginFilter];
-      
+
       if (loginTypes.length === 1) {
         const result = await fetchAuditEventsWithCount({ event_type: loginTypes[0] }, page);
         setLoginEvents(result.events);
-        setLoginPagination({ 
-          currentPage: page, 
-          totalPages: result.totalPages, 
-          totalRecords: result.total 
+        setLoginPagination({
+          currentPage: page,
+          totalPages: result.totalPages,
+          totalRecords: result.total
         });
       } else {
         // Para múltiples tipos, cargar todos y paginar en el cliente
@@ -131,12 +137,12 @@ function AuditLog() {
         const startIndex = (page - 1) * RECORDS_PER_PAGE;
         const endIndex = startIndex + RECORDS_PER_PAGE;
         const paginatedEvents = merged.slice(startIndex, endIndex);
-        
+
         setLoginEvents(paginatedEvents);
-        setLoginPagination({ 
-          currentPage: page, 
-          totalPages, 
-          totalRecords: merged.length 
+        setLoginPagination({
+          currentPage: page,
+          totalPages,
+          totalRecords: merged.length
         });
       }
     } catch (error) {
@@ -149,21 +155,21 @@ function AuditLog() {
       let userTypes = [];
       if (userFilter === "ALL") userTypes = ["CREATE", "UPDATE", "DELETE", "DEACTIVATE", "ACTIVATE"];
       else userTypes = [userFilter];
-      
+
       if (userTypes.length === 1) {
-        const result = await fetchAuditEventsWithCount({ 
-          event_type: userTypes[0], 
-          affected_record_type: "users" 
+        const result = await fetchAuditEventsWithCount({
+          event_type: userTypes[0],
+          affected_record_type: "users"
         }, page);
         setUserEvents(result.events);
-        setUserPagination({ 
-          currentPage: page, 
-          totalPages: result.totalPages, 
-          totalRecords: result.total 
+        setUserPagination({
+          currentPage: page,
+          totalPages: result.totalPages,
+          totalRecords: result.total
         });
       } else {
         // Para múltiples tipos, cargar todos y paginar en el cliente
-        const results = await Promise.all(userTypes.map(type => 
+        const results = await Promise.all(userTypes.map(type =>
           fetchAuditEvents({ event_type: type, affected_record_type: "users" }, 1)
         ));
         const merged = results.flat().sort((a, b) => new Date(b.event_timestamp) - new Date(a.event_timestamp));
@@ -171,12 +177,12 @@ function AuditLog() {
         const startIndex = (page - 1) * RECORDS_PER_PAGE;
         const endIndex = startIndex + RECORDS_PER_PAGE;
         const paginatedEvents = merged.slice(startIndex, endIndex);
-        
+
         setUserEvents(paginatedEvents);
-        setUserPagination({ 
-          currentPage: page, 
-          totalPages, 
-          totalRecords: merged.length 
+        setUserPagination({
+          currentPage: page,
+          totalPages,
+          totalRecords: merged.length
         });
       }
     } catch (error) {
@@ -188,14 +194,14 @@ function AuditLog() {
     try {
       let serviceParams = { affected_record_type: "dental_services" };
       if (serviceFilter !== "ALL") serviceParams.event_type = serviceFilter;
-      
+
       const result = await fetchAuditEventsWithCount(serviceParams, page);
-      
+
       setServiceEvents(result.events);
-      setServicePagination({ 
-        currentPage: page, 
-        totalPages: result.totalPages, 
-        totalRecords: result.total 
+      setServicePagination({
+        currentPage: page,
+        totalPages: result.totalPages,
+        totalRecords: result.total
       });
     } catch (error) {
       console.error("Error cargando eventos de servicios:", error);
@@ -206,14 +212,14 @@ function AuditLog() {
     try {
       let patientParams = { affected_record_type: "patients" };
       if (patientFilter !== "ALL") patientParams.event_type = patientFilter;
-      
+
       const result = await fetchAuditEventsWithCount(patientParams, page);
-      
+
       setPatientEvents(result.events);
-      setPatientPagination({ 
-        currentPage: page, 
-        totalPages: result.totalPages, 
-        totalRecords: result.total 
+      setPatientPagination({
+        currentPage: page,
+        totalPages: result.totalPages,
+        totalRecords: result.total
       });
     } catch (error) {
       console.error("Error cargando eventos de pacientes:", error);
@@ -224,14 +230,14 @@ function AuditLog() {
     try {
       let guardianParams = { affected_record_type: "guardians" };
       if (guardianFilter !== "ALL") guardianParams.event_type = guardianFilter;
-      
+
       const result = await fetchAuditEventsWithCount(guardianParams, page);
-      
+
       setGuardianEvents(result.events);
-      setGuardianPagination({ 
-        currentPage: page, 
-        totalPages: result.totalPages, 
-        totalRecords: result.total 
+      setGuardianPagination({
+        currentPage: page,
+        totalPages: result.totalPages,
+        totalRecords: result.total
       });
     } catch (error) {
       console.error("Error cargando eventos de guardianes:", error);
@@ -242,17 +248,35 @@ function AuditLog() {
     try {
       let personParams = { affected_record_type: "persons" };
       if (personFilter !== "ALL") personParams.event_type = personFilter;
-      
+
       const result = await fetchAuditEventsWithCount(personParams, page);
-      
+
       setPersonEvents(result.events);
-      setPersonPagination({ 
-        currentPage: page, 
-        totalPages: result.totalPages, 
-        totalRecords: result.total 
+      setPersonPagination({
+        currentPage: page,
+        totalPages: result.totalPages,
+        totalRecords: result.total
       });
     } catch (error) {
       console.error("Error cargando eventos de personas:", error);
+    }
+  };
+
+  const loadHistoryEvents = async (page = 1) => {
+    try {
+      let historyParams = { affected_record_type: "clinical_histories" };
+      if (historyFilter !== "ALL") historyParams.event_type = historyFilter;
+
+      const result = await fetchAuditEventsWithCount(historyParams, page);
+
+      setHistoryEvents(result.events);
+      setHistoryPagination({
+        currentPage: page,
+        totalPages: result.totalPages,
+        totalRecords: result.total
+      });
+    } catch (error) {
+      console.error("Error cargando eventos de historias clínicas:", error);
     }
   };
 
@@ -270,26 +294,30 @@ function AuditLog() {
       loadPersonEvents(page);
     } else if (tab === "services") {
       loadServiceEvents(page);
+    } else if (tab === "histories") {
+      loadHistoryEvents(page);
     }
   };
 
   const goToPreviousPage = (tab) => {
-    const pagination = tab === "login" ? loginPagination : 
-                      tab === "users" ? userPagination : 
-                      tab === "patients" ? patientPagination :
-                      tab === "guardians" ? guardianPagination :
-                      tab === "persons" ? personPagination : servicePagination;
+    const pagination = tab === "login" ? loginPagination :
+      tab === "users" ? userPagination :
+        tab === "patients" ? patientPagination :
+          tab === "guardians" ? guardianPagination :
+            tab === "persons" ? personPagination :
+              tab === "services" ? servicePagination : historyPagination;
     if (pagination.currentPage > 1) {
       goToPage(pagination.currentPage - 1, tab);
     }
   };
 
   const goToNextPage = (tab) => {
-    const pagination = tab === "login" ? loginPagination : 
-                      tab === "users" ? userPagination : 
-                      tab === "patients" ? patientPagination :
-                      tab === "guardians" ? guardianPagination :
-                      tab === "persons" ? personPagination : servicePagination;
+    const pagination = tab === "login" ? loginPagination :
+      tab === "users" ? userPagination :
+        tab === "patients" ? patientPagination :
+          tab === "guardians" ? guardianPagination :
+            tab === "persons" ? personPagination :
+              tab === "services" ? servicePagination : historyPagination;
     if (pagination.currentPage < pagination.totalPages) {
       goToPage(pagination.currentPage + 1, tab);
     }
@@ -339,6 +367,8 @@ function AuditLog() {
                   setUserPagination(prev => ({ ...prev, currentPage: 1 }));
                 } else if (tab.key === "services") {
                   setServicePagination(prev => ({ ...prev, currentPage: 1 }));
+                } else if (tab.key === "histories") {
+                  setHistoryPagination(prev => ({ ...prev, currentPage: 1 }));
                 }
               }}
               className={`w-full py-3 px-4 rounded-[40px] font-poppins text-18 font-italic shadow-md
@@ -368,7 +398,6 @@ function AuditLog() {
                   setLoginFilter(e.target.value);
                   setLoginPagination(prev => ({ ...prev, currentPage: 1 })); // Reiniciar a primera página
                 }}
-                className="w-[250px] h-[35px] rounded-[40px] font-poppins text-16 px-6"
               >
                 <option value="ALL">Todos</option>
                 <option value="LOGIN_SUCCESS">Ingresos exitosos</option>
@@ -387,7 +416,6 @@ function AuditLog() {
                   setUserFilter(e.target.value);
                   setUserPagination(prev => ({ ...prev, currentPage: 1 })); // Reiniciar a primera página
                 }}
-                className="w-[250px] h-[35px] rounded-[40px] font-poppins text-16 px-6"
               >
                 <option value="ALL">Todos</option>
                 <option value="CREATE">Creaciones</option>
@@ -408,7 +436,6 @@ function AuditLog() {
                   setServiceFilter(e.target.value);
                   setServicePagination(prev => ({ ...prev, currentPage: 1 })); // Reiniciar a primera página
                 }}
-                className="w-[250px] h-[35px] rounded-[40px] font-poppins text-16 px-6"
               >
                 <option value="ALL">Todos</option>
                 <option value="CREATE">Creaciones</option>
@@ -422,11 +449,11 @@ function AuditLog() {
               <label className="mr-3 font-poppins text-18 font-semibold">Filtrar por tipo:</label>
               <Select
                 value={patientFilter}
+                size="small"
                 onChange={e => {
                   setPatientFilter(e.target.value);
                   setPatientPagination(prev => ({ ...prev, currentPage: 1 }));
                 }}
-                className="w-[250px] h-[35px] rounded-[40px] font-poppins text-16 px-6"
               >
                 <option value="ALL">Todos</option>
                 <option value="CREATE">Creaciones</option>
@@ -444,7 +471,7 @@ function AuditLog() {
                   setGuardianFilter(e.target.value);
                   setGuardianPagination(prev => ({ ...prev, currentPage: 1 }));
                 }}
-                className="w-[250px] h-[35px] rounded-[40px] font-poppins text-16 px-6"
+              // className="w-[250px] h-[35px] rounded-[40px] font-poppins text-16 px-6"
               >
                 <option value="ALL">Todos</option>
                 <option value="CREATE">Creaciones</option>
@@ -462,12 +489,31 @@ function AuditLog() {
                   setPersonFilter(e.target.value);
                   setPersonPagination(prev => ({ ...prev, currentPage: 1 }));
                 }}
-                className="w-[250px] h-[35px] rounded-[40px] font-poppins text-16 px-6"
+              // className="w-[250px] h-[35px] rounded-[40px] font-poppins text-16 px-6"
               >
                 <option value="ALL">Todos</option>
                 <option value="CREATE">Creaciones</option>
                 <option value="UPDATE">Modificaciones</option>
                 <option value="DELETE">Eliminaciones</option>
+              </Select>
+            </>
+          )}
+          {activeTab === "histories" && (
+            <>
+              <label className="mr-3 font-poppins text-18 font-semibold">Filtrar por tipo:</label>
+              <Select
+                value={historyFilter}
+                size="small"
+                onChange={e => {
+                  setHistoryFilter(e.target.value);
+                  setHistoryPagination(prev => ({ ...prev, currentPage: 1 }));
+                }}
+              >
+                <option value="ALL">Todos</option>
+                <option value="CREACION_HISTORIA_CLINICA">Creaciones</option>
+                <option value="ACTUALIZACION_HISTORIA_CLINICA">Actualizaciones</option>
+                <option value="CONSULTA_HISTORIA_CLINICA">Consultas</option>
+                <option value="AGREGAR_TRATAMIENTO">Actulizaciones</option>
               </Select>
             </>
           )}
@@ -674,16 +720,50 @@ function AuditLog() {
               </tbody>
             </table>
           )}
+
+          {activeTab === "histories" && (
+            <table className="w-full border-collapse">
+              <thead className="sticky top-0 z-10 h-10">
+                <tr>
+                  <th className={tableHeaderClass}>Fecha</th>
+                  <th className={tableHeaderClass}>Usuario</th>
+                  <th className={tableHeaderClass}>Tipo Evento</th>
+                  <th className={tableHeaderClass}>Historia afectada</th>
+                  <th className={tableHeaderClass}>Descripción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {historyEvents.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="text-center py-8 text-gray-500 font-poppins text-16">
+                      No se encontraron eventos de historias clínicas
+                    </td>
+                  </tr>
+                ) : (
+                  historyEvents.map(ev => (
+                    <tr key={ev.id}>
+                      <td className={tableCellClass}>{new Date(ev.event_timestamp_colombia || ev.event_timestamp).toLocaleString()}</td>
+                      <td className={tableCellClass}>{ev.user_email || ev.user_id}</td>
+                      <td className={tableCellClass}>{ev.event_type}</td>
+                      <td className={tableCellClass}>{ev.affected_record_id}</td>
+                      <td className={tableCellClass}>{ev.event_description}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/* Controles de paginación - Solo mostrar para el tab activo */}
         {(() => {
-          const pagination = activeTab === "login" ? loginPagination : 
-                            activeTab === "users" ? userPagination : 
-                            activeTab === "patients" ? patientPagination :
-                            activeTab === "guardians" ? guardianPagination :
-                            activeTab === "persons" ? personPagination : servicePagination;
-          
+          const pagination = activeTab === "login" ? loginPagination :
+            activeTab === "users" ? userPagination :
+              activeTab === "patients" ? patientPagination :
+                activeTab === "guardians" ? guardianPagination :
+                  activeTab === "persons" ? personPagination :
+                    activeTab === "services" ? servicePagination : historyPagination;
+
           if (pagination.totalPages <= 1) return null;
 
           return (
@@ -703,20 +783,18 @@ function AuditLog() {
 
               {/* Botón Anterior */}
               <button
-                className={`group flex items-center justify-center px-4 py-2 rounded-full font-poppins text-12 font-medium transition-all duration-200 shadow-sm ${
-                  pagination.currentPage === 1 
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' 
-                    : 'bg-white text-gray-700 hover:bg-primary-blue hover:text-white border border-gray-300 hover:border-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
-                }`}
+                className={`group flex items-center justify-center px-4 py-2 rounded-full font-poppins text-12 font-medium transition-all duration-200 shadow-sm ${pagination.currentPage === 1
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                  : 'bg-white text-gray-700 hover:bg-primary-blue hover:text-white border border-gray-300 hover:border-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
+                  }`}
                 onClick={() => goToPreviousPage(activeTab)}
                 disabled={pagination.currentPage === 1}
               >
-                <svg 
-                  className={`w-4 h-4 mr-2 transition-transform duration-200 ${
-                    pagination.currentPage === 1 ? '' : 'group-hover:-translate-x-0.5'
-                  }`} 
-                  fill="none" 
-                  stroke="currentColor" 
+                <svg
+                  className={`w-4 h-4 mr-2 transition-transform duration-200 ${pagination.currentPage === 1 ? '' : 'group-hover:-translate-x-0.5'
+                    }`}
+                  fill="none"
+                  stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -736,11 +814,10 @@ function AuditLog() {
                     return (
                       <button
                         key={pageNumber}
-                        className={`flex items-center justify-center w-10 h-10 rounded-full font-poppins text-12 font-medium transition-all duration-200 ${
-                          pagination.currentPage === pageNumber
-                            ? 'bg-primary-blue text-white shadow-lg transform scale-105 border-2 border-primary-blue'
-                            : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 hover:border-primary-blue hover:text-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
-                        }`}
+                        className={`flex items-center justify-center w-10 h-10 rounded-full font-poppins text-12 font-medium transition-all duration-200 ${pagination.currentPage === pageNumber
+                          ? 'bg-primary-blue text-white shadow-lg transform scale-105 border-2 border-primary-blue'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 hover:border-primary-blue hover:text-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
+                          }`}
                         onClick={() => goToPage(pageNumber, activeTab)}
                       >
                         {pageNumber}
@@ -762,21 +839,19 @@ function AuditLog() {
 
               {/* Botón Siguiente */}
               <button
-                className={`group flex items-center justify-center px-4 py-2 rounded-full font-poppins text-12 font-medium transition-all duration-200 shadow-sm ${
-                  pagination.currentPage === pagination.totalPages 
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' 
-                    : 'bg-white text-gray-700 hover:bg-primary-blue hover:text-white border border-gray-300 hover:border-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
-                }`}
+                className={`group flex items-center justify-center px-4 py-2 rounded-full font-poppins text-12 font-medium transition-all duration-200 shadow-sm ${pagination.currentPage === pagination.totalPages
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                  : 'bg-white text-gray-700 hover:bg-primary-blue hover:text-white border border-gray-300 hover:border-primary-blue hover:shadow-md transform hover:-translate-y-0.5'
+                  }`}
                 onClick={() => goToNextPage(activeTab)}
                 disabled={pagination.currentPage === pagination.totalPages}
               >
                 Siguiente
-                <svg 
-                  className={`w-4 h-4 ml-2 transition-transform duration-200 ${
-                    pagination.currentPage === pagination.totalPages ? '' : 'group-hover:translate-x-0.5'
-                  }`} 
-                  fill="none" 
-                  stroke="currentColor" 
+                <svg
+                  className={`w-4 h-4 ml-2 transition-transform duration-200 ${pagination.currentPage === pagination.totalPages ? '' : 'group-hover:translate-x-0.5'
+                    }`}
+                  fill="none"
+                  stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -801,22 +876,25 @@ function AuditLog() {
 
         {/* Información de paginación */}
         {(() => {
-          const pagination = activeTab === "login" ? loginPagination : 
-                            activeTab === "users" ? userPagination : 
-                            activeTab === "patients" ? patientPagination :
-                            activeTab === "guardians" ? guardianPagination :
-                            activeTab === "persons" ? personPagination : servicePagination;
-          const events = activeTab === "login" ? loginEvents : 
-                        activeTab === "users" ? userEvents : 
-                        activeTab === "patients" ? patientEvents :
-                        activeTab === "guardians" ? guardianEvents :
-                        activeTab === "persons" ? personEvents : serviceEvents;
-          const entityName = activeTab === "login" ? "eventos" : 
-                           activeTab === "users" ? "eventos de usuarios" : 
-                           activeTab === "patients" ? "eventos de pacientes" :
-                           activeTab === "guardians" ? "eventos de guardianes" :
-                           activeTab === "persons" ? "eventos de personas" : "eventos de servicios";
-          
+          const pagination = activeTab === "login" ? loginPagination :
+            activeTab === "users" ? userPagination :
+              activeTab === "patients" ? patientPagination :
+                activeTab === "guardians" ? guardianPagination :
+                  activeTab === "persons" ? personPagination :
+                    activeTab === "services" ? servicePagination : historyPagination;
+          const events = activeTab === "login" ? loginEvents :
+            activeTab === "users" ? userEvents :
+              activeTab === "patients" ? patientEvents :
+                activeTab === "guardians" ? guardianEvents :
+                  activeTab === "persons" ? personEvents :
+                    activeTab === "services" ? serviceEvents : historyEvents;
+          const entityName = activeTab === "login" ? "eventos" :
+            activeTab === "users" ? "eventos de usuarios" :
+              activeTab === "patients" ? "eventos de pacientes" :
+                activeTab === "guardians" ? "eventos de guardianes" :
+                  activeTab === "persons" ? "eventos de personas" :
+                    activeTab === "services" ? "eventos de servicios" : "eventos de historias clínicas";
+
           if (pagination.totalRecords === 0) return null;
 
           return (
