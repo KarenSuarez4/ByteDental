@@ -406,8 +406,8 @@ class PatientService:
                 detalles_cambios={
                     "data_anterior": "Datos anteriores no capturados en este método",
                     "data_nueva": {
-                        "person_data": person_updates,
-                        "patient_data": patient_fields
+                        "person_data": serialize_for_audit(person_updates),
+                        "patient_data": serialize_for_audit(patient_fields)
                     }
                 },
                 ip_origen=self.user_ip,
