@@ -1,7 +1,28 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import PatientManagement from '../pages/Asistente/PatientManagement';
 import * as patientService from '../services/patientService';
+
+// Mock de import.meta para Jest
+Object.defineProperty(globalThis, 'import', { 
+  value: { 
+    meta: { 
+      env: { 
+        VITE_API_URL: 'http://localhost:8000' 
+      } 
+    } 
+  } 
+});
+
+// Mock del patientService
+jest.mock('../services/patientService', () => ({
+  getAllPatients: jest.fn(),
+  updatePatient: jest.fn(),
+  deactivatePatient: jest.fn(),
+  activatePatient: jest.fn(),
+  changePatientStatus: jest.fn()
+}));
 
 // Mock del contexto de autenticación
 const mockAuthContext = {
@@ -15,36 +36,9 @@ const mockAuthContext = {
 };
 
 jest.mock('../contexts/AuthContext', () => ({
-  useAuth: () => mockAuthContext,
   AuthProvider: ({ children }) => children,
+  useAuth: () => mockAuthContext
 }));
-
-// Mock de react-router-dom
-jest.mock('react-router-dom', () => {
-  const actual = jest.requireActual('react-router-dom');
-  return {
-    ...actual,
-    useNavigate: () => jest.fn(),
-  };
-});
-
-// Mock del patientService
-jest.mock('../services/patientService', () => ({
-  getAllPatients: jest.fn(),
-  updatePatient: jest.fn(),
-  deactivatePatient: jest.fn(),
-  activatePatient: jest.fn(),
-  changePatientStatus: jest.fn()
-}));
-
-// Mock del historyPatientService
-jest.mock('../services/historyPatientService', () => ({
-  getClinicalHistoriesByPatient: jest.fn(),
-  checkPatientHasHistory: jest.fn(),
-}));
-
-// Importar después de los mocks
-import PatientManagement from '../pages/Asistente/PatientManagement';
 
 const MockAuthProvider = ({ children }) => children;
 
@@ -82,7 +76,7 @@ describe('PatientManagement - Desactivación con Motivo', () => {
   test('debe cargar y mostrar la lista de pacientes', async () => {
     const mockPatients = [createMockPatient()];
     patientService.getAllPatients.mockResolvedValue(mockPatients);
-
+    
     renderPatientManagement();
 
     // Esperar a que carguen los pacientes
@@ -91,7 +85,7 @@ describe('PatientManagement - Desactivación con Motivo', () => {
       expect(screen.getByText('12345678')).toBeInTheDocument();
       // Buscar el "Activo" en la tabla, no en el select
       const activeStatusElements = screen.getAllByText('Activo');
-      const tableActiveStatus = activeStatusElements.find(element =>
+      const tableActiveStatus = activeStatusElements.find(element => 
         element.closest('td') !== null
       );
       expect(tableActiveStatus).toBeInTheDocument();
@@ -103,7 +97,7 @@ describe('PatientManagement - Desactivación con Motivo', () => {
   test('debe mostrar el modal de desactivación al hacer clic en desactivar', async () => {
     const mockPatients = [createMockPatient()];
     patientService.getAllPatients.mockResolvedValue(mockPatients);
-
+    
     renderPatientManagement();
 
     // Esperar a que carguen los pacientes
@@ -126,7 +120,7 @@ describe('PatientManagement - Desactivación con Motivo', () => {
   test('debe validar que el motivo de desactivación es obligatorio', async () => {
     const mockPatients = [createMockPatient()];
     patientService.getAllPatients.mockResolvedValue(mockPatients);
-
+    
     renderPatientManagement();
 
     await waitFor(() => {
@@ -154,7 +148,7 @@ describe('PatientManagement - Desactivación con Motivo', () => {
   test('debe habilitar el botón cuando se ingresa un motivo', async () => {
     const mockPatients = [createMockPatient()];
     patientService.getAllPatients.mockResolvedValue(mockPatients);
-
+    
     renderPatientManagement();
 
     await waitFor(() => {
@@ -185,7 +179,7 @@ describe('PatientManagement - Desactivación con Motivo', () => {
   test('debe cerrar el modal al hacer clic en cancelar', async () => {
     const mockPatients = [createMockPatient()];
     patientService.getAllPatients.mockResolvedValue(mockPatients);
-
+    
     renderPatientManagement();
 
     await waitFor(() => {
@@ -219,7 +213,7 @@ describe('PatientManagement - Desactivación con Motivo', () => {
     const mockPatients = [createMockPatient()];
     patientService.getAllPatients.mockResolvedValue(mockPatients);
     patientService.deactivatePatient.mockResolvedValue({});
-
+    
     renderPatientManagement();
 
     await waitFor(() => {
@@ -230,7 +224,7 @@ describe('PatientManagement - Desactivación con Motivo', () => {
     // Abrir modal
     const deactivateButton = screen.getByText('Desactivar');
     fireEvent.click(deactivateButton);
-
+    
     await waitFor(() => {
       expect(screen.getByText('Desactivar Paciente')).toBeInTheDocument();
     });
@@ -243,11 +237,11 @@ describe('PatientManagement - Desactivación con Motivo', () => {
     // Simular clic en confirmar (sin buscar el botón específico ya que sabemos que existe)
     const confirmButtons = screen.getAllByText('Desactivar');
     const modalConfirmButton = confirmButtons.find(btn => btn.closest('[class*="modal"]') || btn.closest('[class*="fixed"]'));
-
+    
     // Si encontramos el botón del modal, hacer clic
     if (modalConfirmButton) {
       fireEvent.click(modalConfirmButton);
-
+      
       // Verificar que se llamó al servicio
       await waitFor(() => {
         expect(patientService.deactivatePatient).toHaveBeenCalled();
