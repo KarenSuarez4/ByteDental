@@ -138,6 +138,7 @@ class EmailService:
         """
         Método sincrónico para enviar email usando smtplib estándar
         """
+        server = None
         try:
             server = smtplib.SMTP(self.smtp_host, self.smtp_port)
             
@@ -165,6 +166,13 @@ class EmailService:
         except Exception as e:
             logger.error(f"Error enviando email: {e}")
             return False
+        finally:
+            # Asegurar que el servidor se cierre
+            if server:
+                try:
+                    server.quit()
+                except:
+                    pass
 
     async def _send_message(self, message: MIMEMultipart) -> bool:
         """
