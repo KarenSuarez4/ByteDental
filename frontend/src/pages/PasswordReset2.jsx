@@ -26,23 +26,35 @@ const PasswordReset2 = () => {
   const [redirectCountdown, setRedirectCountdown] = useState(null);
 
   useEffect(() => {
+    console.log('🔄 [PasswordReset2] useEffect - Cargando email desde localStorage');
     // Obtener el email del localStorage
     const storedEmail = localStorage.getItem('resetEmail');
+    console.log('📧 [PasswordReset2] Email desde localStorage:', storedEmail);
+    
     if (!storedEmail) {
+      console.log('❌ [PasswordReset2] No se encontró email en localStorage - redirigiendo');
       navigate('/PasswordReset');
       return;
     }
+    
+    console.log('✅ [PasswordReset2] Email establecido:', storedEmail);
     setEmail(storedEmail);
   }, [navigate]);
 
   const handleOtpComplete = async (code) => {
+    console.log('🔍 [PasswordReset2] Iniciando verificación de OTP');
+    console.log('📧 [PasswordReset2] Email:', email);
+    console.log('🔢 [PasswordReset2] Código OTP:', code);
+    
     setOtpCode(code);
     setLoading(true);
     setShowError(false);
     setErrorMessage('');
 
     try {
+      console.log('🚀 [PasswordReset2] Llamando a verifyOTP...');
       const result = await otpService.verifyOTP(email, code);
+      console.log('📦 [PasswordReset2] Resultado de verificación:', result);
       
       if (result.success) {
         console.log('Código OTP validado. Enviando email de restablecimiento de Firebase...');
@@ -124,31 +136,67 @@ const PasswordReset2 = () => {
   };
 
   const handleResendCode = async () => {
+    console.log('🔄 [PasswordReset2] Iniciando reenvío de código OTP');
+    console.log('📧 [PasswordReset2] Email para reenvío:', email);
+    console.log('🌐 [PasswordReset2] Environment:', import.meta.env.MODE);
+    console.log('🔗 [PasswordReset2] API URL:', import.meta.env.VITE_API_URL);
+    
+    if (!email) {
+      console.error('❌ [PasswordReset2] Error: No hay email disponible para reenvío');
+      setShowError(true);
+      setErrorMessage('Error: No se encontró el email. Regresa al paso anterior.');
+      return;
+    }
+
+    console.log('⏳ [PasswordReset2] Estableciendo estado de reenvío...');
     setResendLoading(true);
     setShowError(false);
     setErrorMessage('');
 
     try {
+      console.log('🚀 [PasswordReset2] Llamando a otpService.sendOTP para reenvío');
+      console.log('📍 [PasswordReset2] Timestamp:', new Date().toISOString());
+      
+      const startTime = performance.now();
       const result = await otpService.sendOTP(email);
+      const endTime = performance.now();
+      
+      console.log('✅ [PasswordReset2] Respuesta de reenvío recibida');
+      console.log('⏱️ [PasswordReset2] Tiempo de respuesta:', (endTime - startTime).toFixed(2), 'ms');
+      console.log('📦 [PasswordReset2] Resultado completo del reenvío:', result);
       
       if (result.success) {
+        console.log('✅ [PasswordReset2] Reenvío exitoso');
         // Mostrar mensaje de éxito temporal
         setErrorMessage('Código reenviado exitosamente');
         setShowError(false);
         
         // Limpiar el mensaje después de 3 segundos
         setTimeout(() => {
+          console.log('🧹 [PasswordReset2] Limpiando mensaje de éxito');
           setErrorMessage('');
         }, 3000);
       } else {
+        console.log('❌ [PasswordReset2] Reenvío falló - result.success = false');
+        console.log('🔍 [PasswordReset2] Mensaje de error del reenvío:', result.message);
         setShowError(true);
         setErrorMessage(result.message || 'Error reenviando el código');
       }
     } catch (error) {
-      console.error('Error reenviando código:', error);
+      console.error('❌ [PasswordReset2] Error completo en reenvío:', error);
+      console.error('🔍 [PasswordReset2] Error name:', error.name);
+      console.error('🔍 [PasswordReset2] Error message:', error.message);
+      console.error('🔍 [PasswordReset2] Error stack:', error.stack);
+      
+      // Log adicional para errores de red
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.error('🌐 [PasswordReset2] Error de red en reenvío - posible problema de conectividad');
+      }
+      
       setShowError(true);
       setErrorMessage('Error reenviando el código. Intenta nuevamente.');
     } finally {
+      console.log('🏁 [PasswordReset2] Finalizando proceso de reenvío');
       setResendLoading(false);
     }
   };

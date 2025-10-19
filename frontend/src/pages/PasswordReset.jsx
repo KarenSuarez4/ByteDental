@@ -35,33 +35,62 @@ const PasswordReset = () => {
   };
 
   const handleButtonClick = async () => {
+    console.log('🔄 [PasswordReset] Iniciando proceso de recuperación de contraseña');
+    console.log('📧 [PasswordReset] Email ingresado:', email);
+    console.log('🌐 [PasswordReset] Environment:', import.meta.env.MODE);
+    console.log('🔗 [PasswordReset] API URL:', import.meta.env.VITE_API_URL);
+    
     if (emailError || !email) {
+      console.log('❌ [PasswordReset] Error de validación - emailError:', emailError, 'email:', email);
       setResetError('Por favor, ingrese un correo electrónico válido antes de continuar.');
       return;
     }
 
+    console.log('⏳ [PasswordReset] Estableciendo estado de carga...');
     setLoading(true);
     setResetError('');
     setResetSuccess(false);
 
     try {
-      // Usar el nuevo servicio OTP
+      console.log('🚀 [PasswordReset] Llamando a otpService.sendOTP con email:', email);
+      console.log('📍 [PasswordReset] Timestamp:', new Date().toISOString());
+      
+      const startTime = performance.now();
       const result = await otpService.sendOTP(email);
+      const endTime = performance.now();
+      
+      console.log('✅ [PasswordReset] Respuesta de sendOTP recibida');
+      console.log('⏱️ [PasswordReset] Tiempo de respuesta:', (endTime - startTime).toFixed(2), 'ms');
+      console.log('📦 [PasswordReset] Resultado completo:', result);
       
       if (result.success) {
+        console.log('✅ [PasswordReset] Envío exitoso - estableciendo success state');
         setResetSuccess(true);
         
         // Guardar el email en localStorage para usarlo en la siguiente página
         localStorage.setItem('resetEmail', email);
+        console.log('💾 [PasswordReset] Email guardado en localStorage');
+        
         setTimeout(() => {
+          console.log('🔄 [PasswordReset] Navegando a PasswordReset2');
           setLoading(false);
           navigate('/PasswordReset2');
         }, 2000);
       } else {
+        console.log('❌ [PasswordReset] sendOTP falló - result.success = false');
+        console.log('🔍 [PasswordReset] Mensaje de error:', result.message);
         throw new Error(result.message);
       }
     } catch (error) {
-      console.error('Error al enviar código OTP:', error);
+      console.error('❌ [PasswordReset] Error completo capturado:', error);
+      console.error('🔍 [PasswordReset] Error name:', error.name);
+      console.error('🔍 [PasswordReset] Error message:', error.message);
+      console.error('🔍 [PasswordReset] Error stack:', error.stack);
+      
+      // Log adicional para errores de red
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.error('🌐 [PasswordReset] Error de red detectado - posible problema de conectividad');
+      }
       
       let errorMessage = 'Error al enviar el código de verificación';
       
@@ -75,6 +104,7 @@ const PasswordReset = () => {
         errorMessage = error.message || 'Error al enviar el código';
       }
       
+      console.log('💬 [PasswordReset] Mensaje de error final:', errorMessage);
       setResetError(errorMessage);
       setLoading(false);
     }
