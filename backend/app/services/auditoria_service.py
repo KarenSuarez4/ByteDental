@@ -3,14 +3,14 @@ import hashlib
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
-import pytz  # ✅ Agregar esta importación
 
 from ..models.auditoria_models import Audit
 from ..models.user_models import User
 from ..models.rol_models import Role
 
-# ✅ Zona horaria de Colombia usando pytz (más confiable)
-COLOMBIA_TZ = pytz.timezone('America/Bogota')
+# Zona horaria de Colombia (UTC-5)
+COLOMBIA_TZ = timezone(timedelta(hours=-5))
+
 
 class AuditoriaService:
     """Servicio para gestionar auditoría de cambios en el sistema"""
@@ -26,22 +26,9 @@ class AuditoriaService:
         Returns:
             datetime object en zona horaria de Colombia
         """
-        if timestamp_utc:
-            if timestamp_utc.tzinfo is None:
-                # Si no tiene timezone, asumir que es UTC
-                timestamp_utc = pytz.utc.localize(timestamp_utc)
+        if timestamp_utc and hasattr(timestamp_utc, 'astimezone'):
             return timestamp_utc.astimezone(COLOMBIA_TZ)
         return timestamp_utc
-
-    @staticmethod
-    def obtener_hora_colombia_actual():
-        """
-        Obtener la hora actual de Colombia
-        
-        Returns:
-            datetime object con zona horaria de Colombia
-        """
-        return datetime.now(COLOMBIA_TZ)
     
     @staticmethod
     def _obtener_datos_usuario(db: Session, usuario_id: str) -> tuple[Optional[str], Optional[str]]:
@@ -403,6 +390,7 @@ class AuditoriaService:
         except Exception as e:
             print(f"Error al contar eventos de auditoría: {str(e)}")
             return 0
+        
     @staticmethod
     def registrar_creacion_historia_clinica(
         db: Session,
