@@ -10,6 +10,10 @@ import FilterBar from "../../components/FilterBar";
 import { useNavigate } from "react-router-dom";
 import { getAllPatients, updatePatient, deactivatePatient, activatePatient } from "../../services/patientService";
 import { getClinicalHistoriesByPatient, checkPatientHasHistory } from "../../services/historyPatientService";
+import { FaEye } from "react-icons/fa";
+import { motion } from "framer-motion";
+
+
 
 const tableHeaderClass = "bg-header-blue text-white font-semibold text-center font-poppins text-18";
 const tableCellClass = "text-center font-poppins text-16 py-2";
@@ -31,7 +35,7 @@ function PatientManagement() {
   const [deactivationModal, setDeactivationModal] = useState({ open: false, patient: null, reason: '', loading: false });
 
   // Filtros y búsqueda
-  const [searchTerm, setSearchTerm] = useState(""); // Cambiar de searchDoc a searchTerm
+  const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
 
   // Paginación
@@ -887,7 +891,7 @@ function PatientManagement() {
           </div>
         )}
 
-        {/* ✅ Usar FilterBar con configuración correcta */}
+        {/*Usar FilterBar con configuración correcta */}
         <FilterBar
           searchValue={searchTerm} // Cambiar de searchDoc a searchTerm
           onSearchChange={(e) => setSearchTerm(e.target.value)} // Cambiar función
@@ -914,7 +918,9 @@ function PatientManagement() {
                 <th className={tableHeaderClass}>Grupo Sanguíneo</th>
                 <th className={tableHeaderClass}>Ocupación</th>
                 <th className={tableHeaderClass}>Estado</th>
-                <th className={tableHeaderClass}>Información</th>
+                {userRole !== "Doctor" && (
+                  <th className={tableHeaderClass}>Información</th>
+                )}
                 <th className={tableHeaderClass}>Acciones</th>
               </tr>
             </thead>
@@ -943,23 +949,36 @@ function PatientManagement() {
                       <span className="text-red-600 font-bold">Inactivo</span>
                     )}
                   </td>
-                  <td className={tableCellClass}>
-                    <span
-                      className="text-blue-600 font-semibold hover:text-blue-800 hover:underline cursor-pointer"
-                      onClick={() => handlePatientInfo(patient)}
-                      title="Haga clic para ver la información completa del paciente"
-                    >
-                      Ver Información
-                    </span>
-                  </td>
+                  {userRole !== "Doctor" && (
+                    <td className={tableCellClass}>
+                      <span
+                        className="text-blue-600 font-semibold hover:text-blue-800 hover:underline cursor-pointer"
+                        onClick={() => handlePatientInfo(patient)}
+                        title="Haga clic para ver la información completa del paciente"
+                      >
+                        Ver Información
+                      </span>
+                    </td>
+                  )}
                   <td className={tableCellClass}>
                     <div className="flex flex-col items-center justify-center gap-2">
                       {userRole === "Doctor" ? (
                         <Button
-                          className="bg-primary-blue hover:bg-primary-blue-hover text-white px-4 py-2 rounded-[40px] font-poppins text-16 font-bold w-[130px] h-[35px]"
+                          aria-label="Ver historia clínica del paciente"
+                          title="Ver historia clínica"
                           onClick={() => handleViewHistory(patient)}
+                          className="flex items-center justify-center gap-2 bg-primary-blue hover:bg-primary-blue-hover text-white 
+                          px-1 py-2 rounded-full font-poppins text-[12px] font-semibold 
+                          w-[160px] h-[44px] shadow-sm hover:shadow-md transition-all duration-200"
                         >
-                          Ver Historia clínica
+                          <motion.span
+                            whileHover={{ scale: 1.15 }}
+                            transition={{ type: 'spring', stiffness: 250, damping: 10 }}
+                            className="flex items-center justify-center"
+                          >
+                            <FaEye className="text-white text-[18px]" />
+                          </motion.span>
+                          <span className="leading-none tracking-wide">Ver historia clínica</span>
                         </Button>
                       ) : (
                         patient.is_active ? (
