@@ -16,36 +16,6 @@ const PasswordReset = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Función de debug para probar conectividad del backend
-  const testBackendConnection = async () => {
-    console.log('🧪 [BACKEND TEST] Probando conexión con backend...');
-    
-    try {
-      const backendUrl = import.meta.env.VITE_API_URL || 'https://bytedental-guyt.onrender.com';
-      const response = await fetch(`${backendUrl}/debug/cors`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      console.log('🧪 [BACKEND TEST] Status:', response.status);
-      console.log('🧪 [BACKEND TEST] Headers:', Object.fromEntries(response.headers));
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ [BACKEND TEST] Backend conectado correctamente:', data);
-        alert('✅ Backend funciona correctamente. Ver consola para detalles.');
-      } else {
-        console.log('❌ [BACKEND TEST] Error en respuesta:', response.statusText);
-        alert('❌ Backend responde con error. Ver consola para detalles.');
-      }
-    } catch (error) {
-      console.error('💥 [BACKEND TEST] Error de conexión:', error);
-      alert('💥 Error de conexión con backend. Ver consola para detalles.');
-    }
-  };
-
   const handleEmailChange = (event) => {
     const value = event.target.value;
     setEmail(value);
@@ -65,62 +35,33 @@ const PasswordReset = () => {
   };
 
   const handleButtonClick = async () => {
-    console.log('🔄 [PasswordReset] Iniciando proceso de recuperación de contraseña');
-    console.log('📧 [PasswordReset] Email ingresado:', email);
-    console.log('🌐 [PasswordReset] Environment:', import.meta.env.MODE);
-    console.log('🔗 [PasswordReset] API URL:', import.meta.env.VITE_API_URL);
-    
     if (emailError || !email) {
-      console.log('❌ [PasswordReset] Error de validación - emailError:', emailError, 'email:', email);
       setResetError('Por favor, ingrese un correo electrónico válido antes de continuar.');
       return;
     }
 
-    console.log('⏳ [PasswordReset] Estableciendo estado de carga...');
     setLoading(true);
     setResetError('');
     setResetSuccess(false);
 
     try {
-      console.log('🚀 [PasswordReset] Llamando a otpService.sendOTP con email:', email);
-      console.log('📍 [PasswordReset] Timestamp:', new Date().toISOString());
-      
-      const startTime = performance.now();
+      // Usar el nuevo servicio OTP
       const result = await otpService.sendOTP(email);
-      const endTime = performance.now();
-      
-      console.log('✅ [PasswordReset] Respuesta de sendOTP recibida');
-      console.log('⏱️ [PasswordReset] Tiempo de respuesta:', (endTime - startTime).toFixed(2), 'ms');
-      console.log('📦 [PasswordReset] Resultado completo:', result);
       
       if (result.success) {
-        console.log('✅ [PasswordReset] Envío exitoso - estableciendo success state');
         setResetSuccess(true);
         
         // Guardar el email en localStorage para usarlo en la siguiente página
         localStorage.setItem('resetEmail', email);
-        console.log('💾 [PasswordReset] Email guardado en localStorage');
-        
         setTimeout(() => {
-          console.log('🔄 [PasswordReset] Navegando a PasswordReset2');
           setLoading(false);
           navigate('/PasswordReset2');
         }, 2000);
       } else {
-        console.log('❌ [PasswordReset] sendOTP falló - result.success = false');
-        console.log('🔍 [PasswordReset] Mensaje de error:', result.message);
         throw new Error(result.message);
       }
     } catch (error) {
-      console.error('❌ [PasswordReset] Error completo capturado:', error);
-      console.error('🔍 [PasswordReset] Error name:', error.name);
-      console.error('🔍 [PasswordReset] Error message:', error.message);
-      console.error('🔍 [PasswordReset] Error stack:', error.stack);
-      
-      // Log adicional para errores de red
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.error('🌐 [PasswordReset] Error de red detectado - posible problema de conectividad');
-      }
+      console.error('Error al enviar código OTP:', error);
       
       let errorMessage = 'Error al enviar el código de verificación';
       
@@ -134,7 +75,6 @@ const PasswordReset = () => {
         errorMessage = error.message || 'Error al enviar el código';
       }
       
-      console.log('💬 [PasswordReset] Mensaje de error final:', errorMessage);
       setResetError(errorMessage);
       setLoading(false);
     }
@@ -180,14 +120,6 @@ const PasswordReset = () => {
         {emailError && (
           <p className="text-red-500 text-18 font-poppins mb-5">{emailError}</p>
         )}
-        {/* Botón de debug para probar backend */}
-        <button 
-          onClick={testBackendConnection}
-          className="mb-4 px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-sm"
-        >
-          🧪 Probar Backend
-        </button>
-
         <Button 
           onClick={handleButtonClick} 
           className="shadow-md mb-2 mt-9 text-18" 

@@ -35,10 +35,7 @@ export function AuthProvider({ children }) {
         setToken(token);
         const uid = user.uid;
         const response = await fetch(`${API_BASE_URL}/api/users/me`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+          headers: { Authorization: `Bearer ${token}` }
         });
         if (response.ok) {
           const backendUser = await response.json();
@@ -65,7 +62,7 @@ export function AuthProvider({ children }) {
       if (currentUser) {
         await registerLogoutEvent(currentUser.uid);
       }
-
+      
       await logout();
       setCurrentUser(null);
       setToken(null);
