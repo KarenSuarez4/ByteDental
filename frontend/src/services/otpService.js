@@ -1,12 +1,13 @@
 // src/services/otpService.js
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-// Debug de variables de entorno
+// Debug de variables de entorno (v2.0)
 console.log('🔧 [otpService] Variables de entorno:');
 console.log('🔧 [otpService] import.meta.env.MODE:', import.meta.env.MODE);
 console.log('🔧 [otpService] import.meta.env.VITE_API_URL:', import.meta.env.VITE_API_URL);
 console.log('🔧 [otpService] API_BASE_URL final:', API_BASE_URL);
 console.log('🔧 [otpService] Todas las variables VITE_:', Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')));
+console.log('🔧 [otpService] Timestamp de deploy:', new Date().toISOString());
 
 export const otpService = {
   // Enviar código OTP
