@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { FaTimes, FaSave, FaCalendarAlt, FaNotesMedical, FaStethoscope } from 'react-icons/fa';
 import Button from './Button';
 import Select from './Select';
+import DateInput from './DateInput';
 
 /**
  * AddTreatmentModal Component
@@ -283,32 +284,22 @@ const AddTreatmentModal = ({
                                 <FaCalendarAlt className="mr-2 text-primary-blue" />
                                 Fecha del Tratamiento <span className="text-red-500 ml-1">*</span>
                             </label>
-                            <input
-                                type="date"
-                                id="treatment_date"
+
+                            <DateInput
                                 name="treatment_date"
                                 value={formData.treatment_date}
                                 onChange={handleChange}
                                 onBlur={handleBlur}
-                                min={dateConstraints.oneYearAgo}
-                                max={dateConstraints.today}
-                                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${errors.treatment_date && touched.treatment_date
-                                    ? 'border-red-500 focus:ring-red-200 bg-red-50'
-                                    : 'border-gray-300 focus:ring-primary-blue focus:border-primary-blue hover:border-gray-400'
-                                    }`}
-                                disabled={loading}
+                                minDate={dateConstraints.oneYearAgoDate}
+                                maxDate={dateConstraints.todayDate}
+                                className="w-full"
+                                error={!!errors.treatment_date}
                             />
-                            {errors.treatment_date && touched.treatment_date && (
-                                <p className="text-red-500 text-sm mt-2 flex items-center animate-fadeIn">
-                                    <span className="mr-1">⚠️</span>
-                                    {errors.treatment_date}
-                                </p>
+                            {errors.treatment_date && (
+                                <p className="text-red-500 text-sm font-poppins mt-1">{errors.treatment_date}</p>
                             )}
-                            <p className="text-xs text-gray-500 mt-2 flex items-center">
-                                <span className="mr-1">ℹ️</span>
-                                Rango válido: Desde hace un año hasta hoy
-                            </p>
                         </div>
+
 
                         {/* Notas/Observaciones */}
                         <div className="group">
