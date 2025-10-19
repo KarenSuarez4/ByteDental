@@ -121,7 +121,8 @@ class PatientService:
                 guardian_id=guardian_id,
                 requires_guardian=requires_guardian,
                 has_disability=patient_data.has_disability,
-                disability_description=patient_data.disability_description
+                disability_description=patient_data.disability_description,
+                blood_group=patient_data.blood_group
             )
             
             self.db.add(patient)
