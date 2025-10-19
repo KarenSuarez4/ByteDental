@@ -16,6 +16,7 @@ import SignatureCredentialField from "../../components/SignatureCredentialField"
 import PatientInfoCard from "../../components/PatientInfoCard";
 import LegalConfirmationModal from "../../components/LegalConfirmationModal";
 import FormNavigationBar from "../../components/FormNavigationBar";
+import PatientSearchSelect from "../../components/PatientSearchSelect";
 
 // Hooks
 import { useAuth } from "../../contexts/AuthContext";
@@ -24,7 +25,7 @@ import { useFormProgress } from "../../hooks/useFormProgress";
 import { useFormSections } from "../../hooks/useFormSections";
 
 // Services
-import { getAllPatients, getPatientById } from "../../services/patientService";
+import { getActivePatients, getPatientById } from "../../services/patientService";
 import { createClinicalHistory, formatClinicalHistoryData } from "../../services/historyPatientService";
 import { getDentalServices } from "../../services/dentalServiceService";
 
@@ -121,6 +122,8 @@ const RegisterPatientFirstHistory = () => {
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+
+
   // UI State Management
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
@@ -157,7 +160,7 @@ const RegisterPatientFirstHistory = () => {
    */
   useEffect(() => {
     if (formData.patient_id && patients.length > 0) {
-      const patient = patients.find(p => p.id === parseInt(formData.patient_id));
+      const patient = patients.find(p => p.id === Number.parseInt(formData.patient_id));
       setSelectedPatient(patient);
     }
   }, [formData.patient_id, patients]);
@@ -204,7 +207,7 @@ const RegisterPatientFirstHistory = () => {
   const loadPatients = async () => {
     setLoadingData(true);
     try {
-      const response = await getAllPatients(token);
+      const response = await getActivePatients(token);
       setPatients(response || []);
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
@@ -238,6 +241,7 @@ const RegisterPatientFirstHistory = () => {
       setFormError('Error al cargar los detalles del paciente');
     }
   };
+
 
   /**
    * Load available dental services
@@ -555,27 +559,13 @@ const RegisterPatientFirstHistory = () => {
         <FormSection id="patient-info" title="Información del Paciente">
           <div className="grid grid-cols-1 gap-4">
             <FormField label="Seleccionar Paciente" required error={formErrors.patient_id}>
-              <Select
-                name="patient_id"
-                id="patient_id"
-                value={formData.patient_id}
-                onChange={(e) => handlePatientChange(e.target.value)}
-                error={!!formErrors.patient_id}
-                placeholder="Seleccione un paciente"
+              <PatientSearchSelect
+                patients={patients || []}
+                selectedPatientId={formData.patient_id}
+                onSelectPatient={handlePatientChange}
                 disabled={!!patientId}
-                className={patientId ? "cursor-not-allowed" : ""}
-                aria-required="true"
-                aria-invalid={!!formErrors.patient_id}
-                aria-describedby={formErrors.patient_id ? "patient_id-error" : undefined}
-              >
-                {patients.map(patient => (
-                  <option key={patient.id} value={patient.id}>
-                    {patient.person.first_name} {patient.person.first_surname} - {patient.person.document_type}: {patient.person.document_number}
-                  </option>
-                ))}
-              </Select>
+              />
             </FormField>
-
             {/* Patient Information Display */}
             <PatientInfoCard
               patientDetails={patientDetails}

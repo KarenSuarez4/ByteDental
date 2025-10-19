@@ -49,10 +49,11 @@ const FormNavigationBar = ({
             aria-live="polite"
         >
             <div className="max-w-[900px] px-3 sm:px-4 mx-auto">
-                <div className="flex flex-col items-center gap-2 mb-3">
+                <div className="flex flex-col items-center gap-0 mb-1">
                     {showProgressBar && (
                         <ProgressBar
                             progress={progress}
+                            
                             aria-valuenow={progress}
                             aria-valuemin="0"
                             aria-valuemax="100"

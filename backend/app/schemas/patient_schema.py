@@ -1,7 +1,10 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Literal
 from app.schemas.person_schema import PersonResponse, PersonCreate, PersonUpdate
 from app.models.guardian_models import PatientRelationshipEnum
+
+# Definir los tipos de grupo sanguíneo permitidos
+BloodGroupType = Literal['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
 
 class GuardianCreateEmbedded(BaseModel):
     """Schema para crear un guardian junto con un paciente"""
@@ -14,6 +17,7 @@ class PatientBase(BaseModel):
     guardian_id: Optional[int] = Field(None, description="ID del guardian asignado")
     has_disability: bool = Field(default=False, description="Indica si el paciente tiene alguna discapacidad")
     disability_description: Optional[str] = Field(None, description="Descripción de la discapacidad")
+    blood_group: BloodGroupType = Field(default='O+', description="Grupo sanguíneo del paciente")
 
 class PatientCreate(BaseModel):
     """Schema para crear un paciente (incluye datos de persona)"""
@@ -24,6 +28,7 @@ class PatientCreate(BaseModel):
     guardian_id: Optional[int] = Field(None, description="ID del guardian asignado (si ya existe)")
     has_disability: bool = Field(default=False, description="Indica si el paciente tiene alguna discapacidad")
     disability_description: Optional[str] = Field(None, description="Descripción de la discapacidad")
+    blood_group: BloodGroupType = Field(default='O+', description="Grupo sanguíneo del paciente")
     # Datos del guardian nuevo (si se va a crear)
     guardian: Optional['GuardianCreateEmbedded'] = Field(None, description="Datos para crear un guardian nuevo")
 
@@ -40,6 +45,7 @@ class PatientUpdate(BaseModel):
     requires_guardian: Optional[bool] = None
     has_disability: Optional[bool] = None
     disability_description: Optional[str] = None
+    blood_group: Optional[BloodGroupType] = None
     is_active: Optional[bool] = None
     deactivation_reason: Optional[str] = Field(None, max_length=200, description="Motivo de desactivación")
     # Datos del guardian nuevo (si se va a crear o actualizar)
