@@ -2,6 +2,7 @@
 import React from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { motion } from "framer-motion";
 
 function cn(...args) {
   return twMerge(clsx(args));
@@ -9,7 +10,7 @@ function cn(...args) {
 
 const ProgressBar = ({ progress = 0, className = '' }) => {
   const isComplete = progress >= 100;
-  
+
   return (
     <div className={cn('w-full max-w-[700px] mb-8', className)}>
       <div className="flex justify-between items-center mb-2">
@@ -27,7 +28,7 @@ const ProgressBar = ({ progress = 0, className = '' }) => {
         </span>
       </div>
       <div className="w-full bg-gray-200 rounded-full h-3">
-        <div 
+        <div
           className={cn(
             "h-3 rounded-full transition-all duration-500 ease-out",
             isComplete ? "bg-teal-500" : "bg-primary-blue"
