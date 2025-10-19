@@ -1,4 +1,3 @@
-import pytest
 
 def test_create_clinical_history_success(client, doctor_token):
     """Prueba: Creación exitosa de una historia clínica"""
