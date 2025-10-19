@@ -16,6 +16,36 @@ const PasswordReset = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Función de debug para probar conectividad del backend
+  const testBackendConnection = async () => {
+    console.log('🧪 [BACKEND TEST] Probando conexión con backend...');
+    
+    try {
+      const backendUrl = import.meta.env.VITE_API_URL || 'https://bytedental-guyt.onrender.com';
+      const response = await fetch(`${backendUrl}/debug/cors`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      console.log('🧪 [BACKEND TEST] Status:', response.status);
+      console.log('🧪 [BACKEND TEST] Headers:', Object.fromEntries(response.headers));
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ [BACKEND TEST] Backend conectado correctamente:', data);
+        alert('✅ Backend funciona correctamente. Ver consola para detalles.');
+      } else {
+        console.log('❌ [BACKEND TEST] Error en respuesta:', response.statusText);
+        alert('❌ Backend responde con error. Ver consola para detalles.');
+      }
+    } catch (error) {
+      console.error('💥 [BACKEND TEST] Error de conexión:', error);
+      alert('💥 Error de conexión con backend. Ver consola para detalles.');
+    }
+  };
+
   const handleEmailChange = (event) => {
     const value = event.target.value;
     setEmail(value);
@@ -150,6 +180,14 @@ const PasswordReset = () => {
         {emailError && (
           <p className="text-red-500 text-18 font-poppins mb-5">{emailError}</p>
         )}
+        {/* Botón de debug para probar backend */}
+        <button 
+          onClick={testBackendConnection}
+          className="mb-4 px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-sm"
+        >
+          🧪 Probar Backend
+        </button>
+
         <Button 
           onClick={handleButtonClick} 
           className="shadow-md mb-2 mt-9 text-18" 
