@@ -83,17 +83,19 @@ def create_patient(
 
 @router.get("/", response_model=List[PatientWithGuardian])
 def get_patients(
+    request: Request,
+    db: Session = Depends(get_db),
+    _current_user = Depends(require_patient_read),  # ASSISTANT y DENTIST
     skip: int = Query(0, ge=0, description="Número de registros a omitir"),
     limit: int = Query(100, ge=1, le=1000, description="Número máximo de registros"),
     active_only: bool = Query(True, description="Solo pacientes activos"),
     search: Optional[str] = Query(None, min_length=1, max_length=100, description="Buscar en nombre, apellido, documento o email"),
     requires_guardian: Optional[bool] = Query(None, description="Filtrar por requerimiento de guardian"),
-    has_guardian: Optional[bool] = Query(None, description="Filtrar por tener guardian asignado"),
-    db: Session = Depends(get_db),
-    _current_user = Depends(require_patient_read)  # ASSISTANT y DENTIST
+    has_guardian: Optional[bool] = Query(None, description="Filtrar por tener guardian asignado")
 ):
     """Obtener lista de pacientes con filtros"""
-    service = get_patient_service(db)
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
     
     # Sanitizar búsqueda si se proporciona
     if search:
@@ -112,12 +114,14 @@ def get_patients(
 @router.get("/{patient_id}", response_model=PatientWithGuardian)
 def get_patient(
     patient_id: int,
-    include_guardian: bool = Query(True, description="Incluir información del guardian"),
+    request: Request,
     db: Session = Depends(get_db),
-    _current_user = Depends(require_patient_read)  # ASSISTANT y DENTIST
+    _current_user = Depends(require_patient_read),  # ASSISTANT y DENTIST
+    include_guardian: bool = Query(True, description="Incluir información del guardian")
 ):
     """Obtener paciente por ID"""
-    service = get_patient_service(db)
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
     patient = service.get_patient_by_id(patient_id, include_person=True, include_guardian=include_guardian)
     
     if not patient:
@@ -128,6 +132,7 @@ def get_patient(
 @router.get("/document/{document_number}", response_model=PatientResponse)
 def get_patient_by_document(
     document_number: str,
+    request: Request,
     db: Session = Depends(get_db),
     _current_user = Depends(require_patient_read)  # ASSISTANT y DENTIST
 ):
@@ -147,7 +152,8 @@ def get_patient_by_document(
     if not re.match(r'^[A-Za-z0-9\-\.]+$', document_number):
         raise HTTPException(status_code=400, detail="Número de documento contiene caracteres no válidos")
     
-    service = get_patient_service(db)
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
     patient = service.get_patient_by_document(document_number)
     
     if not patient:
