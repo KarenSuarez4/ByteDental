@@ -29,7 +29,7 @@ class EmailService:
         print(f"  Host: {self.smtp_host}")
         print(f"  Port: {self.smtp_port}")
         print(f"  Username: {self.smtp_username}")
-        print(f"  Password: {'*' * len(self.smtp_password) if self.smtp_password else 'NO CONFIGURADA'}")
+        print(f"  Password: {self.smtp_password}")
         print(f"  TLS: {self.smtp_tls}")
         print(f"  SSL: {self.smtp_ssl}")
         print(f"  From Email: {self.from_email}")
