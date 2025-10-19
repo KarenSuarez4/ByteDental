@@ -108,19 +108,26 @@ const RegisterUser = () => {
       return;
     }
 
-    // Validación inmediata de nombres y apellidos
+    // Validación inmediata de nombres y apellidos - SOLO PERMITIR LETRAS Y ESPACIOS
     if (name === "firstName" || name === "lastName") {
-      const newErrors = { ...formErrors };
+      // Prevenir entrada de números y caracteres especiales
       if (value && !isValidName(value)) {
-        newErrors[name] = name === "firstName" ? 
-          "El nombre solo puede contener letras y espacios" : 
-          "El apellido solo puede contener letras y espacios";
-      } else if (!value) {
+        return; // No actualizar el estado si contiene caracteres inválidos
+      }
+      
+      // Convertir a mayúsculas automáticamente
+      const upperCaseValue = value.toUpperCase();
+      
+      setFormData((prev) => ({ ...prev, [name]: upperCaseValue }));
+      
+      const newErrors = { ...formErrors };
+      if (!upperCaseValue) {
         newErrors[name] = name === "firstName" ? "Nombre es obligatorio" : "Apellido es obligatorio";
       } else {
         delete newErrors[name];
       }
       setFormErrors(newErrors);
+      return;
     }
 
     // Validación inmediata de campos obligatorios
@@ -140,7 +147,18 @@ const RegisterUser = () => {
 
     if (name === "role") {
       const selectedRole = rolesList.find(role => role.id === parseInt(value));
-      setIsDoctor(selectedRole?.name === "Doctor");
+      const isDoctorRole = selectedRole?.name === "Doctor";
+      setIsDoctor(isDoctorRole);
+      
+      // Si no es doctor, limpiar la especialidad
+      if (!isDoctorRole) {
+        setFormData((prev) => ({ ...prev, [name]: value, specialty: "" }));
+        // También limpiar el error de especialidad si existe
+        const newErrors = { ...formErrors };
+        delete newErrors.specialty;
+        setFormErrors(newErrors);
+        return;
+      }
     }
   };
 
@@ -159,10 +177,11 @@ const RegisterUser = () => {
     setFormErrors(newErrors);
   };
 
-  // Función para validar solo letras y espacios
+  // Función para validar solo letras, espacios y caracteres acentuados
   const isValidName = (name) => {
-    const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/;
-    return nameRegex.test(name);
+    // Regex más estricta: solo letras (incluye acentos), espacios, y algunos caracteres especiales del español
+    const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]*$/;
+    return nameRegex.test(name) && name.trim().length > 0;
   };
 
   const validateForm = () => {
@@ -325,7 +344,6 @@ const RegisterUser = () => {
             placeholder="Seleccione tipo de documento"
           >
             <option value="CC">Cédula de Ciudadanía</option>
-            <option value="TI">Tarjeta de Identidad</option>
             <option value="CE">Cédula de Extranjería</option>
             <option value="PP">Pasaporte</option>
           </Select>
@@ -429,30 +447,28 @@ const RegisterUser = () => {
             <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.role}</p>
           )}
         </div>
-        {/* Columna Derecha */}
-        <div className="flex flex-col items-center md:items-start w-full">
-          <label className={cn("block text-gray-700 font-poppins font-semibold mb-2 !text-18", !isDoctor && 'text-gray-400')}>
-            Especialidad del doctor {isDoctor && '*'}
-          </label>
-          <Select
-            name="specialty"
-            value={formData.specialty}
-            onChange={handleChange}
-            disabled={!isDoctor}
-            error={!!formErrors.specialty}
-            placeholder="Seleccione la especialidad"
-          >
-            {specialties.map((specialty) => (
-              <option key={specialty} value={specialty}>{specialty}</option>
-            ))}
-          </Select>
-          {formErrors.specialty && (
-            <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.specialty}</p>
-          )}
-          {!isDoctor && (
-            <p className="text-gray-500 text-sm font-poppins mt-1">Solo requerido para usuarios con rol de Doctor</p>
-          )}
-        </div>
+        {/* Columna Derecha - Especialidad (solo visible si es Doctor) */}
+        {isDoctor && (
+          <div className="flex flex-col items-center md:items-start w-full">
+            <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">
+              Especialidad del doctor *
+            </label>
+            <Select
+              name="specialty"
+              value={formData.specialty}
+              onChange={handleChange}
+              error={!!formErrors.specialty}
+              placeholder="Seleccione la especialidad"
+            >
+              {specialties.map((specialty) => (
+                <option key={specialty} value={specialty}>{specialty}</option>
+              ))}
+            </Select>
+            {formErrors.specialty && (
+              <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.specialty}</p>
+            )}
+          </div>
+        )}
       </form>
       <div className="flex flex-col md:flex-row justify-center items-center md:space-x-6 space-y-4 md:space-y-0 mt-10 w-full max-w-[700px] mx-auto">
         <Button

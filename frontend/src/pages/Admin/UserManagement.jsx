@@ -4,6 +4,8 @@ import Button from "../../components/Button";
 import Input from "../../components/Input";
 import Select from "../../components/Select";
 import ConfirmDialog from "../../components/ConfirmDialog";
+import SearchInput from "../../components/SearchInput"; 
+import FilterBar from "../../components/FilterBar"; 
 import { getAllUsers as getUsers, updateUser, deactivateUser, activateUser, getRoles } from "../../services/userService";
 
 const tableHeaderClass = "bg-header-blue text-white font-semibold text-center font-poppins text-18";
@@ -23,15 +25,53 @@ function UserManagement() {
   const [confirmDialog, setConfirmDialog] = useState({ open: false, user: null });
   const [phoneEditError, setPhoneEditError] = useState("");
 
-  // Filtros y búsqueda
-  const [searchDoc, setSearchDoc] = useState("");
+  // Filtros y búsqueda - ACTUALIZAR NOMBRES DE VARIABLES
+  const [searchTerm, setSearchTerm] = useState(""); // Cambiar de searchDoc a searchTerm
   const [filterRole, setFilterRole] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(4);
+  const [itemsPerPage] = useState(6);
   const [totalPages, setTotalPages] = useState(1);
+
+  // ✅ Configuración de filtros para FilterBar
+  const filterConfig = [
+    {
+      key: 'role',
+      value: filterRole,
+      onChange: (e) => {
+        setFilterRole(e.target.value);
+        setCurrentPage(1);
+      },
+      options: [
+        { value: 'ALL', label: 'Todos los roles' },
+        ...roles.map(role => ({ value: role.id.toString(), label: role.name }))
+      ],
+      ariaLabel: 'Filtrar por rol de usuario',
+      className: 'w-[210px]'
+    },
+    {
+      key: 'status',
+      value: filterStatus,
+      onChange: (e) => {
+        setFilterStatus(e.target.value);
+        setCurrentPage(1);
+      },
+      options: [
+        { value: 'ALL', label: 'Todos' },
+        { value: 'ACTIVO', label: 'Activo' },
+        { value: 'INACTIVO', label: 'Inactivo' }
+      ],
+      ariaLabel: 'Filtrar por estado del usuario',
+      className: 'w-[180px]'
+    }
+  ];
+
+  // ✅ Función para resetear página (usada por FilterBar)
+  const resetToFirstPage = () => {
+    setCurrentPage(1);
+  };
 
   useEffect(() => {
     if (userRole !== "Administrador" || !token) return;
@@ -124,6 +164,34 @@ function UserManagement() {
       return;
     }
 
+    // ✅ AGREGAR validación para nombres y apellidos - SOLO PERMITIR LETRAS Y ESPACIOS + MAYÚSCULAS
+    if (name === "first_name" || name === "last_name") {
+      // Función para validar solo letras, espacios y caracteres acentuados
+      const isValidName = (name) => {
+        const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]*$/;
+        return nameRegex.test(name) && name.trim().length > 0;
+      };
+
+      // Prevenir entrada de números y caracteres especiales
+      if (value && !isValidName(value)) {
+        return; // No actualizar el estado si contiene caracteres inválidos
+      }
+      
+      // Convertir a mayúsculas automáticamente
+      const upperCaseValue = value.toUpperCase();
+      
+      setEditForm(prev => ({ ...prev, [name]: upperCaseValue }));
+      
+      const newErrors = { ...editFormErrors };
+      if (!upperCaseValue) {
+        newErrors[name] = name === "first_name" ? "Nombre es obligatorio" : "Apellido es obligatorio";
+      } else {
+        delete newErrors[name];
+      }
+      setEditFormErrors(newErrors);
+      return;
+    }
+
     setEditForm(prev => {
       // Si cambia el rol y no es Doctor, borra la especialidad
       if (name === "role_id") {
@@ -212,18 +280,56 @@ function UserManagement() {
     }
   };
 
-  // Filtros
+  // Filtros - ACTUALIZAR LÓGICA DE FILTRADO
   const filteredUsers = users.filter(user => {
-    const docMatch = searchDoc === "" || user.document_number.includes(searchDoc);
+    // Función auxiliar para normalizar texto (quitar acentos y convertir a minúsculas)
+    const normalizeText = (text) => {
+      return text
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, ''); // Remover acentos
+    };
+
+    // Si no hay término de búsqueda, solo aplicar filtros de rol y estado
+    if (searchTerm === "") {
+      const roleMatch = filterRole === "ALL" || user.role_id === parseInt(filterRole);
+      const statusMatch = filterStatus === "ALL" || (filterStatus === "ACTIVO" ? user.is_active : !user.is_active);
+      return roleMatch && statusMatch;
+    }
+
+    // Normalizar término de búsqueda
+    const normalizedSearchTerm = normalizeText(searchTerm);
+
+    // Buscar en documento (exacto, no normalizado para números)
+    const docMatch = user.document_number.includes(searchTerm);
+
+    // Crear texto completo para búsqueda (nombres + apellidos)
+    const fullSearchText = `${user.first_name} ${user.last_name}`.trim();
+    const normalizedFullText = normalizeText(fullSearchText);
+
+    // Buscar el término normalizado en el texto completo normalizado
+    const nameMatch = normalizedFullText.includes(normalizedSearchTerm);
+
+    // También buscar términos individuales si el usuario busca por palabras separadas
+    const searchWords = normalizedSearchTerm.split(/\s+/).filter(word => word.length > 0);
+    const individualWordsMatch = searchWords.every(word =>
+      normalizedFullText.includes(word)
+    );
+
+    // El usuario coincide si encuentra el término en documento, nombre completo, o palabras individuales
+    const searchMatch = docMatch || nameMatch || individualWordsMatch;
+
+    // Aplicar también filtros de rol y estado
     const roleMatch = filterRole === "ALL" || user.role_id === parseInt(filterRole);
     const statusMatch = filterStatus === "ALL" || (filterStatus === "ACTIVO" ? user.is_active : !user.is_active);
-    return docMatch && roleMatch && statusMatch;
+
+    return searchMatch && roleMatch && statusMatch;
   }).sort((a, b) => a.uid - b.uid); // Ordenar por ID ascendente
 
   // Calcular total de páginas
   const totalPagesCount = Math.ceil(filteredUsers.length / itemsPerPage);
 
-  // Obtener usuarios para la página actual
+  // Obtener usuarios para la página current
   const currentUsers = filteredUsers.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -275,6 +381,7 @@ function UserManagement() {
         <h1 className="text-header-blue text-46 font-bold font-poppins mb-1 pt-6 text-center pb-6">
           GESTIÓN DE USUARIOS
         </h1>
+
         {editError && (
           <div className="mb-2 w-full max-w-[900px] p-3 bg-red-100 border border-red-400 text-red-700 rounded text-center text-18">
             {editError}
@@ -286,47 +393,16 @@ function UserManagement() {
           </div>
         )}
 
-        {/* Filtros y búsqueda */}
-        <div className="w-full max-w-[1000px] flex flex-wrap items-center justify-between mb-3 gap-4">
-          <div className="flex items-center gap-4">
-            <Input
-              className="w-[280px] h-[35px] font-poppins"
-              placeholder="Buscar por documento"
-              value={searchDoc}
-              onChange={(e) => {
-                setSearchDoc(e.target.value);
-                setCurrentPage(1); // Resetear a primera página al buscar
-              }}
-            />
-            <Select
-              className="w-[210px]   font-poppins"
-              size="small"
-              value={filterRole}
-              onChange={(e) => {
-                setFilterRole(e.target.value);
-                setCurrentPage(1); // Resetear a primera página al filtrar
-              }}
-            >
-              <option value="ALL">Todos los roles</option>
-              {roles.map(role => (
-                <option key={role.id} value={role.id}>{role.name}</option>
-              ))}
-            </Select>
-            <Select
-              className="w-[180px] font-poppins"
-              value={filterStatus}
-              size="small"
-              onChange={(e) => {
-                setFilterStatus(e.target.value);
-                setCurrentPage(1); // Resetear a primera página al filtrar
-              }}
-            >
-              <option value="ALL">Todos</option>
-              <option value="ACTIVO">Activo</option>
-              <option value="INACTIVO">Inactivo</option>
-            </Select>
-          </div>
-        </div>
+        {/* REEMPLAZAR la sección de filtros con FilterBar */}
+        <FilterBar
+          searchValue={searchTerm}
+          onSearchChange={(e) => setSearchTerm(e.target.value)}
+          filters={filterConfig}
+          onPageReset={resetToFirstPage}
+          searchPlaceholder="Buscar por documento, nombres o apellidos"
+          searchAriaLabel="Buscar usuario por documento, nombres o apellidos"
+          className="max-w-[1000px]"
+        />
 
         {/* Tabla de usuarios con scroll vertical */}
         <div className="w-full max-w-[1000px] bg-white rounded-[12px] shadow-md overflow-x-auto"
@@ -407,7 +483,7 @@ function UserManagement() {
               {currentUsers.length === 0 && (
                 <tr>
                   <td colSpan="6" className="text-center py-8 text-gray-500 font-poppins text-16">
-                    {searchDoc ? "La información proporcionada no corresponde a ningún registro existente" : "No hay usuarios registrados"}
+                    {searchTerm ? "La información proporcionada no corresponde a ningún registro existente" : "No hay usuarios registrados"}
                   </td>
                 </tr>
               )}
@@ -624,7 +700,7 @@ function UserManagement() {
                       <Input
                         name="first_name"
                         value={editForm.first_name}
-                        onChange={e => setEditForm(f => ({ ...f, first_name: e.target.value }))}
+                        onChange={handleEditFormChange} // ✅ Usar la función que maneja mayúsculas
                         className="w-full"
                         error={!!editFormErrors.first_name}
                       />
@@ -637,7 +713,7 @@ function UserManagement() {
                       <Input
                         name="last_name"
                         value={editForm.last_name}
-                        onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))}
+                        onChange={handleEditFormChange} // ✅ Usar la función que maneja mayúsculas
                         className="w-full"
                         error={!!editFormErrors.last_name}
                       />
@@ -689,30 +765,29 @@ function UserManagement() {
                         <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.role_id}</p>
                       )}
                     </div>
-                    <div>
-                      <label className="block font-poppins font-medium text-gray-700 mb-2">
-                        Especialidad {isDoctor && <span className="text-red-500">*</span>}
-                      </label>
-                      <Select
-                        name="specialty"
-                        value={editForm.specialty || ""}
-                        onChange={handleEditFormChange}
-                        disabled={!isDoctor}
-                        className={`w-full ${!isDoctor ? 'bg-gray-100' : ''}`}
-                        error={!!editFormErrors.specialty}
-                      >
-                        <option value="">Seleccione una especialidad</option>
-                        {specialties.map((specialty) => (
-                          <option key={specialty} value={specialty}>{specialty}</option>
-                        ))}
-                      </Select>
-                      {editFormErrors.specialty && (
-                        <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.specialty}</p>
-                      )}
-                      {!isDoctor && (
-                        <p className="text-gray-500 text-sm font-poppins mt-1">Solo requerido para usuarios con rol de Doctor</p>
-                      )}
-                    </div>
+                    {/* ✅ CONDICIONAL: Solo mostrar especialidad si es Doctor */}
+                    {isDoctor && (
+                      <div>
+                        <label className="block font-poppins font-medium text-gray-700 mb-2">
+                          Especialidad <span className="text-red-500">*</span>
+                        </label>
+                        <Select
+                          name="specialty"
+                          value={editForm.specialty || ""}
+                          onChange={handleEditFormChange}
+                          className="w-full"
+                          error={!!editFormErrors.specialty}
+                        >
+                          <option value="">Seleccione una especialidad</option>
+                          {specialties.map((specialty) => (
+                            <option key={specialty} value={specialty}>{specialty}</option>
+                          ))}
+                        </Select>
+                        {editFormErrors.specialty && (
+                          <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.specialty}</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </form>
 
