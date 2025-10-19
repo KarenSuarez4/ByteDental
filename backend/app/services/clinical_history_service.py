@@ -9,7 +9,7 @@ from app.models.guardian_models import Guardian
 from app.models.treatment_models import Treatment
 from app.models.user_models import User
 from app.models.dental_service_models import DentalService
-from app.schemas.clinical_history_schema import ClinicalHistoryCreate, ClinicalHistoryCreateResponse
+from app.schemas.clinical_history_schema import ClinicalHistoryCreate
 from fastapi import HTTPException, Request, status
 from app.services.auditoria_service import AuditoriaService  
 
