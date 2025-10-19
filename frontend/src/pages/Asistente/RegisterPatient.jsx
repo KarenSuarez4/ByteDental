@@ -30,6 +30,7 @@ const RegisterPatient = () => {
     phone: "",
     occupation: "",
     birthdate: "",
+    blood_group:"",
     has_disability: "",
     disability_description: "",
     // Datos del tutor legal
@@ -122,6 +123,7 @@ const RegisterPatient = () => {
       'email',
       'phone',
       'occupation',
+      'blood_group',
       'birthdate',
       'has_disability'
     ];
@@ -553,6 +555,7 @@ const RegisterPatient = () => {
     if (!formData.email) errors.email = 'Correo electrónico es obligatorio';
     if (!formData.phone) errors.phone = 'Teléfono es obligatorio';
     if (!formData.occupation) errors.occupation = 'Ocupación es obligatoria';
+    if (!formData.blood_group) errors.blood_group = 'Grupo sanguíneo es obligatorio';
     if (!formData.birthdate) errors.birthdate = 'Fecha de nacimiento es obligatoria';
 
     // Validar fecha de nacimiento y edad
@@ -752,6 +755,7 @@ const RegisterPatient = () => {
         birthdate: formData.birthdate,
       },
       occupation: formData.occupation || null,
+      blood_group: formData.blood_group || null,
       has_disability: hasDisabilityValue,
       disability_description: disabilityDescValue,
       guardian: needsGuardian ? {
@@ -785,6 +789,7 @@ const RegisterPatient = () => {
         email: "",
         phone: "",
         occupation: "",
+        blood_group: "",
         birthdate: "",
         has_disability: null,
         disability_description: "",
@@ -845,6 +850,7 @@ const RegisterPatient = () => {
       email: "",
       phone: "",
       occupation: "",
+      blood_group: "",
       birthdate: "",
       has_disability: null,
       disability_description: "",
@@ -969,7 +975,7 @@ const RegisterPatient = () => {
         </div>
 
         {/* Campo vacío para mantener grid */}
-        <div></div>
+        {/* <div></div> */}
 
         {/* Tipo de documento */}
         <div className="flex flex-col items-center md:items-start w-full">
@@ -1046,6 +1052,32 @@ const RegisterPatient = () => {
           />
           {formErrors.apellidos && (
             <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.apellidos}</p>
+          )}
+        </div>
+
+        {/* Grupo sanguíneo */}
+        <div className="flex flex-col items-center md:items-start w-full">
+          <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">
+            Grupo Sanguíneo *
+          </label>
+          <Select
+            name="blood_group"
+            value={formData.blood_group}
+            onChange={handleChange}
+            error={!!formErrors.blood_group}
+            placeholder="Seleccione el grupo sanguíneo"
+          >
+            <option value="O+">O+</option>
+            <option value="O-">O-</option>
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+          </Select>
+          {formErrors.blood_group && (
+            <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.blood_group}</p>
           )}
         </div>
 
