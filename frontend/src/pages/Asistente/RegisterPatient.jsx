@@ -75,6 +75,11 @@ const RegisterPatient = () => {
     return nameRegex.test(name);
   };
 
+  // Función para filtrar caracteres no válidos en nombres
+  const filterValidNameChars = (text) => {
+    return text.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, '');
+  };
+
   // Función para obtener tipos de documento válidos según la edad
   const getValidDocumentTypes = (age, isGuardian = false) => {
     if (isGuardian) {
@@ -282,8 +287,17 @@ const RegisterPatient = () => {
       return;
     }
 
-    // Validación inmediata para nombres y apellidos
-    if (name === 'nombres' || name === 'apellidos' || name === 'guardian_nombres' || name === 'guardian_apellidos') {
+    // Validación preventiva y filtrado para campos de texto que solo deben contener letras
+    if (name === 'nombres' || name === 'apellidos' || name === 'guardian_nombres' || name === 'guardian_apellidos' || name === 'occupation') {
+      // Filtrar caracteres no válidos antes de establecer el valor
+      const filteredValue = filterValidNameChars(value);
+      
+      // Solo actualizar si el valor filtrado es diferente o si no había filtrado
+      if (filteredValue !== value) {
+        // Si hubo caracteres inválidos, no actualizar el estado y retornar
+        return;
+      }
+
       const newErrors = { ...formErrors };
 
       // Limpiar error anterior primero
@@ -291,25 +305,31 @@ const RegisterPatient = () => {
         delete newErrors[name];
       }
 
-      if (value && !isValidName(value)) {
+      if (filteredValue && !isValidName(filteredValue)) {
         const fieldNames = {
           nombres: 'Los nombres solo pueden contener letras y espacios',
           apellidos: 'Los apellidos solo pueden contener letras y espacios',
           guardian_nombres: 'Los nombres del tutor solo pueden contener letras y espacios',
-          guardian_apellidos: 'Los apellidos del tutor solo pueden contener letras y espacios'
+          guardian_apellidos: 'Los apellidos del tutor solo pueden contener letras y espacios',
+          occupation: 'La ocupación solo puede contener letras y espacios'
         };
         newErrors[name] = fieldNames[name];
-      } else if (!value) {
+      } else if (!filteredValue) {
         const requiredMessages = {
           nombres: 'Nombres son obligatorios',
           apellidos: 'Apellidos son obligatorios',
           guardian_nombres: 'Nombres del tutor son obligatorios',
-          guardian_apellidos: 'Apellidos del tutor son obligatorios'
+          guardian_apellidos: 'Los apellidos del tutor son obligatorios',
+          occupation: 'Ocupación es obligatoria'
         };
         newErrors[name] = requiredMessages[name];
       }
 
       setFormErrors({ ...newErrors, _timestamp: Date.now() });
+      
+      // Actualizar el estado con el valor filtrado
+      setFormData((prev) => ({ ...prev, [name]: filteredValue }));
+      return;
     }
 
     // Validación inmediata para fecha de nacimiento
@@ -555,6 +575,11 @@ const RegisterPatient = () => {
     if (!formData.email) errors.email = 'Correo electrónico es obligatorio';
     if (!formData.phone) errors.phone = 'Teléfono es obligatorio';
     if (!formData.occupation) errors.occupation = 'Ocupación es obligatoria';
+    
+    // Validar formato de ocupación
+    if (formData.occupation && !isValidName(formData.occupation)) {
+      errors.occupation = 'La ocupación solo puede contener letras y espacios';
+    }
     if (!formData.blood_group) errors.blood_group = 'Grupo sanguíneo es obligatorio';
     if (!formData.birthdate) errors.birthdate = 'Fecha de nacimiento es obligatoria';
 
