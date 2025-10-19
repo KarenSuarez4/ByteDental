@@ -149,9 +149,11 @@ class EmailService:
         """
         Método sincrónico para enviar email usando smtplib estándar
         """
+        server = None
         try:
             print(f"🐛 [EMAIL] Iniciando envío de email a {message['To']}")
             print(f"🐛 [EMAIL] Conectando a {self.smtp_host}:{self.smtp_port}")
+            print(f"🐛 [EMAIL] Modo: {'SSL' if self.smtp_ssl else 'TLS' if self.smtp_tls else 'Plain'}")
             
             # Validar configuración básica
             if not self.smtp_username or not self.smtp_password:
@@ -162,12 +164,22 @@ class EmailService:
                 print(f"❌ [EMAIL] Email remitente no configurado")
                 return False
             
-            server = smtplib.SMTP(self.smtp_host, self.smtp_port)
-            print(f"✅ [EMAIL] Conexión SMTP establecida")
-            
-            if self.smtp_tls:
-                server.starttls()
-                print(f"✅ [EMAIL] TLS habilitado")
+            # Conectar según el modo SSL o TLS
+            if self.smtp_ssl:
+                # Para puerto 465 (SSL directo)
+                print(f"🔒 [EMAIL] Usando SMTP_SSL para puerto {self.smtp_port}")
+                server = smtplib.SMTP_SSL(self.smtp_host, self.smtp_port, timeout=30)
+                print(f"✅ [EMAIL] Conexión SMTP_SSL establecida")
+            else:
+                # Para puerto 587 (TLS) o 25 (Plain)
+                print(f"🔓 [EMAIL] Usando SMTP para puerto {self.smtp_port}")
+                server = smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=30)
+                print(f"✅ [EMAIL] Conexión SMTP establecida")
+                
+                if self.smtp_tls:
+                    print(f"🔒 [EMAIL] Iniciando STARTTLS...")
+                    server.starttls()
+                    print(f"✅ [EMAIL] TLS habilitado")
             
             # Autenticación
             if self.smtp_username and self.smtp_password:
@@ -203,10 +215,23 @@ class EmailService:
             print(f"❌ [EMAIL] Servidor SMTP desconectado: {e}")
             logger.error(f"Servidor SMTP desconectado: {e}")
             return False
+        except OSError as e:
+            print(f"❌ [EMAIL] Error de red/OS: {e}")
+            print(f"💡 [EMAIL] Sugerencia: El puerto {self.smtp_port} puede estar bloqueado por el firewall/hosting")
+            print(f"💡 [EMAIL] Intenta usar puerto 465 (SSL) o un servicio de email como SendGrid/Resend")
+            logger.error(f"Error de red enviando email: {e}")
+            return False
         except Exception as e:
             print(f"❌ [EMAIL] Error general enviando email: {e}")
             logger.error(f"Error enviando email: {e}")
             return False
+        finally:
+            # Asegurar que el servidor se cierre
+            if server:
+                try:
+                    server.quit()
+                except:
+                    pass
 
     async def _send_message(self, message: MIMEMultipart) -> bool:
         """
