@@ -8,7 +8,7 @@ from app.schemas.clinical_history_schema import (
     ClinicalHistoryCreateResponse
 )
 from app.services.clinical_history_service import ClinicalHistoryService
-from app.middleware.auth_middleware import require_roles, RolePermissions
+from app.middleware.auth_middleware import RolePermissions
 from app.models.clinical_history_models import ClinicalHistory
 from app.models.treatment_models import Treatment
 from app.models.patient_models import Patient
