@@ -26,7 +26,7 @@ jobs:
       - name: Run tests
         run: |
           cd frontend
-          npm test -- --testPathIgnorePatterns="PatientManagement.test"
+          npm test
 
   test-backend:
     runs-on: ubuntu-latest

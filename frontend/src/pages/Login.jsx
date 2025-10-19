@@ -26,7 +26,6 @@ const Login = () => {
   // Redirigir si el usuario ya está autenticado
   useEffect(() => {
     if (isAuthenticated && userRole && !mustChangePassword) {
-      console.log('Login: Usuario ya autenticado, redirigiendo...', { userRole, mustChangePassword, token });
       // Redirigir según el rol (solo si no debe cambiar contraseña)
       if (userRole === "Administrador") {
         navigate('/users/register');

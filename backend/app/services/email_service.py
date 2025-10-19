@@ -24,17 +24,6 @@ class EmailService:
         self.from_email = settings.from_email
         self.from_name = settings.from_name
         
-        # Debug: Imprimir configuración SMTP (sin contraseñas)
-        print(f"🐛 [EMAIL SERVICE] Configuración SMTP:")
-        print(f"  Host: {self.smtp_host}")
-        print(f"  Port: {self.smtp_port}")
-        print(f"  Username: {self.smtp_username}")
-        print(f"  Password: {self.smtp_password}")
-        print(f"  TLS: {self.smtp_tls}")
-        print(f"  SSL: {self.smtp_ssl}")
-        print(f"  From Email: {self.from_email}")
-        print(f"  From Name: {self.from_name}")
-        
         # Configurar Jinja2 para templates
         template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
         self.jinja_env = Environment(loader=FileSystemLoader(template_dir))
@@ -150,33 +139,16 @@ class EmailService:
         Método sincrónico para enviar email usando smtplib estándar
         """
         try:
-            print(f"🐛 [EMAIL] Iniciando envío de email a {message['To']}")
-            print(f"🐛 [EMAIL] Conectando a {self.smtp_host}:{self.smtp_port}")
-            
-            # Validar configuración básica
-            if not self.smtp_username or not self.smtp_password:
-                print(f"❌ [EMAIL] Credenciales SMTP no configuradas")
-                return False
-            
-            if not self.from_email:
-                print(f"❌ [EMAIL] Email remitente no configurado")
-                return False
-            
             server = smtplib.SMTP(self.smtp_host, self.smtp_port)
-            print(f"✅ [EMAIL] Conexión SMTP establecida")
             
             if self.smtp_tls:
                 server.starttls()
-                print(f"✅ [EMAIL] TLS habilitado")
             
             # Autenticación
             if self.smtp_username and self.smtp_password:
-                print(f"🔐 [EMAIL] Autenticando con usuario: {self.smtp_username}")
                 server.login(self.smtp_username, self.smtp_password)
-                print(f"✅ [EMAIL] Autenticación exitosa")
             
             # Enviar mensaje
-            print(f"📤 [EMAIL] Enviando mensaje...")
             text = message.as_string()
             server.sendmail(
                 self.from_email,
@@ -186,25 +158,11 @@ class EmailService:
             
             # Cerrar conexión
             server.quit()
-            print(f"✅ [EMAIL] Email enviado exitosamente a {message['To']}")
             
             logger.info(f"Email enviado exitosamente a {message['To']}")
             return True
             
-        except smtplib.SMTPAuthenticationError as e:
-            print(f"❌ [EMAIL] Error de autenticación SMTP: {e}")
-            logger.error(f"Error de autenticación SMTP: {e}")
-            return False
-        except smtplib.SMTPRecipientsRefused as e:
-            print(f"❌ [EMAIL] Destinatario rechazado: {e}")
-            logger.error(f"Destinatario rechazado: {e}")
-            return False
-        except smtplib.SMTPServerDisconnected as e:
-            print(f"❌ [EMAIL] Servidor SMTP desconectado: {e}")
-            logger.error(f"Servidor SMTP desconectado: {e}")
-            return False
         except Exception as e:
-            print(f"❌ [EMAIL] Error general enviando email: {e}")
             logger.error(f"Error enviando email: {e}")
             return False
 
