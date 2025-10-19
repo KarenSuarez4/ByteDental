@@ -1,6 +1,14 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Index, Text
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import ENUM
 from app.database import Base
+
+# Definir el enum que corresponde al blood_group_enum de PostgreSQL
+blood_group_enum = ENUM(
+    'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-',
+    name='blood_group_enum',
+    create_type=False  # No crear el tipo porque ya existe en la BD
+)
 
 class Patient(Base):
     __tablename__ = "patients"
@@ -12,6 +20,7 @@ class Patient(Base):
     requires_guardian = Column(Boolean, default=False)
     has_disability = Column(Boolean, default=False)
     disability_description = Column(Text, nullable=True)
+    blood_group = Column(blood_group_enum, nullable=False, default='O+')
     is_active = Column(Boolean, default=True)
     deactivation_reason = Column(Text, nullable=True)
 

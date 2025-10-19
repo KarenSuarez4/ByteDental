@@ -208,7 +208,8 @@ function PatientManagement() {
       phone: patient.person.phone || "",
       birthdate: patient.person.birthdate,
       occupation: patient.occupation || "",
-      has_disability: patient.has_disability === true ? true : patient.has_disability === false ? false : "",
+      blood_group: patient.blood_group || "O+",
+      has_disability: patient.has_disability === true ? "true" : patient.has_disability === false ? "false" : "",
       disability_description: patient.disability_description || "",
     });
 
@@ -317,14 +318,14 @@ function PatientManagement() {
 
       // Limpiar descripción de discapacidad si se marca como false
       if (!hasDisability) {
-        setEditForm(prev => ({ ...prev, has_disability: false, disability_description: "" }));
+        setEditForm(prev => ({ ...prev, has_disability: "false", disability_description: "" }));
         const newErrors = { ...editFormErrors };
         if (newErrors.disability_description) {
           delete newErrors.disability_description;
           setEditFormErrors(newErrors);
         }
       } else {
-        setEditForm(prev => ({ ...prev, has_disability: true }));
+        setEditForm(prev => ({ ...prev, has_disability: "true" }));
       }
 
       // Recalcular si necesita tutor considerando la discapacidad
@@ -344,7 +345,7 @@ function PatientManagement() {
         delete newErrors[name];
       }
 
-      if (editForm.has_disability && !value.trim()) {
+      if (editForm.has_disability === "true" && !value.trim()) {
         newErrors[name] = 'La descripción de la discapacidad es obligatoria';
       }
 
@@ -386,7 +387,7 @@ function PatientManagement() {
         setEditFormErrors(prev => ({ ...prev, birthdate: '' }));
 
         // Considerar discapacidad también en el cálculo del tutor
-        const requiresGuardian = age < 18 || age > 64 || editForm.has_disability;
+        const requiresGuardian = age < 18 || age > 64 || editForm.has_disability === "true";
         setNeedsGuardian(requiresGuardian);
 
         // Si ya no necesita tutor, limpiar datos del tutor
@@ -580,7 +581,7 @@ function PatientManagement() {
     }
 
     // Validar discapacidad
-    if (editForm.has_disability && !editForm.disability_description?.trim()) {
+    if (editForm.has_disability === "true" && !editForm.disability_description?.trim()) {
       errors.disability_description = 'La descripción de la discapacidad es obligatoria';
     }
 
@@ -665,8 +666,9 @@ function PatientManagement() {
           birthdate: editForm.birthdate,
         },
         occupation: editForm.occupation || null,
-        has_disability: editForm.has_disability,
-        disability_description: editForm.has_disability ? editForm.disability_description : null,
+        blood_group: editForm.blood_group,
+        has_disability: editForm.has_disability === "true",
+        disability_description: editForm.has_disability === "true" ? editForm.disability_description : null,
       };
 
       // Si necesita tutor y se proporcionaron datos del tutor
@@ -909,6 +911,7 @@ function PatientManagement() {
                 <th className={tableHeaderClass}>Correo</th>
                 <th className={tableHeaderClass}>Teléfono</th>
                 <th className={tableHeaderClass}>Edad</th>
+                <th className={tableHeaderClass}>Grupo Sanguíneo</th>
                 <th className={tableHeaderClass}>Ocupación</th>
                 <th className={tableHeaderClass}>Estado</th>
                 <th className={tableHeaderClass}>Información</th>
@@ -931,6 +934,7 @@ function PatientManagement() {
                   <td className={tableCellClass}>{patient.person.email || "-"}</td>
                   <td className={tableCellClass}>{patient.person.phone || "-"}</td>
                   <td className={tableCellClass}>{calculateAge(patient.person.birthdate)} años</td>
+                  <td className={tableCellClass}>{patient.blood_group || "-"}</td>
                   <td className={tableCellClass}>{patient.occupation || "-"}</td>
                   <td className={tableCellClass}>
                     {patient.is_active ? (
@@ -1285,6 +1289,28 @@ function PatientManagement() {
                       />
                     </div>
                     <div>
+                      <label className="block font-poppins font-medium text-gray-700 mb-2">Grupo Sanguíneo</label>
+                      <Select
+                        name="blood_group"
+                        value={editForm.blood_group}
+                        onChange={handleEditFormChange}
+                        className="w-full"
+                        error={!!editFormErrors.blood_group}
+                      >
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                      </Select>
+                      {editFormErrors.blood_group && (
+                        <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.blood_group}</p>
+                      )}
+                    </div>
+                    <div>
                       <label className="block font-poppins font-medium text-gray-700 mb-2">¿Tiene discapacidad?</label>
                       <Select
                         name="has_disability"
@@ -1304,7 +1330,7 @@ function PatientManagement() {
                   </div>
 
                   {/* Descripción de discapacidad - Solo si tiene discapacidad */}
-                  {editForm.has_disability && (
+                  {editForm.has_disability === "true" && (
                     <div className="mt-6">
                       <label className="block font-poppins font-medium text-gray-700 mb-2">
                         Descripción de la discapacidad *
@@ -1341,7 +1367,7 @@ function PatientManagement() {
                           <h3 className="text-20 font-semibold font-poppins text-gray-800">Información del Tutor Legal</h3>
                           <p className="text-14 text-gray-600 font-poppins">
                             El paciente requiere un tutor legal debido a su
-                            {editForm.has_disability && (calculateAge(editForm.birthdate) >= 18 && calculateAge(editForm.birthdate) <= 64) ?
+                            {editForm.has_disability === "true" && (calculateAge(editForm.birthdate) >= 18 && calculateAge(editForm.birthdate) <= 64) ?
                               ' discapacidad' :
                               ' edad'}
                           </p>
@@ -1569,6 +1595,12 @@ function PatientManagement() {
                       <label className="block text-sm font-medium text-gray-600 mb-1">Edad</label>
                       <p className="text-16 font-medium text-gray-900 font-poppins">
                         {calculateAge(patientInfoModal.patient.person.birthdate)} años
+                      </p>
+                    </div>
+                    <div className="bg-white rounded-[12px] p-4 shadow-sm">
+                      <label className="block text-sm font-medium text-gray-600 mb-1">Grupo Sanguíneo</label>
+                      <p className="text-16 font-medium text-gray-900 font-poppins">
+                        {patientInfoModal.patient.blood_group || 'No especificado'}
                       </p>
                     </div>
                     <div className="bg-white rounded-[12px] p-4 shadow-sm">
