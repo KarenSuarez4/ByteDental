@@ -6,6 +6,7 @@ import Select from "../../components/Select";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import SearchInput from "../../components/SearchInput"; 
 import FilterBar from "../../components/FilterBar"; 
+import DateInput from "../../components/DateInput";  
 import { getAllUsers as getUsers, updateUser, deactivateUser, activateUser, getRoles } from "../../services/userService";
 
 const tableHeaderClass = "bg-header-blue text-white font-semibold text-center font-poppins text-18";
@@ -25,8 +26,8 @@ function UserManagement() {
   const [confirmDialog, setConfirmDialog] = useState({ open: false, user: null });
   const [phoneEditError, setPhoneEditError] = useState("");
 
-  // Filtros y búsqueda - ACTUALIZAR NOMBRES DE VARIABLES
-  const [searchTerm, setSearchTerm] = useState(""); // Cambiar de searchDoc a searchTerm
+  // Filtros y búsqueda
+  const [searchTerm, setSearchTerm] = useState(""); 
   const [filterRole, setFilterRole] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
 
@@ -35,7 +36,6 @@ function UserManagement() {
   const [itemsPerPage] = useState(6);
   const [totalPages, setTotalPages] = useState(1);
 
-  // ✅ Configuración de filtros para FilterBar
   const filterConfig = [
     {
       key: 'role',
@@ -68,7 +68,6 @@ function UserManagement() {
     }
   ];
 
-  // ✅ Función para resetear página (usada por FilterBar)
   const resetToFirstPage = () => {
     setCurrentPage(1);
   };
@@ -98,6 +97,25 @@ function UserManagement() {
     }
   }, [editError]);
 
+  // Calcular edad a partir de la fecha de nacimiento
+  const calculateAge = (birthDate) => {
+    if (!birthDate || birthDate.length !== 10) return null;
+    
+    const today = new Date();
+    const birth = new Date(birthDate);
+    
+    if (isNaN(birth.getTime())) return null;
+    
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
   // Abrir modal de edición
   const handleEdit = (user) => {
     setEditUser(user);
@@ -107,44 +125,45 @@ function UserManagement() {
       first_name: user.first_name,
       last_name: user.last_name,
       email: user.email,
-      phone: user.phone,
+      phone: user.phone || "",
       role_id: user.role_id,
-      specialty: user.specialty,
+      specialty: user.specialty || "",
+      birthdate: user.birthdate || "",
+      is_active: user.is_active
     });
     setEditError("");
     setSuccessMsg("");
+    setEditFormErrors({});
   };
 
   const handleEditFormChange = (e) => {
     const { name, value } = e.target;
 
-    if (name === "document_number") {
-      const docType = editForm.document_type;
-
-      // Validar según el tipo de documento
-      if (docType === 'PP') {
-        // Pasaporte: alfanumérico, entre 6 y 10 caracteres, puede contener letras y números
-        if (!/^[a-zA-Z0-9]*$/.test(value)) return;
-        if (value.length > 10) return;
-      } else {
-        // Otros documentos: solo números
-        if (!/^\d*$/.test(value)) return;
-      }
-      
+    if (name === 'birthdate') {
       setEditForm(prev => ({ ...prev, [name]: value }));
       
       const newErrors = { ...editFormErrors };
-
-      // Limpiar error anterior primero
-      if (newErrors[name]) {
-        delete newErrors[name];
+      
+      if (newErrors.birthdate) {
+        delete newErrors.birthdate;
       }
 
-      // Validar longitud según tipo de documento
-      if (value) {
-        if (docType === 'PP') {
-          if (value.length < 6) {
-            newErrors[name] = 'El pasaporte debe tener entre 6 y 10 caracteres';
+      if (value && value.length === 10) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const birthDate = new Date(value);
+
+        if (isNaN(birthDate.getTime())) {
+          newErrors.birthdate = 'Fecha de nacimiento inválida';
+        } else if (birthDate > today) {
+          newErrors.birthdate = 'La fecha de nacimiento no puede ser en el futuro';
+        } else {
+
+          const age = calculateAge(value);
+          if (age < 18) {
+            newErrors.birthdate = 'Los usuarios del sistema deben ser mayores de 18 años';
+          } else if (age > 80) {
+            newErrors.birthdate = 'Edad inválida - debe estar entre 18 y 80 años';
           }
         }
       }
@@ -164,7 +183,6 @@ function UserManagement() {
       return;
     }
 
-    // ✅ AGREGAR validación para nombres y apellidos - SOLO PERMITIR LETRAS Y ESPACIOS + MAYÚSCULAS
     if (name === "first_name" || name === "last_name") {
       // Función para validar solo letras, espacios y caracteres acentuados
       const isValidName = (name) => {
@@ -232,6 +250,29 @@ function UserManagement() {
       }
     }
 
+    if (editForm.birthdate) {
+      if (editForm.birthdate.length !== 10) {
+        errors.birthdate = 'Ingrese la fecha completa';
+      } else {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const birthDate = new Date(editForm.birthdate);
+
+        if (isNaN(birthDate.getTime())) {
+          errors.birthdate = 'Fecha de nacimiento inválida';
+        } else if (birthDate > today) {
+          errors.birthdate = 'La fecha de nacimiento no puede ser en el futuro';
+        } else {
+          const age = calculateAge(editForm.birthdate);
+          if (age < 18) {
+            errors.birthdate = 'Los usuarios del sistema deben ser mayores de 18 años';
+          } else if (age > 80) {
+            errors.birthdate = 'Edad inválida - debe estar entre 18 y 80 años';
+          }
+        }
+      }
+    }
+
     setEditFormErrors(errors);
     setPhoneEditError(errors.phone || "");
     return Object.keys(errors).length === 0;
@@ -241,18 +282,37 @@ function UserManagement() {
   const handleSaveEdit = async () => {
     if (!validateEditForm()) return;
 
-    setEditLoading(true);
     try {
-      await updateUser(editUser.uid, editForm, token);
-      setSuccessMsg("Usuario actualizado correctamente");
+      setEditLoading(true);
+      setEditError("");
+
+      const updateData = {
+        document_number: editForm.document_number,
+        document_type: editForm.document_type,
+        first_name: editForm.first_name,
+        last_name: editForm.last_name,
+        email: editForm.email,
+        phone: editForm.phone || null,
+        role_id: parseInt(editForm.role_id),
+        specialty: editForm.specialty || null,
+        birthdate: editForm.birthdate || null,
+        is_active: editForm.is_active
+      };
+
+      await updateUser(editUser.uid, updateData, token);
+      
+      setSuccessMsg("Usuario actualizado exitosamente");
       setEditUser(null);
+      setEditForm({});
+      setEditFormErrors({});
+      
       setLoading(true);
       const updatedUsers = await getUsers(token);
       setUsers(updatedUsers);
       setLoading(false);
-      setEditFormErrors({});
-    } catch (err) {
-      setEditFormErrors({ general: err.message || "Error al actualizar usuario" });
+      
+    } catch (error) {
+      setEditError(error.message || "Error al actualizar usuario");
     } finally {
       setEditLoading(false);
     }
@@ -280,7 +340,6 @@ function UserManagement() {
     }
   };
 
-  // Filtros - ACTUALIZAR LÓGICA DE FILTRADO
   const filteredUsers = users.filter(user => {
     // Función auxiliar para normalizar texto (quitar acentos y convertir a minúsculas)
     const normalizeText = (text) => {
@@ -405,7 +464,7 @@ function UserManagement() {
         />
 
         {/* Tabla de usuarios con scroll vertical */}
-        <div className="w-full max-w-[1000px] bg-white rounded-[12px] shadow-md overflow-x-auto"
+        <div className="w-full max-w-[1200px] bg-white rounded-[12px] shadow-md overflow-x-auto"
           style={{ maxHeight: "calc(100vh - 226px)", overflowY: "auto" }}>
           <table className="w-full border-collapse">
             <thead className="sticky top-0 z-10 h-10">
@@ -416,6 +475,7 @@ function UserManagement() {
                 <th className={tableHeaderClass}>Apellido</th>
                 <th className={tableHeaderClass}>Correo</th>
                 <th className={tableHeaderClass}>Teléfono</th>
+                <th className={tableHeaderClass}>Fecha Nac.</th> 
                 <th className={tableHeaderClass}>Rol</th>
                 <th className={tableHeaderClass}>Especialidad</th>
                 <th className={tableHeaderClass}>Estado</th>
@@ -431,6 +491,16 @@ function UserManagement() {
                   <td className={tableCellClass}>{user.last_name}</td>
                   <td className={tableCellClass}>{user.email}</td>
                   <td className={tableCellClass}>{user.phone}</td>
+                  <td className={tableCellClass}> 
+                    {user.birthdate ? 
+                      new Date(user.birthdate).toLocaleDateString('es-ES', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      }) 
+                      : '-'
+                    }
+                  </td>
                   <td className={tableCellClass}>{user.role_name}</td>
                   <td className={tableCellClass}>{user.specialty || "-"}</td>
                   <td className={tableCellClass}>
@@ -482,7 +552,7 @@ function UserManagement() {
               ))}
               {currentUsers.length === 0 && (
                 <tr>
-                  <td colSpan="6" className="text-center py-8 text-gray-500 font-poppins text-16">
+                  <td colSpan="11" className="text-center py-8 text-gray-500 font-poppins text-16">  
                     {searchTerm ? "La información proporcionada no corresponde a ningún registro existente" : "No hay usuarios registrados"}
                   </td>
                 </tr>
@@ -623,7 +693,7 @@ function UserManagement() {
 
         {/* Modal de edición */}
         {editUser && (
-          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(255, 255, 255, 0.3)' }}>
+          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[1000px] max-h-[90vh] overflow-y-auto">
               {/* Header del modal */}
               <div className="bg-gradient-to-br from-primary-blue to-header-blue text-white p-6 rounded-t-[24px] relative overflow-hidden">
@@ -700,7 +770,7 @@ function UserManagement() {
                       <Input
                         name="first_name"
                         value={editForm.first_name}
-                        onChange={handleEditFormChange} // ✅ Usar la función que maneja mayúsculas
+                        onChange={handleEditFormChange} 
                         className="w-full"
                         error={!!editFormErrors.first_name}
                       />
@@ -713,7 +783,7 @@ function UserManagement() {
                       <Input
                         name="last_name"
                         value={editForm.last_name}
-                        onChange={handleEditFormChange} // ✅ Usar la función que maneja mayúsculas
+                        onChange={handleEditFormChange} 
                         className="w-full"
                         error={!!editFormErrors.last_name}
                       />
@@ -765,7 +835,6 @@ function UserManagement() {
                         <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.role_id}</p>
                       )}
                     </div>
-                    {/* ✅ CONDICIONAL: Solo mostrar especialidad si es Doctor */}
                     {isDoctor && (
                       <div>
                         <label className="block font-poppins font-medium text-gray-700 mb-2">
@@ -788,6 +857,19 @@ function UserManagement() {
                         )}
                       </div>
                     )}
+                    <div>
+                      <label className="block font-poppins font-medium text-gray-700 mb-2">Fecha de nacimiento</label>
+                      <DateInput
+                        name="birthdate"
+                        value={editForm.birthdate}
+                        onChange={handleEditFormChange}
+                        error={!!editFormErrors.birthdate}
+                        className="w-full"
+                      />
+                      {editFormErrors.birthdate && (
+                        <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.birthdate}</p>
+                      )}
+                    </div>
                   </div>
                 </form>
 
