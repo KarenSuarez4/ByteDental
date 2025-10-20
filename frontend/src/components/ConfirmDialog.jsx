@@ -10,16 +10,16 @@ const ConfirmDialog = ({ open, title, message, onConfirm, onCancel }) => {
         <div className="text-gray-700 text-16 mb-8">{message}</div>
         <div className="flex justify-center gap-6">
           <Button
-            className="bg-primary-blue hover:bg-primary-blue-hover text-white px-6 py-2 rounded-[40px] font-bold text-18"
-            onClick={onConfirm}
-          >
-            Aceptar
-          </Button>
-          <Button
             className="bg-header-blue hover:bg-header-blue-hover text-white px-6 py-2 rounded-[40px] font-bold text-18"
             onClick={onCancel}
           >
             Cancelar
+          </Button>
+          <Button
+            className="bg-primary-blue hover:bg-primary-blue-hover text-white px-6 py-2 rounded-[40px] font-bold text-18"
+            onClick={onConfirm}
+          >
+            Aceptar
           </Button>
         </div>
       </div>
