@@ -7,37 +7,39 @@ const handleResponse = async (response) => {
     try {
       errorData = await response.json();
     } catch (e) {
-      errorData = { detail: 'Error desconocido en el servidor' };
+      errorData = { detail: "Error desconocido en el servidor" };
     }
-    
+
     // Crear un error con estructura completa para debugging
-    const error = new Error(errorData.detail || errorData.message || `Error ${response.status}`);
+    const error = new Error(
+      errorData.detail || errorData.message || `Error ${response.status}`
+    );
     error.response = {
       status: response.status,
       statusText: response.statusText,
-      data: errorData
+      data: errorData,
     };
-    
-    console.error('❌ patientService handleResponse error:', {
+
+    console.error("❌ patientService handleResponse error:", {
       status: response.status,
       statusText: response.statusText,
       errorData,
-      url: response.url
+      url: response.url,
     });
-    
+
     // Log específico del detail si es array
     if (errorData.detail && Array.isArray(errorData.detail)) {
-      console.error('❌ Errores de validación específicos:', errorData.detail);
+      console.error("❌ Errores de validación específicos:", errorData.detail);
       errorData.detail.forEach((error, index) => {
         console.error(`  Error ${index + 1}:`, {
-          field: error.loc?.join('.'),
-          message: error.msg,  
+          field: error.loc?.join("."),
+          message: error.msg,
           type: error.type,
-          input: error.input
+          input: error.input,
         });
       });
     }
-    
+
     throw error;
   }
   return response.json();
@@ -46,10 +48,10 @@ const handleResponse = async (response) => {
 // Crear un nuevo paciente
 export const createPatient = async (patientData, token) => {
   const response = await fetch(`${API_URL}/api/patients/`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(patientData),
   });
@@ -60,7 +62,16 @@ export const createPatient = async (patientData, token) => {
 export const getAllPatients = async (token) => {
   const response = await fetch(`${API_URL}/api/patients/?active_only=false`, {
     headers: {
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return handleResponse(response);
+};
+
+export const getActivePatients = async (token) => {
+  const response = await fetch(`${API_URL}/api/patients/?active_only=True`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
     },
   });
   return handleResponse(response);
@@ -70,7 +81,7 @@ export const getAllPatients = async (token) => {
 export const getPatientById = async (patientId, token) => {
   const response = await fetch(`${API_URL}/api/patients/${patientId}`, {
     headers: {
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
     },
   });
   return handleResponse(response);
@@ -79,10 +90,10 @@ export const getPatientById = async (patientId, token) => {
 // Actualizar un paciente
 export const updatePatient = async (patientId, patientData, token) => {
   const response = await fetch(`${API_URL}/api/patients/${patientId}`, {
-    method: 'PUT',
+    method: "PUT",
     headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(patientData),
   });
@@ -90,19 +101,24 @@ export const updatePatient = async (patientId, patientData, token) => {
 };
 
 // Cambiar estado de un paciente (activar/desactivar) con motivo
-export const changePatientStatus = async (patientId, isActive, deactivationReason, token) => {
+export const changePatientStatus = async (
+  patientId,
+  isActive,
+  deactivationReason,
+  token
+) => {
   const body = { is_active: isActive };
-  
+
   // Solo incluir deactivation_reason si se está desactivando
   if (!isActive && deactivationReason) {
     body.deactivation_reason = deactivationReason;
   }
-  
+
   const response = await fetch(`${API_URL}/api/patients/${patientId}/status`, {
-    method: 'PATCH',
+    method: "PATCH",
     headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(body),
   });
@@ -110,7 +126,11 @@ export const changePatientStatus = async (patientId, isActive, deactivationReaso
 };
 
 // Desactivar un paciente con motivo (soft delete)
-export const deactivatePatient = async (patientId, deactivationReason, token) => {
+export const deactivatePatient = async (
+  patientId,
+  deactivationReason,
+  token
+) => {
   return changePatientStatus(patientId, false, deactivationReason, token);
 };
 

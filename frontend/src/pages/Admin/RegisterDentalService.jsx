@@ -330,6 +330,12 @@ const RegisterDentalService = () => {
         {/* Botones siguiendo el patrón de RegisterUser */}
         <div className="flex flex-col md:flex-row justify-center items-center md:space-x-6 space-y-4 md:space-y-0 mt-10 w-full max-w-[700px] mx-auto">
           <Button
+            onClick={handleCancel}
+            className="bg-header-blue hover:bg-header-blue-hover text-white w-full md:w-auto px-10 py-4 font-bold rounded-[40px] text-18 shadow-md"
+          >
+            Cancelar
+          </Button>
+          <Button
             onClick={handleSubmit}
             disabled={loading}
             className={cn(
@@ -350,12 +356,6 @@ const RegisterDentalService = () => {
             ) : (
               "Guardar"
             )}
-          </Button>
-          <Button
-            onClick={handleCancel}
-            className="bg-header-blue hover:bg-header-blue-hover text-white w-full md:w-auto px-10 py-4 font-bold rounded-[40px] text-18 shadow-md"
-          >
-            Cancelar
           </Button>
         </div>
       </section>

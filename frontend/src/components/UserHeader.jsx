@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useAuth } from '../contexts/AuthContext';
 import StyledLogoutButton from './StyledLogoutButton'; 
+import UserProfileModal from './UserProfileModal';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUserCircle } from '@fortawesome/free-solid-svg-icons';
 
@@ -25,7 +26,10 @@ function cn(...args) {
 const UserHeader = ({ userRole }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, token } = useAuth();
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [userData, setUserData] = useState(null);
+  const [loadingUserData, setLoadingUserData] = useState(false);
 
   const navLinks = {
     'Administrador': [
@@ -78,6 +82,58 @@ const UserHeader = ({ userRole }) => {
     navigate('/login');
   };
 
+  const fetchUserData = async () => {
+    console.log('🔍 Fetching user data...');
+    setLoadingUserData(true);
+    try {
+      console.log('🔑 Token from context:', token ? 'Present' : 'Missing');
+      if (!token) {
+        console.error('❌ No token found in context');
+        return;
+      }
+
+      const url = `${import.meta.env.VITE_API_URL}/api/users/me`;
+      console.log('🌐 Fetching from:', url);
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('📊 Response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ User data received:', data);
+        setUserData(data);
+        setIsProfileModalOpen(true);
+        console.log('🎭 Modal should be open now');
+      } else {
+        console.error('❌ Error fetching user data:', response.statusText);
+      }
+    } catch (error) {
+      console.error('💥 Exception:', error);
+    } finally {
+      setLoadingUserData(false);
+      console.log('✅ Fetch completed');
+    }
+  };
+
+  const handleUserIconClick = () => {
+    console.log('👆 User icon clicked');
+    console.log('📊 Current state:', { userData: !!userData, loadingUserData, isProfileModalOpen });
+    
+    if (!userData && !loadingUserData) {
+      console.log('➡️ Fetching user data...');
+      fetchUserData();
+    } else if (userData) {
+      console.log('➡️ Opening modal with existing data');
+      setIsProfileModalOpen(true);
+    }
+  };
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: scrollbarHideStyles }} />
@@ -90,7 +146,17 @@ const UserHeader = ({ userRole }) => {
         
         {/* User info - visible en móvil, oculto en desktop */}
         <div className="flex items-center gap-2 text-white font-poppins lg:hidden">
-          <FontAwesomeIcon icon={faUserCircle} className="text-white text-xl" />
+          <button 
+            onClick={handleUserIconClick}
+            className="hover:opacity-80 transition-opacity duration-200"
+            disabled={loadingUserData}
+            aria-label="Ver perfil de usuario"
+          >
+            <FontAwesomeIcon 
+              icon={faUserCircle} 
+              className={`text-white text-xl ${loadingUserData ? 'animate-pulse' : ''}`} 
+            />
+          </button>
           <span className="font-semibold text-15">{userRole}</span>
           <StyledLogoutButton onClick={handleSignOut} />
         </div>
@@ -115,10 +181,27 @@ const UserHeader = ({ userRole }) => {
 
       {/* User info - visible solo en desktop */}
       <div className="hidden lg:flex items-center gap-3 text-white font-poppins flex-shrink-0">
-        <FontAwesomeIcon icon={faUserCircle} className="text-white text-3xl" />
+        <button 
+          onClick={handleUserIconClick}
+          className="hover:opacity-80 transition-opacity duration-200"
+          disabled={loadingUserData}
+          aria-label="Ver perfil de usuario"
+        >
+          <FontAwesomeIcon 
+            icon={faUserCircle} 
+            className={`text-white text-3xl ${loadingUserData ? 'animate-pulse' : ''}`} 
+          />
+        </button>
         <span className="font-semibold text-18 whitespace-nowrap">{userRole}</span>
         <StyledLogoutButton onClick={handleSignOut} />
       </div>
+
+      {/* User Profile Modal */}
+      <UserProfileModal 
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        userData={userData}
+      />
     </header>
     </>
   );

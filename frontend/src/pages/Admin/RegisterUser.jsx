@@ -136,7 +136,11 @@ const RegisterUser = () => {
       setFormErrors(newErrors);
     }
 
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === "firstName" || name === "lastName") {
+      setFormData((prev) => ({ ...prev, [name]: value.toUpperCase() }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
 
     if (name === "role") {
       const selectedRole = rolesList.find(role => role.id === parseInt(value));
@@ -144,20 +148,20 @@ const RegisterUser = () => {
     }
   };
 
-  const handleEmailChange = (e) => {
-    const { value } = e.target;
-    setFormData((prev) => ({ ...prev, email: value }));
-
-    const newErrors = { ...formErrors };
-    if (!value) {
-      newErrors.email = 'Correo electrónico es obligatorio';
-    } else if (!value.includes('@') || !value.includes('.')) {
-      newErrors.email = 'Ingrese un correo electrónico válido';
-    } else {
-      delete newErrors.email;
-    }
-    setFormErrors(newErrors);
-  };
+const handleEmailChange = (e) => {
+  const { value } = e.target;
+  setFormData((prev) => ({ ...prev, email: value }));
+  const newErrors = { ...formErrors };
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+  if (!value) {
+    newErrors.email = 'Correo electrónico es obligatorio';
+  } else if (!emailRegex.test(value)) {
+    newErrors.email = 'Ingrese un correo electrónico válido';
+  } else {
+    delete newErrors.email;
+  }
+  setFormErrors(newErrors);
+};
 
   // Función para validar solo letras y espacios
   const isValidName = (name) => {
@@ -456,6 +460,12 @@ const RegisterUser = () => {
       </form>
       <div className="flex flex-col md:flex-row justify-center items-center md:space-x-6 space-y-4 md:space-y-0 mt-10 w-full max-w-[700px] mx-auto">
         <Button
+          onClick={handleCancel}
+          className="bg-header-blue hover:bg-header-blue-hover text-white w-full md:w-auto px-10 py-4 font-bold rounded-[40px] text-18 shadow-md"
+        >
+          Cancelar
+        </Button>
+        <Button
           onClick={handleSubmit}
           disabled={loading}
           className={cn(
@@ -476,12 +486,6 @@ const RegisterUser = () => {
           ) : (
             "Guardar"
           )}
-        </Button>
-        <Button
-          onClick={handleCancel}
-          className="bg-header-blue hover:bg-header-blue-hover text-white w-full md:w-auto px-10 py-4 font-bold rounded-[40px] text-18 shadow-md"
-        >
-          Cancelar
         </Button>
       </div>
 

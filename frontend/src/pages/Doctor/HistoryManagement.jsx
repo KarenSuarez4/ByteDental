@@ -37,7 +37,7 @@ const HistoryManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [scrollPosition, setScrollPosition] = useState(0);
-  
+
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [dentalServices, setDentalServices] = useState([]);
@@ -324,7 +324,7 @@ const HistoryManagement = () => {
   const handleSubmitTreatment = async (treatmentData) => {
     try {
       setModalLoading(true);
-      
+
       const result = await addTreatmentToHistory(
         parseInt(historyId),
         treatmentData,
@@ -396,6 +396,18 @@ const HistoryManagement = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="container mx-auto px-4 py-6" role="main">
+        <div className="mb-4">
+          <Button
+            onClick={handleGoBack}
+            aria-label="Regresar a la vista anterior"
+            title="Regresar"
+            className="flex items-center justify-center 
+             bg-primary-blue hover:bg-primary-blue-hover text-white 
+             w-8 h-8 rounded-full shadow-sm"
+          >
+            <FaArrowLeft className="text-white text-sm" />
+          </Button>
+        </div>
         {/* Success Message */}
         {successMessage && (
           <div className="mb-4">
@@ -455,16 +467,10 @@ const HistoryManagement = () => {
                   Agregar Tratamiento
                 </Button>
 
-                <Button
-                  onClick={handleGoBack}
-                  variant="secondary"
-                  className="flex items-center justify-center"
-                >
-                  <FaArrowLeft className="mr-2" />
-                  Regresar
-                </Button>
+
               </div>
             </section>
+
           </div>
         </div>
       </main>

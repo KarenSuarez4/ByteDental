@@ -16,6 +16,7 @@ import SignatureCredentialField from "../../components/SignatureCredentialField"
 import PatientInfoCard from "../../components/PatientInfoCard";
 import LegalConfirmationModal from "../../components/LegalConfirmationModal";
 import FormNavigationBar from "../../components/FormNavigationBar";
+import PatientSearchSelect from "../../components/PatientSearchSelect";
 
 // Hooks
 import { useAuth } from "../../contexts/AuthContext";
@@ -24,7 +25,7 @@ import { useFormProgress } from "../../hooks/useFormProgress";
 import { useFormSections } from "../../hooks/useFormSections";
 
 // Services
-import { getAllPatients, getPatientById } from "../../services/patientService";
+import { getActivePatients, getPatientById } from "../../services/patientService";
 import { createClinicalHistory, formatClinicalHistoryData } from "../../services/historyPatientService";
 import { getDentalServices } from "../../services/dentalServiceService";
 
@@ -121,6 +122,8 @@ const RegisterPatientFirstHistory = () => {
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+
+
   // UI State Management
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
@@ -157,7 +160,7 @@ const RegisterPatientFirstHistory = () => {
    */
   useEffect(() => {
     if (formData.patient_id && patients.length > 0) {
-      const patient = patients.find(p => p.id === parseInt(formData.patient_id));
+      const patient = patients.find(p => p.id === Number.parseInt(formData.patient_id));
       setSelectedPatient(patient);
     }
   }, [formData.patient_id, patients]);
@@ -204,7 +207,7 @@ const RegisterPatientFirstHistory = () => {
   const loadPatients = async () => {
     setLoadingData(true);
     try {
-      const response = await getAllPatients(token);
+      const response = await getActivePatients(token);
       setPatients(response || []);
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
@@ -238,6 +241,7 @@ const RegisterPatientFirstHistory = () => {
       setFormError('Error al cargar los detalles del paciente');
     }
   };
+
 
   /**
    * Load available dental services
@@ -555,27 +559,13 @@ const RegisterPatientFirstHistory = () => {
         <FormSection id="patient-info" title="Información del Paciente">
           <div className="grid grid-cols-1 gap-4">
             <FormField label="Seleccionar Paciente" required error={formErrors.patient_id}>
-              <Select
-                name="patient_id"
-                id="patient_id"
-                value={formData.patient_id}
-                onChange={(e) => handlePatientChange(e.target.value)}
-                error={!!formErrors.patient_id}
-                placeholder="Seleccione un paciente"
+              <PatientSearchSelect
+                patients={patients || []}
+                selectedPatientId={formData.patient_id}
+                onSelectPatient={handlePatientChange}
                 disabled={!!patientId}
-                className={patientId ? "cursor-not-allowed" : ""}
-                aria-required="true"
-                aria-invalid={!!formErrors.patient_id}
-                aria-describedby={formErrors.patient_id ? "patient_id-error" : undefined}
-              >
-                {patients.map(patient => (
-                  <option key={patient.id} value={patient.id}>
-                    {patient.person.first_name} {patient.person.first_surname} - {patient.person.document_type}: {patient.person.document_number}
-                  </option>
-                ))}
-              </Select>
+              />
             </FormField>
-
             {/* Patient Information Display */}
             <PatientInfoCard
               patientDetails={patientDetails}
@@ -840,6 +830,20 @@ const RegisterPatientFirstHistory = () => {
 
         {/* Form Action Buttons */}
         <div className="flex flex-col sm:flex-row justify-center items-stretch sm:items-center gap-3 sm:gap-4 md:gap-6 mt-6 sm:mt-8 md:mt-10 w-full max-w-[700px] mx-auto px-2">
+          {/* Cancel Button */}
+          <Button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="w-full sm:flex-1 md:w-auto md:px-10 py-3 sm:py-4 font-bold rounded-full text-base sm:text-lg shadow-lg font-poppins bg-header-blue hover:bg-header-blue-hover text-white transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-header-blue focus:ring-offset-2 hover:shadow-xl transform hover:scale-105"
+            aria-label="Cancelar y volver al dashboard"
+            disabled={loading}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <MdCancel className="text-2xl" />
+              <span>Cancelar</span>
+            </div>
+          </Button>
+          
           {/* Submit Button */}
           <Button
             type="submit"
@@ -874,20 +878,6 @@ const RegisterPatientFirstHistory = () => {
                 <span>Guardar Historia Clínica</span>
               </div>
             )}
-          </Button>
-
-          {/* Cancel Button */}
-          <Button
-            type="button"
-            onClick={() => navigate('/dashboard')}
-            className="w-full sm:flex-1 md:w-auto md:px-10 py-3 sm:py-4 font-bold rounded-full text-base sm:text-lg shadow-lg font-poppins bg-header-blue hover:bg-header-blue-hover text-white transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-header-blue focus:ring-offset-2 hover:shadow-xl transform hover:scale-105"
-            aria-label="Cancelar y volver al dashboard"
-            disabled={loading}
-          >
-            <div className="flex items-center justify-center gap-2">
-              <MdCancel className="text-2xl" />
-              <span>Cancelar</span>
-            </div>
           </Button>
         </div>
       </form>
