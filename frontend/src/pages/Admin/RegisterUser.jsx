@@ -148,20 +148,20 @@ const RegisterUser = () => {
     }
   };
 
-  const handleEmailChange = (e) => {
-    const { value } = e.target;
-    setFormData((prev) => ({ ...prev, email: value }));
-
-    const newErrors = { ...formErrors };
-    if (!value) {
-      newErrors.email = 'Correo electrónico es obligatorio';
-    } else if (!value.includes('@') || !value.includes('.')) {
-      newErrors.email = 'Ingrese un correo electrónico válido';
-    } else {
-      delete newErrors.email;
-    }
-    setFormErrors(newErrors);
-  };
+const handleEmailChange = (e) => {
+  const { value } = e.target;
+  setFormData((prev) => ({ ...prev, email: value }));
+  const newErrors = { ...formErrors };
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+  if (!value) {
+    newErrors.email = 'Correo electrónico es obligatorio';
+  } else if (!emailRegex.test(value)) {
+    newErrors.email = 'Ingrese un correo electrónico válido';
+  } else {
+    delete newErrors.email;
+  }
+  setFormErrors(newErrors);
+};
 
   // Función para validar solo letras y espacios
   const isValidName = (name) => {

@@ -47,7 +47,8 @@ const Login = () => {
     const value = event.target.value;
     setUsername(value);
 
-    if (!value.includes('@') || !value.includes('.')) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(value)) {
       setUsernameError('Ingrese un correo electrónico válido');
     } else {
       setUsernameError('');
