@@ -53,17 +53,17 @@ export function loginWithGoogle() {
 // Función para mapear errores de Firebase a mensajes personalizados
 function getCustomErrorMessage(firebaseError) {
   const errorMessages = {
-    'auth/wrong-password': 'Error 401: Credenciales inválidas',
-    'auth/user-not-found': 'Error 404: Usuario no encontrado',
-    'auth/invalid-email': 'Error 400: Formato de email inválido',
-    'auth/user-disabled': 'Error 403: Usuario deshabilitado',
-    'auth/too-many-requests': 'Error 429: Demasiados intentos fallidos. Intenta más tarde',
-    'auth/email-already-in-use': 'Error 409: El email ya está registrado',
-    'auth/weak-password': 'Error 400: La contraseña debe tener al menos 6 caracteres',
-    'auth/invalid-credential': 'Error 401: Credenciales inválidas',
-    'auth/network-request-failed': 'Error 500: Error de conexión. Verifica tu internet',
-    'auth/popup-closed-by-user': 'Error 400: Ventana de autenticación cerrada',
-    'auth/cancelled-popup-request': 'Error 400: Proceso de autenticación cancelado'
+    'auth/wrong-password': 'Credenciales inválidas',
+    'auth/user-not-found': 'Usuario no encontrado',
+    'auth/invalid-email': 'Formato de email inválido',
+    'auth/user-disabled': 'Usuario deshabilitado',
+    'auth/too-many-requests': 'Demasiados intentos fallidos. Intenta más tarde',
+    'auth/email-already-in-use': 'El email ya está registrado',
+    'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres',
+    'auth/invalid-credential': 'Credenciales inválidas',
+    'auth/network-request-failed': 'Error de conexión. Verifica tu internet',
+    'auth/popup-closed-by-user': 'Ventana de autenticación cerrada',
+    'auth/cancelled-popup-request': 'Proceso de autenticación cancelado'
   };
 
   return errorMessages[firebaseError.code] || `Error: ${firebaseError.message}`;
@@ -99,6 +99,11 @@ export function registerWithEmailAndPassword(email, password) {
 
 // Función para enviar email de restablecimiento de contraseña
 export function resetPassword(email) {
+  // Validar formato de email con extensión válida
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    throw new Error('Ingrese un correo electrónico válido');
+  }
   return sendPasswordResetEmail(auth, email)
     .then(() => {
       console.log("Password reset email sent successfully");
@@ -141,7 +146,7 @@ export async function changePassword(currentPassword, newPassword) {
   const user = auth.currentUser;
   
   if (!user) {
-    throw new Error("Error 401: No hay usuario autenticado");
+    throw new Error("No hay usuario autenticado");
   }
 
   // Re-autenticar usuario

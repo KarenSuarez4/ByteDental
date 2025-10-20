@@ -20,7 +20,8 @@ const PasswordReset = () => {
     const value = event.target.value;
     setEmail(value);
 
-    if (!value.includes('@') ||!value.includes('.')) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(value)) {
       setEmailError('Ingrese un correo electrónico válido');
     } else {
       setEmailError('');

@@ -12,14 +12,15 @@ def create_user(db: Session, user_data: dict):
     )
     # Crear usuario en la base de datos
     user = User(
-        tipo_documento=user_data["tipo_documento"],
-        nombre=user_data["nombre"],
+        first_name=user_data["first_name"].upper(),
+        last_name=user_data["last_name"].upper(),
         email=user_data["email"],
-        documento=user_data["documento"],
-        telefono=user_data.get("telefono"),
-        firebase_uuid=firebase_uuid,
+        document_number=user_data["document_number"],
+        document_type=user_data["document_type"],
+        phone=user_data.get("phone"),
         role_id=user_data["role_id"],
-        activo=True
+        specialty=user_data.get("specialty"),
+        is_active=True
     )
     db.add(user)
     db.commit()

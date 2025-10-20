@@ -218,6 +218,12 @@ const RegisterPatient = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
+    // Convertir nombres y apellidos a mayúsculas
+    if (["nombres", "apellidos", "guardian_nombres", "guardian_apellidos"].includes(name)) {
+      setFormData((prev) => ({ ...prev, [name]: value.toUpperCase() }));
+      return;
+    }
+
     // Validaciones específicas para teléfono
     if (name === 'phone' || name === 'guardian_phone') {
       // Solo permitir números
