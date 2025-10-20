@@ -136,7 +136,11 @@ const RegisterUser = () => {
       setFormErrors(newErrors);
     }
 
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === "firstName" || name === "lastName") {
+      setFormData((prev) => ({ ...prev, [name]: value.toUpperCase() }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
 
     if (name === "role") {
       const selectedRole = rolesList.find(role => role.id === parseInt(value));

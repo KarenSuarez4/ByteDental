@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, TIMESTAMP, Enum
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -25,3 +25,9 @@ class User(Base):
     
     def __repr__(self):
         return f"<User(uid={self.uid}, name={self.first_name} {self.last_name}, role_id={self.role_id})>"
+    
+    @validates('first_name', 'last_name')
+    def convert_to_uppercase(self, key, value):
+        if value:
+            return value.upper()
+        return value
