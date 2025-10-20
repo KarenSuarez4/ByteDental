@@ -81,10 +81,9 @@ async def register_login_event(
                     )
                 
                 # Si el bloqueo expiró, resetear los intentos
-                elif locked_until_value <= now_utc:  # type: ignore
-                    setattr(user, 'failed_login_attempts', 0)
-                    setattr(user, 'locked_until', None)
-                    db.commit()
+                setattr(user, 'failed_login_attempts', 0)
+                setattr(user, 'locked_until', None)
+                db.commit()
             
             # Verificar si el usuario está activo
             if user.is_active is False:
@@ -129,7 +128,7 @@ async def register_login_event(
                 db.commit()
                 
                 # Registrar el bloqueo en auditoría
-                audit_record_lock = AuditoriaService.registrar_evento(
+                AuditoriaService.registrar_evento(
                     db=db,
                     usuario_id=user_uid,
                     tipo_evento="ACCOUNT_LOCKED",

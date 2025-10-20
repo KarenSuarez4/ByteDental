@@ -155,7 +155,7 @@ class EmailService:
             
             # Verificar respuesta
             if response.status_code in [200, 202]:
-                logger.info(f"Email enviado exitosamente a {to_email} vía SendGrid")
+                logger.info(f"Email enviado exitosamente a {to_email.replace('\n','').replace('\r','')} vía SendGrid")
                 return True
             else:
                 logger.error(f"SendGrid error: status {response.status_code}")

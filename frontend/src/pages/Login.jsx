@@ -322,7 +322,7 @@ const Login = () => {
       
       // Mostrar error al usuario solo si no se manejó desde el backend
       if (!errorHandled) {
-        let errorMessage = 'Error al iniciar sesión con Google';
+        let errorMessage;
         
         switch (error.code) {
           case 'auth/popup-closed-by-user':
