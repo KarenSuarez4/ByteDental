@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, TIMESTAMP, Enum
+from sqlalchemy import Column, Date, Integer, String, Boolean, ForeignKey, TIMESTAMP, Enum
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.sql import func
 from app.database import Base  # ✅ Cambiar a import absoluto
