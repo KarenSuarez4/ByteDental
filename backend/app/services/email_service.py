@@ -158,11 +158,17 @@ class EmailService:
                 logger.info(f"Email enviado exitosamente a {to_email.replace('\n','').replace('\r','')} vía SendGrid")
                 return True
             else:
-                logger.error(f"SendGrid error: status {response.status_code}")
+                logger.error(f"SendGrid error: status {response.status_code}, body: {response.body}")
                 return False
                 
         except Exception as e:
             logger.error(f"Error enviando email con SendGrid: {e}")
+            logger.error(f"Tipo de error: {type(e).__name__}")
+            # Intentar obtener más detalles del error
+            if hasattr(e, 'body'):
+                logger.error(f"SendGrid error body: {getattr(e, 'body', 'N/A')}")
+            if hasattr(e, 'status_code'):
+                logger.error(f"SendGrid status code: {getattr(e, 'status_code', 'N/A')}")
             return False
     
     async def _send_with_smtp(self, to_email: str, subject: str, body: str, is_html: bool) -> bool:
