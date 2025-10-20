@@ -119,7 +119,7 @@ function AuditLog() {
   const loadLoginEvents = async (page = 1) => {
     try {
       let loginTypes = [];
-      if (loginFilter === "ALL") loginTypes = ["LOGIN_SUCCESS", "LOGIN_FAILED", "LOGOUT"];
+      if (loginFilter === "ALL") loginTypes = ["LOGIN_SUCCESS", "LOGIN_FAILED", "LOGOUT", "ACCOUNT_LOCKED"];
       else loginTypes = [loginFilter];
 
       if (loginTypes.length === 1) {
@@ -409,6 +409,7 @@ function AuditLog() {
                 <option value="LOGIN_SUCCESS">Ingresos exitosos</option>
                 <option value="LOGIN_FAILED">Intentos fallidos</option>
                 <option value="LOGOUT">Salidas</option>
+                <option value="ACCOUNT_LOCKED">Cuentas bloqueadas</option>
               </Select>
             </>
           )}

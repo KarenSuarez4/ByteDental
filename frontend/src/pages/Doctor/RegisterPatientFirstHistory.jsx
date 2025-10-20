@@ -830,6 +830,20 @@ const RegisterPatientFirstHistory = () => {
 
         {/* Form Action Buttons */}
         <div className="flex flex-col sm:flex-row justify-center items-stretch sm:items-center gap-3 sm:gap-4 md:gap-6 mt-6 sm:mt-8 md:mt-10 w-full max-w-[700px] mx-auto px-2">
+          {/* Cancel Button */}
+          <Button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="w-full sm:flex-1 md:w-auto md:px-10 py-3 sm:py-4 font-bold rounded-full text-base sm:text-lg shadow-lg font-poppins bg-header-blue hover:bg-header-blue-hover text-white transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-header-blue focus:ring-offset-2 hover:shadow-xl transform hover:scale-105"
+            aria-label="Cancelar y volver al dashboard"
+            disabled={loading}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <MdCancel className="text-2xl" />
+              <span>Cancelar</span>
+            </div>
+          </Button>
+          
           {/* Submit Button */}
           <Button
             type="submit"
@@ -864,20 +878,6 @@ const RegisterPatientFirstHistory = () => {
                 <span>Guardar Historia Clínica</span>
               </div>
             )}
-          </Button>
-
-          {/* Cancel Button */}
-          <Button
-            type="button"
-            onClick={() => navigate('/dashboard')}
-            className="w-full sm:flex-1 md:w-auto md:px-10 py-3 sm:py-4 font-bold rounded-full text-base sm:text-lg shadow-lg font-poppins bg-header-blue hover:bg-header-blue-hover text-white transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-header-blue focus:ring-offset-2 hover:shadow-xl transform hover:scale-105"
-            aria-label="Cancelar y volver al dashboard"
-            disabled={loading}
-          >
-            <div className="flex items-center justify-center gap-2">
-              <MdCancel className="text-2xl" />
-              <span>Cancelar</span>
-            </div>
           </Button>
         </div>
       </form>
