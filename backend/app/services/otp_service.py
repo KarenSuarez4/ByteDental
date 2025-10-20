@@ -32,10 +32,11 @@ class OTPService:
             otp_store.store_otp(email, otp_code, expires_at)
             
             # Enviar email con el código OTP
+            logger.info(f"Intentando enviar OTP a {email} con código {otp_code}")
             success = await self._send_otp_email(email, otp_code)
             
             if success:
-                logger.info(f"Código OTP enviado exitosamente a {email}")
+                logger.info(f"✅ Código OTP enviado exitosamente a {email}")
                 return OTPResponse(
                     success=True,
                     message="Código OTP enviado exitosamente",
@@ -44,14 +45,16 @@ class OTPService:
             else:
                 # Si falla el envío, limpiar el código almacenado
                 otp_store.remove_otp(email)
-                logger.error(f"Error enviando código OTP a {email}")
+                logger.error(f"❌ Error enviando código OTP a {email}")
+                logger.error(f"OTP generado era: {otp_code} pero el envío falló")
                 return OTPResponse(
                     success=False,
-                    message="Error enviando el código OTP"
+                    message="Error enviando el código OTP. Por favor verifica que tu correo sea válido o intenta más tarde."
                 )
                 
         except Exception as e:
-            logger.error(f"Error generando/enviando OTP para {email}: {e}")
+            logger.error(f"❌ Excepción al generar/enviar OTP para {email}: {e}")
+            logger.exception("Stack trace completo:")
             return OTPResponse(
                 success=False,
                 message="Error interno del servidor"
