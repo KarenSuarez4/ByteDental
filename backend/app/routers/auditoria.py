@@ -68,8 +68,8 @@ def get_eventos_auditoria(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     user_id: Optional[str] = Query(None),
-    event_type: Optional[str] = Query(None),
-    affected_record_type: Optional[str] = Query(None),
+    event_type: Optional[str] = Query(None),  # Filtrar por tipo de evento
+    affected_record_type: Optional[str] = Query(None),  # Filtrar por tipo de entidad afectada
     fecha_inicio: Optional[datetime] = Query(None, description="Fecha de inicio (YYYY-MM-DD HH:MM:SS). Si no se especifica zona horaria, se asume Colombia"),
     fecha_fin: Optional[datetime] = Query(None, description="Fecha de fin (YYYY-MM-DD HH:MM:SS). Si no se especifica zona horaria, se asume Colombia"),
     db: Session = Depends(get_db),
@@ -87,43 +87,35 @@ def get_eventos_auditoria(
         fecha_inicio: Fecha de inicio del rango (formato: YYYY-MM-DD HH:MM:SS)
         fecha_fin: Fecha de fin del rango (formato: YYYY-MM-DD HH:MM:SS)
     """
-    
     query = db.query(Audit)
-    
+
     # Aplicar filtros básicos
     if user_id:
         query = query.filter(Audit.user_id == user_id)
-    
     if event_type:
-        query = query.filter(Audit.event_type == event_type)
-    
+        query = query.filter(Audit.event_type == event_type)  # Filtrar por tipo de evento
     if affected_record_type:
         query = query.filter(Audit.affected_record_type == affected_record_type)
-    
+
     # Aplicar filtros de fecha
     if fecha_inicio:
-        # Si la fecha no tiene zona horaria, asumimos que es hora de Colombia
         if fecha_inicio.tzinfo is None:
             fecha_inicio = fecha_inicio.replace(tzinfo=COLOMBIA_TZ)
-        # Convertir a UTC para comparar con la base de datos
         fecha_inicio_utc = fecha_inicio.astimezone(timezone.utc)
         query = query.filter(Audit.event_timestamp >= fecha_inicio_utc)
-    
     if fecha_fin:
-        # Si la fecha no tiene zona horaria, asumimos que es hora de Colombia
         if fecha_fin.tzinfo is None:
             fecha_fin = fecha_fin.replace(tzinfo=COLOMBIA_TZ)
-        # Convertir a UTC para comparar con la base de datos
         fecha_fin_utc = fecha_fin.astimezone(timezone.utc)
         query = query.filter(Audit.event_timestamp <= fecha_fin_utc)
-    
+
     # Ordenar por timestamp descendente (más recientes primero)
     eventos = query.order_by(Audit.event_timestamp.desc()).offset(skip).limit(limit).all()
-    
+
     # Agregar timestamp en hora de Colombia a la respuesta
     for evento in eventos:
         evento.event_timestamp_colombia = AuditoriaService.convertir_a_hora_colombia(evento.event_timestamp)
-    
+
     return eventos
 
 @router.get("/{evento_id}", response_model=AuditResponse)

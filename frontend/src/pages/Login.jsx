@@ -314,7 +314,7 @@ const Login = () => {
             {/* Campo de Usuario con validación de email */}
             <div className="mb-5 w-[338px] pl-4">
               <label htmlFor="username" className="block text-header-blue text-18 font-poppins mb-1 font-bold">
-                Usuario
+                Correo Electrónico
               </label>
               <Input
                 id="username"
