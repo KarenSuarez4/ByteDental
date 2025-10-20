@@ -17,6 +17,8 @@ class User(Base):
     specialty = Column(String(100), nullable=True)  # Especialidad (para doctores)
     is_active = Column(Boolean, default=True)  # Si está activo
     must_change_password = Column(Boolean, default=False, nullable=False)  # Debe cambiar contraseña en primer login
+    failed_login_attempts = Column(Integer, default=0, nullable=False)  # Intentos fallidos de inicio de sesión
+    locked_until = Column(TIMESTAMP(timezone=True), nullable=True)  # Bloqueado hasta esta fecha/hora
     created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)  # Fecha de creación
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now(), nullable=False)  # Fecha de actualización
     

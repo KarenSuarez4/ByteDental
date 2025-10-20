@@ -28,13 +28,18 @@ export const registerLoginEvent = async (email, success, errorMessage = null, fi
     });
 
     if (!response.ok) {
-      return null;
+      // Si hay un error, intentar parsear el detalle del error
+      const errorData = await response.json().catch(() => null);
+      const error = new Error(errorData?.detail?.message || 'Error al registrar evento de login');
+      error.response = { status: response.status, data: errorData };
+      throw error;
     }
 
     const result = await response.json();
     return result;
   } catch (error) {
-    return null;
+    // Re-lanzar el error para que el frontend lo pueda manejar
+    throw error;
   }
 };
 
@@ -104,5 +109,30 @@ export const checkUserActiveStatus = async (firebaseUid) => {
     return userStatus.is_active;
   } catch (error) {
     return null;
+  }
+};
+
+/**
+ * Verificar si una cuenta está bloqueada por email
+ * @param {string} email - Email del usuario
+ * @returns {Object} - { is_locked: boolean, message: string }
+ */
+export const checkLockStatus = async (email) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/check-lock-status?email=${encodeURIComponent(email)}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+
+    if (!response.ok) {
+      return { is_locked: false, message: 'OK' };
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    return { is_locked: false, message: 'OK' };
   }
 };
