@@ -28,6 +28,19 @@ class PatientService:
     
     def create_patient(self, patient_data: PatientCreate) -> Patient:
         """Crear un nuevo paciente (incluye crear la persona)"""
+        # Convertir nombres del paciente a mayúsculas
+        patient_data.person.first_name = patient_data.person.first_name.upper()
+        patient_data.person.middle_name = patient_data.person.middle_name.upper() if patient_data.person.middle_name else None
+        patient_data.person.first_surname = patient_data.person.first_surname.upper()
+        patient_data.person.second_surname = patient_data.person.second_surname.upper() if patient_data.person.second_surname else None
+
+        # Convertir nombres del tutor a mayúsculas (si aplica)
+        if patient_data.guardian and patient_data.guardian.person:
+            patient_data.guardian.person.first_name = patient_data.guardian.person.first_name.upper()
+            patient_data.guardian.person.middle_name = patient_data.guardian.person.middle_name.upper() if patient_data.guardian.person.middle_name else None
+            patient_data.guardian.person.first_surname = patient_data.guardian.person.first_surname.upper()
+            patient_data.guardian.person.second_surname = patient_data.guardian.person.second_surname.upper() if patient_data.guardian.person.second_surname else None
+
         # Verificar que no exista otra persona con el mismo documento
         existing_person = self.person_service.get_person_by_document(
             patient_data.person.document_number

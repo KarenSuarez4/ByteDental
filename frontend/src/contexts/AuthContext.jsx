@@ -27,6 +27,21 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(null);
 
+  // Función para refrescar el token
+  const refreshToken = async (user) => {
+    if (user) {
+      try {
+        const newToken = await user.getIdToken(true); // force refresh
+        setToken(newToken);
+        return newToken;
+      } catch (error) {
+        console.error('Error refreshing token:', error);
+        return null;
+      }
+    }
+    return null;
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChange(async (user) => {
       setCurrentUser(user);
@@ -56,6 +71,18 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
+  // Refrescar token automáticamente cada 50 minutos (antes de que expire)
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const interval = setInterval(async () => {
+      console.log('🔄 Refreshing Firebase token...');
+      await refreshToken(currentUser);
+    }, 50 * 60 * 1000); // 50 minutos
+
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
   const signOut = async () => {
     try {
       // Registrar logout en auditoría antes de cerrar sesión
@@ -78,6 +105,7 @@ export function AuthProvider({ children }) {
     token,
     loading,
     signOut,
+    refreshToken: () => refreshToken(currentUser),
     isAuthenticated: !!currentUser
   };
 

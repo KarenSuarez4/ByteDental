@@ -71,7 +71,7 @@ describe('Firebase Authentication Tests', () => {
       const wrongPassword = 'contraseña_incorrecta';
       const authError = {
         code: 'auth/wrong-password',
-        message: 'Error 401: Credenciales inválidas'
+        message: 'Credenciales inválidas'
       };
 
       signInWithEmailAndPassword.mockRejectedValue(authError);

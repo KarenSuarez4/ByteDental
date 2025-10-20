@@ -21,6 +21,9 @@ aiofiles==23.2.1
 jinja2==3.1.2
 MarkupSafe==3.0.2
 
+# Servicio de email SendGrid
+sendgrid==6.11.0
+
 # Seguridad y autenticación
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4

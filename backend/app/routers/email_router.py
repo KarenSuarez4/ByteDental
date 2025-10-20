@@ -4,6 +4,7 @@ from app.models.email_models import (
     EmailResponse
 )
 from app.services.email_service import email_service
+from app.config import settings
 import logging
 import uuid
 

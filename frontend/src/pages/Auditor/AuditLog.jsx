@@ -30,7 +30,7 @@ function AuditLog() {
   // Filtros
   const [loginFilter, setLoginFilter] = useState("ALL");
   const [userFilter, setUserFilter] = useState("ALL");
-  const [patientFilter, setPatientFilter] = useState("ALL");
+  const [patientFilter, setPatientFilter] = useState("ALL"); // Filtro por tipo de evento
   const [guardianFilter, setGuardianFilter] = useState("ALL");
   const [personFilter, setPersonFilter] = useState("ALL");
   const [serviceFilter, setServiceFilter] = useState("ALL");
@@ -44,6 +44,7 @@ function AuditLog() {
   const [personPagination, setPersonPagination] = useState({ currentPage: 1, totalPages: 1, totalRecords: 0 });
   const [servicePagination, setServicePagination] = useState({ currentPage: 1, totalPages: 1, totalRecords: 0 });
   const [historyPagination, setHistoryPagination] = useState({ currentPage: 1, totalPages: 1, totalRecords: 0 });
+  
 
   const RECORDS_PER_PAGE = 10;
 
@@ -118,7 +119,7 @@ function AuditLog() {
   const loadLoginEvents = async (page = 1) => {
     try {
       let loginTypes = [];
-      if (loginFilter === "ALL") loginTypes = ["LOGIN_SUCCESS", "LOGIN_FAILED", "LOGOUT"];
+      if (loginFilter === "ALL") loginTypes = ["LOGIN_SUCCESS", "LOGIN_FAILED", "LOGOUT", "ACCOUNT_LOCKED"];
       else loginTypes = [loginFilter];
 
       if (loginTypes.length === 1) {
@@ -211,7 +212,11 @@ function AuditLog() {
   const loadPatientEvents = async (page = 1) => {
     try {
       let patientParams = { affected_record_type: "patients" };
-      if (patientFilter !== "ALL") patientParams.event_type = patientFilter;
+
+      // Aplicar el filtro según el tipo de evento seleccionado
+      if (patientFilter !== "ALL") {
+        patientParams.event_type = patientFilter;
+      }
 
       const result = await fetchAuditEventsWithCount(patientParams, page);
 
@@ -350,6 +355,7 @@ function AuditLog() {
   //header de la tabla
   const tableHeaderClass = "bg-header-blue text-white font-semibold text-center font-poppins text-18";
   const tableCellClass = "text-center font-poppins text-18 py-2";
+  const wideColumnClass = "w-[155px]";
 
   return (
     <main className="flex min-h-[calc(100vh-94px)] bg-gray-50 overflow-hidden">
@@ -403,6 +409,7 @@ function AuditLog() {
                 <option value="LOGIN_SUCCESS">Ingresos exitosos</option>
                 <option value="LOGIN_FAILED">Intentos fallidos</option>
                 <option value="LOGOUT">Salidas</option>
+                <option value="ACCOUNT_LOCKED">Cuentas bloqueadas</option>
               </Select>
             </>
           )}
@@ -452,13 +459,15 @@ function AuditLog() {
                 size="small"
                 onChange={e => {
                   setPatientFilter(e.target.value);
-                  setPatientPagination(prev => ({ ...prev, currentPage: 1 }));
+                  setPatientPagination(prev => ({ ...prev, currentPage: 1 })); // Reiniciar a primera página
                 }}
               >
                 <option value="ALL">Todos</option>
                 <option value="CREATE">Creaciones</option>
                 <option value="UPDATE">Modificaciones</option>
                 <option value="DELETE">Eliminaciones</option>
+                <option value="REACTIVATE">Activaciones</option>
+                <option value="DEACTIVATE">Desactivaciones</option>
               </Select>
             </>
           )}
@@ -593,7 +602,7 @@ function AuditLog() {
             <table className="w-full border-collapse">
               <thead className="sticky top-0 z-10 h-10">
                 <tr>
-                  <th className={tableHeaderClass}>Fecha</th>
+                  <th className={`${tableHeaderClass} ${wideColumnClass}`}>Fecha</th>
                   <th className={tableHeaderClass}>Usuario</th>
                   <th className={tableHeaderClass}>Tipo Evento</th>
                   <th className={tableHeaderClass}>Servicio afectado</th>
@@ -725,7 +734,7 @@ function AuditLog() {
             <table className="w-full border-collapse">
               <thead className="sticky top-0 z-10 h-10">
                 <tr>
-                  <th className={tableHeaderClass}>Fecha</th>
+                  <th className={`${tableHeaderClass} ${wideColumnClass}`}>Fecha</th>
                   <th className={tableHeaderClass}>Usuario</th>
                   <th className={tableHeaderClass}>Tipo Evento</th>
                   <th className={tableHeaderClass}>Historia afectada</th>

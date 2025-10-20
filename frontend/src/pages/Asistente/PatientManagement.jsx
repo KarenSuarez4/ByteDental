@@ -259,35 +259,33 @@ function PatientManagement() {
   const handleEditFormChange = (e) => {
     const { name, value } = e.target;
 
-    // Validaciones específicas para número de documento
+    // Convertir nombres y apellidos a mayúsculas
+    if (name === "full_names" || name === "full_surnames") {
+      setEditForm((prev) => ({ ...prev, [name]: value.toUpperCase() }));
+      return;
+    }
+
     if (name === "document_number") {
       const docType = editForm.document_type;
 
       // Validar según el tipo de documento
       if (docType === 'PP') {
-        // Pasaporte: alfanumérico, entre 6 y 10 caracteres, puede contener letras y números
         if (!/^[a-zA-Z0-9]*$/.test(value)) return;
         if (value.length > 10) return;
       } else {
-        // Otros documentos: solo números
         if (!/^\d*$/.test(value)) return;
       }
 
-      setEditForm(prev => ({ ...prev, [name]: value }));
-
+      setEditForm((prev) => ({ ...prev, [name]: value }));
       const newErrors = { ...editFormErrors };
 
-      // Limpiar error anterior primero
       if (newErrors[name]) {
         delete newErrors[name];
       }
 
-      // Validar longitud según tipo de documento
       if (value) {
-        if (docType === 'PP') {
-          if (value.length < 6) {
-            newErrors[name] = 'El pasaporte debe tener entre 6 y 10 caracteres';
-          }
+        if (docType === 'PP' && value.length < 6) {
+          newErrors[name] = 'El pasaporte debe tener entre 6 y 10 caracteres';
         }
       }
 
@@ -297,7 +295,7 @@ function PatientManagement() {
 
     if (name === "phone") {
       if (!/^\d*$/.test(value)) return;
-      setEditForm(prev => ({ ...prev, [name]: value }));
+      setEditForm((prev) => ({ ...prev, [name]: value }));
       if (value && value.length !== 10) {
         setPhoneEditError("El teléfono debe tener exactamente 10 dígitos.");
       } else {
@@ -311,28 +309,25 @@ function PatientManagement() {
       if (value && !isValidName(value)) {
         return; // No permitir el valor si no es válido
       }
-      setEditForm(prev => ({ ...prev, [name]: value }));
+      setEditForm((prev) => ({ ...prev, [name]: value.toUpperCase() }));
       return;
     }
 
     // Validación para discapacidad
     if (name === "has_disability") {
-      // Convertir el valor del select a booleano
       const hasDisability = value === "true" || value === true;
 
-      // Limpiar descripción de discapacidad si se marca como false
       if (!hasDisability) {
-        setEditForm(prev => ({ ...prev, has_disability: "false", disability_description: "" }));
+        setEditForm((prev) => ({ ...prev, has_disability: "false", disability_description: "" }));
         const newErrors = { ...editFormErrors };
         if (newErrors.disability_description) {
           delete newErrors.disability_description;
           setEditFormErrors(newErrors);
         }
       } else {
-        setEditForm(prev => ({ ...prev, has_disability: "true" }));
+        setEditForm((prev) => ({ ...prev, has_disability: "true" }));
       }
 
-      // Recalcular si necesita tutor considerando la discapacidad
       const age = calculateAge(editForm.birthdate);
       const requiresGuardian = (age !== null && (age < 18 || age > 64)) || hasDisability;
       setNeedsGuardian(requiresGuardian);
@@ -340,11 +335,9 @@ function PatientManagement() {
       return;
     }
 
-    // Validación para descripción de discapacidad
     if (name === "disability_description") {
       const newErrors = { ...editFormErrors };
 
-      // Limpiar error anterior primero
       if (newErrors[name]) {
         delete newErrors[name];
       }
@@ -354,47 +347,39 @@ function PatientManagement() {
       }
 
       setEditFormErrors(newErrors);
-      setEditForm(prev => ({ ...prev, [name]: value }));
+      setEditForm((prev) => ({ ...prev, [name]: value }));
       return;
     }
 
-    // Si se cambia la fecha de nacimiento, recalcular si necesita tutor
     if (name === "birthdate") {
-      setEditForm(prev => ({ ...prev, [name]: value }));
+      setEditForm((prev) => ({ ...prev, [name]: value }));
 
-      // Validación inmediata de fecha de nacimiento solo si la fecha está completa
-      if (value && value.length === 10) { // formato YYYY-MM-DD
+      if (value && value.length === 10) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const birthDate = new Date(value);
 
-        // Verificar que la fecha sea válida
         if (isNaN(birthDate.getTime())) {
-          setEditFormErrors(prev => ({ ...prev, birthdate: 'Fecha de nacimiento inválida' }));
+          setEditFormErrors((prev) => ({ ...prev, birthdate: 'Fecha de nacimiento inválida' }));
           return;
         }
 
-        // Verificar que la fecha no sea futura
         if (birthDate > today) {
-          setEditFormErrors(prev => ({ ...prev, birthdate: 'La fecha de nacimiento no puede ser en el futuro' }));
+          setEditFormErrors((prev) => ({ ...prev, birthdate: 'La fecha de nacimiento no puede ser en el futuro' }));
           return;
         }
 
-        // Calcular edad y verificar límites
         const age = calculateAge(value);
         if (age > 120) {
-          setEditFormErrors(prev => ({ ...prev, birthdate: 'La edad no puede ser mayor a 120 años' }));
+          setEditFormErrors((prev) => ({ ...prev, birthdate: 'La edad no puede ser mayor a 120 años' }));
           return;
         }
 
-        // Si la fecha es válida, limpiar error
-        setEditFormErrors(prev => ({ ...prev, birthdate: '' }));
+        setEditFormErrors((prev) => ({ ...prev, birthdate: '' }));
 
-        // Considerar discapacidad también en el cálculo del tutor
         const requiresGuardian = age < 18 || age > 64 || editForm.has_disability === "true";
         setNeedsGuardian(requiresGuardian);
 
-        // Si ya no necesita tutor, limpiar datos del tutor
         if (!requiresGuardian) {
           setGuardianForm({
             guardian_document_type: "",
@@ -409,16 +394,15 @@ function PatientManagement() {
           setGuardianFormErrors({});
         }
       } else if (value === '') {
-        setEditFormErrors(prev => ({ ...prev, birthdate: 'La fecha de nacimiento es obligatoria' }));
+        setEditFormErrors((prev) => ({ ...prev, birthdate: 'La fecha de nacimiento es obligatoria' }));
       } else {
-        // Si la fecha está incompleta, limpiar error temporal
-        setEditFormErrors(prev => ({ ...prev, birthdate: '' }));
+        setEditFormErrors((prev) => ({ ...prev, birthdate: '' }));
       }
 
       return;
     }
 
-    setEditForm(prev => ({ ...prev, [name]: value }));
+    setEditForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleGuardianFormChange = (e) => {
@@ -780,8 +764,6 @@ function PatientManagement() {
     }
   };
 
-
-  // ...existing code...
 
   // Filtros y paginación - CORREGIR esta sección
   const filteredPatients = patients.filter(patient => {
@@ -1556,7 +1538,6 @@ function PatientManagement() {
           </div>
         )}
 
-        {/* Modal de información del tutor */}
         {/* Modal unificado de información del paciente */}
         {patientInfoModal.open && patientInfoModal.patient && (
           <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(255, 255, 255, 0.3)' }}>

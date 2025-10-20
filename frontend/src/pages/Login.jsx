@@ -9,7 +9,8 @@ import LoadingScreen from '../components/LoadingScreen';
 import { loginWithGoogle, loginWithEmailAndPassword, logout } from '../Firebase/client';
 import { 
   registerLoginEvent, 
-  checkUserActiveStatus 
+  checkUserActiveStatus,
+  checkLockStatus 
 } from '../services/authAuditService';
 
 
@@ -47,7 +48,8 @@ const Login = () => {
     const value = event.target.value;
     setUsername(value);
 
-    if (!value.includes('@') || !value.includes('.')) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(value)) {
       setUsernameError('Ingrese un correo electrónico válido');
     } else {
       setUsernameError('');
@@ -91,6 +93,15 @@ const Login = () => {
     let loginSuccessful = false;
 
     try {
+      // PRIMERO: Verificar si la cuenta está bloqueada
+      const lockStatus = await checkLockStatus(username);
+      
+      if (lockStatus.is_locked) {
+        setLoginError(lockStatus.message);
+        setLoading(false);
+        return;
+      }
+      
       // Intentar login con Firebase
       const userCredential = await loginWithEmailAndPassword(username, password);
       
@@ -156,16 +167,45 @@ const Login = () => {
       
     } catch (error) {
       // Solo registrar como LOGIN_FAILED si realmente falló el login de Firebase
+      let errorHandled = false;
       if (!loginSuccessful) {
         try {
           await registerLoginEvent(username, false, error.message);
         } catch (auditError) {
-          // Error registrando en auditoría - continuar
+          // Verificar si el error de auditoría es por cuenta bloqueada o intentos restantes
+          if (auditError.response) {
+            const errorData = auditError.response.data?.detail;
+            
+            // Error 403: Cuenta bloqueada
+            if (auditError.response.status === 403) {
+              if (typeof errorData === 'object' && errorData.message) {
+                setLoginError(errorData.message);
+                errorHandled = true;
+              } else if (typeof errorData === 'string') {
+                setLoginError(errorData);
+                errorHandled = true;
+              }
+            }
+            
+            // Error 401: Credenciales incorrectas con intentos restantes
+            if (auditError.response.status === 401) {
+              if (typeof errorData === 'object' && errorData.message) {
+                setLoginError(errorData.message);
+                errorHandled = true;
+              } else if (typeof errorData === 'string') {
+                setLoginError(errorData);
+                errorHandled = true;
+              }
+            }
+          }
+          // Error registrando en auditoría - continuar con el error original
         }
       }
       
-      // Mostrar error al usuario
-      setLoginError(error.message);
+      // Mostrar error al usuario solo si no se manejó desde el backend
+      if (!errorHandled) {
+        setLoginError(error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -245,28 +285,58 @@ const Login = () => {
       
     } catch (error) {
       // Solo registrar como LOGIN_FAILED si realmente falló el login de Google
+      let errorHandled = false;
       if (!loginSuccessful) {
         try {
           await registerLoginEvent('google-signin-attempt', false, error.message);
         } catch (auditError) {
-          // Error registrando en auditoría - continuar
+          // Verificar si el error de auditoría es por cuenta bloqueada o intentos restantes
+          if (auditError.response) {
+            const errorData = auditError.response.data?.detail;
+            
+            // Error 403: Cuenta bloqueada
+            if (auditError.response.status === 403) {
+              if (typeof errorData === 'object' && errorData.message) {
+                setLoginError(errorData.message);
+                errorHandled = true;
+              } else if (typeof errorData === 'string') {
+                setLoginError(errorData);
+                errorHandled = true;
+              }
+            }
+            
+            // Error 401: Credenciales incorrectas con intentos restantes
+            if (auditError.response.status === 401) {
+              if (typeof errorData === 'object' && errorData.message) {
+                setLoginError(errorData.message);
+                errorHandled = true;
+              } else if (typeof errorData === 'string') {
+                setLoginError(errorData);
+                errorHandled = true;
+              }
+            }
+          }
+          // Error registrando en auditoría - continuar con el error original
         }
       }
       
-      let errorMessage = 'Error al iniciar sesión con Google';
-      
-      switch (error.code) {
-        case 'auth/popup-closed-by-user':
-          errorMessage = 'Inicio de sesión cancelado';
-          break;
-        case 'auth/popup-blocked':
-          errorMessage = 'Popup bloqueado por el navegador';
-          break;
-        default:
-          errorMessage = error.message;
+      // Mostrar error al usuario solo si no se manejó desde el backend
+      if (!errorHandled) {
+        let errorMessage;
+        
+        switch (error.code) {
+          case 'auth/popup-closed-by-user':
+            errorMessage = 'Inicio de sesión cancelado';
+            break;
+          case 'auth/popup-blocked':
+            errorMessage = 'Popup bloqueado por el navegador';
+            break;
+          default:
+            errorMessage = error.message;
+        }
+        
+        setLoginError(errorMessage);
       }
-      
-      setLoginError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -314,7 +384,7 @@ const Login = () => {
             {/* Campo de Usuario con validación de email */}
             <div className="mb-5 w-[338px] pl-4">
               <label htmlFor="username" className="block text-header-blue text-18 font-poppins mb-1 font-bold">
-                Usuario
+                Correo Electrónico
               </label>
               <Input
                 id="username"
@@ -356,7 +426,7 @@ const Login = () => {
             </a>
 
             {/* Botón de Ingresar */}
-            <Button type="submit" onClick={handleLogin} className="shadow-md mb-5" disabled={!isFormValid}>
+            <Button type="submit" className="shadow-md mb-5" disabled={!isFormValid}>
               Ingresar
             </Button>
           </form>
