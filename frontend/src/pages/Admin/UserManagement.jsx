@@ -4,6 +4,9 @@ import Button from "../../components/Button";
 import Input from "../../components/Input";
 import Select from "../../components/Select";
 import ConfirmDialog from "../../components/ConfirmDialog";
+import SearchInput from "../../components/SearchInput"; 
+import FilterBar from "../../components/FilterBar"; 
+import DateInput from "../../components/DateInput";  
 import { getAllUsers as getUsers, updateUser, deactivateUser, activateUser, getRoles } from "../../services/userService";
 
 const tableHeaderClass = "bg-header-blue text-white font-semibold text-center font-poppins text-18";
@@ -24,14 +27,50 @@ function UserManagement() {
   const [phoneEditError, setPhoneEditError] = useState("");
 
   // Filtros y búsqueda
-  const [searchDoc, setSearchDoc] = useState("");
+  const [searchTerm, setSearchTerm] = useState(""); 
   const [filterRole, setFilterRole] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(4);
+  const [itemsPerPage] = useState(6);
   const [totalPages, setTotalPages] = useState(1);
+
+  const filterConfig = [
+    {
+      key: 'role',
+      value: filterRole,
+      onChange: (e) => {
+        setFilterRole(e.target.value);
+        setCurrentPage(1);
+      },
+      options: [
+        { value: 'ALL', label: 'Todos los roles' },
+        ...roles.map(role => ({ value: role.id.toString(), label: role.name }))
+      ],
+      ariaLabel: 'Filtrar por rol de usuario',
+      className: 'w-[210px]'
+    },
+    {
+      key: 'status',
+      value: filterStatus,
+      onChange: (e) => {
+        setFilterStatus(e.target.value);
+        setCurrentPage(1);
+      },
+      options: [
+        { value: 'ALL', label: 'Todos' },
+        { value: 'ACTIVO', label: 'Activo' },
+        { value: 'INACTIVO', label: 'Inactivo' }
+      ],
+      ariaLabel: 'Filtrar por estado del usuario',
+      className: 'w-[180px]'
+    }
+  ];
+
+  const resetToFirstPage = () => {
+    setCurrentPage(1);
+  };
 
   useEffect(() => {
     if (userRole !== "Administrador" || !token) return;
@@ -58,6 +97,25 @@ function UserManagement() {
     }
   }, [editError]);
 
+  // Calcular edad a partir de la fecha de nacimiento
+  const calculateAge = (birthDate) => {
+    if (!birthDate || birthDate.length !== 10) return null;
+    
+    const today = new Date();
+    const birth = new Date(birthDate);
+    
+    if (isNaN(birth.getTime())) return null;
+    
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
   // Abrir modal de edición
   const handleEdit = (user) => {
     setEditUser(user);
@@ -67,44 +125,45 @@ function UserManagement() {
       first_name: user.first_name,
       last_name: user.last_name,
       email: user.email,
-      phone: user.phone,
+      phone: user.phone || "",
       role_id: user.role_id,
-      specialty: user.specialty,
+      specialty: user.specialty || "",
+      birthdate: user.birthdate || "",
+      is_active: user.is_active
     });
     setEditError("");
     setSuccessMsg("");
+    setEditFormErrors({});
   };
 
   const handleEditFormChange = (e) => {
     const { name, value } = e.target;
 
-    if (name === "document_number") {
-      const docType = editForm.document_type;
-
-      // Validar según el tipo de documento
-      if (docType === 'PP') {
-        // Pasaporte: alfanumérico, entre 6 y 10 caracteres, puede contener letras y números
-        if (!/^[a-zA-Z0-9]*$/.test(value)) return;
-        if (value.length > 10) return;
-      } else {
-        // Otros documentos: solo números
-        if (!/^\d*$/.test(value)) return;
-      }
-      
+    if (name === 'birthdate') {
       setEditForm(prev => ({ ...prev, [name]: value }));
       
       const newErrors = { ...editFormErrors };
-
-      // Limpiar error anterior primero
-      if (newErrors[name]) {
-        delete newErrors[name];
+      
+      if (newErrors.birthdate) {
+        delete newErrors.birthdate;
       }
 
-      // Validar longitud según tipo de documento
-      if (value) {
-        if (docType === 'PP') {
-          if (value.length < 6) {
-            newErrors[name] = 'El pasaporte debe tener entre 6 y 10 caracteres';
+      if (value && value.length === 10) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const birthDate = new Date(value);
+
+        if (isNaN(birthDate.getTime())) {
+          newErrors.birthdate = 'Fecha de nacimiento inválida';
+        } else if (birthDate > today) {
+          newErrors.birthdate = 'La fecha de nacimiento no puede ser en el futuro';
+        } else {
+
+          const age = calculateAge(value);
+          if (age < 18) {
+            newErrors.birthdate = 'Los usuarios del sistema deben ser mayores de 18 años';
+          } else if (age > 80) {
+            newErrors.birthdate = 'Edad inválida - debe estar entre 18 y 80 años';
           }
         }
       }
@@ -121,6 +180,33 @@ function UserManagement() {
       } else {
         setPhoneEditError("");
       }
+      return;
+    }
+
+    if (name === "first_name" || name === "last_name") {
+      // Función para validar solo letras, espacios y caracteres acentuados
+      const isValidName = (name) => {
+        const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]*$/;
+        return nameRegex.test(name) && name.trim().length > 0;
+      };
+
+      // Prevenir entrada de números y caracteres especiales
+      if (value && !isValidName(value)) {
+        return; // No actualizar el estado si contiene caracteres inválidos
+      }
+      
+      // Convertir a mayúsculas automáticamente
+      const upperCaseValue = value.toUpperCase();
+      
+      setEditForm(prev => ({ ...prev, [name]: upperCaseValue }));
+      
+      const newErrors = { ...editFormErrors };
+      if (!upperCaseValue) {
+        newErrors[name] = name === "first_name" ? "Nombre es obligatorio" : "Apellido es obligatorio";
+      } else {
+        delete newErrors[name];
+      }
+      setEditFormErrors(newErrors);
       return;
     }
 
@@ -164,6 +250,29 @@ function UserManagement() {
       }
     }
 
+    if (editForm.birthdate) {
+      if (editForm.birthdate.length !== 10) {
+        errors.birthdate = 'Ingrese la fecha completa';
+      } else {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const birthDate = new Date(editForm.birthdate);
+
+        if (isNaN(birthDate.getTime())) {
+          errors.birthdate = 'Fecha de nacimiento inválida';
+        } else if (birthDate > today) {
+          errors.birthdate = 'La fecha de nacimiento no puede ser en el futuro';
+        } else {
+          const age = calculateAge(editForm.birthdate);
+          if (age < 18) {
+            errors.birthdate = 'Los usuarios del sistema deben ser mayores de 18 años';
+          } else if (age > 80) {
+            errors.birthdate = 'Edad inválida - debe estar entre 18 y 80 años';
+          }
+        }
+      }
+    }
+
     setEditFormErrors(errors);
     setPhoneEditError(errors.phone || "");
     return Object.keys(errors).length === 0;
@@ -173,18 +282,37 @@ function UserManagement() {
   const handleSaveEdit = async () => {
     if (!validateEditForm()) return;
 
-    setEditLoading(true);
     try {
-      await updateUser(editUser.uid, editForm, token);
-      setSuccessMsg("Usuario actualizado correctamente");
+      setEditLoading(true);
+      setEditError("");
+
+      const updateData = {
+        document_number: editForm.document_number,
+        document_type: editForm.document_type,
+        first_name: editForm.first_name,
+        last_name: editForm.last_name,
+        email: editForm.email,
+        phone: editForm.phone || null,
+        role_id: parseInt(editForm.role_id),
+        specialty: editForm.specialty || null,
+        birthdate: editForm.birthdate || null,
+        is_active: editForm.is_active
+      };
+
+      await updateUser(editUser.uid, updateData, token);
+      
+      setSuccessMsg("Usuario actualizado exitosamente");
       setEditUser(null);
+      setEditForm({});
+      setEditFormErrors({});
+      
       setLoading(true);
       const updatedUsers = await getUsers(token);
       setUsers(updatedUsers);
       setLoading(false);
-      setEditFormErrors({});
-    } catch (err) {
-      setEditFormErrors({ general: err.message || "Error al actualizar usuario" });
+      
+    } catch (error) {
+      setEditError(error.message || "Error al actualizar usuario");
     } finally {
       setEditLoading(false);
     }
@@ -212,18 +340,55 @@ function UserManagement() {
     }
   };
 
-  // Filtros
   const filteredUsers = users.filter(user => {
-    const docMatch = searchDoc === "" || user.document_number.includes(searchDoc);
+    // Función auxiliar para normalizar texto (quitar acentos y convertir a minúsculas)
+    const normalizeText = (text) => {
+      return text
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, ''); // Remover acentos
+    };
+
+    // Si no hay término de búsqueda, solo aplicar filtros de rol y estado
+    if (searchTerm === "") {
+      const roleMatch = filterRole === "ALL" || user.role_id === parseInt(filterRole);
+      const statusMatch = filterStatus === "ALL" || (filterStatus === "ACTIVO" ? user.is_active : !user.is_active);
+      return roleMatch && statusMatch;
+    }
+
+    // Normalizar término de búsqueda
+    const normalizedSearchTerm = normalizeText(searchTerm);
+
+    // Buscar en documento (exacto, no normalizado para números)
+    const docMatch = user.document_number.includes(searchTerm);
+
+    // Crear texto completo para búsqueda (nombres + apellidos)
+    const fullSearchText = `${user.first_name} ${user.last_name}`.trim();
+    const normalizedFullText = normalizeText(fullSearchText);
+
+    // Buscar el término normalizado en el texto completo normalizado
+    const nameMatch = normalizedFullText.includes(normalizedSearchTerm);
+
+    // También buscar términos individuales si el usuario busca por palabras separadas
+    const searchWords = normalizedSearchTerm.split(/\s+/).filter(word => word.length > 0);
+    const individualWordsMatch = searchWords.every(word =>
+      normalizedFullText.includes(word)
+    );
+
+    // El usuario coincide si encuentra el término en documento, nombre completo, o palabras individuales
+    const searchMatch = docMatch || nameMatch || individualWordsMatch;
+
+    // Aplicar también filtros de rol y estado
     const roleMatch = filterRole === "ALL" || user.role_id === parseInt(filterRole);
     const statusMatch = filterStatus === "ALL" || (filterStatus === "ACTIVO" ? user.is_active : !user.is_active);
-    return docMatch && roleMatch && statusMatch;
+
+    return searchMatch && roleMatch && statusMatch;
   }).sort((a, b) => a.uid - b.uid); // Ordenar por ID ascendente
 
   // Calcular total de páginas
   const totalPagesCount = Math.ceil(filteredUsers.length / itemsPerPage);
 
-  // Obtener usuarios para la página actual
+  // Obtener usuarios para la página current
   const currentUsers = filteredUsers.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -275,6 +440,7 @@ function UserManagement() {
         <h1 className="text-header-blue text-46 font-bold font-poppins mb-1 pt-6 text-center pb-6">
           GESTIÓN DE USUARIOS
         </h1>
+
         {editError && (
           <div className="mb-2 w-full max-w-[900px] p-3 bg-red-100 border border-red-400 text-red-700 rounded text-center text-18">
             {editError}
@@ -286,50 +452,19 @@ function UserManagement() {
           </div>
         )}
 
-        {/* Filtros y búsqueda */}
-        <div className="w-full max-w-[1000px] flex flex-wrap items-center justify-between mb-3 gap-4">
-          <div className="flex items-center gap-4">
-            <Input
-              className="w-[280px] h-[35px] font-poppins"
-              placeholder="Buscar por documento"
-              value={searchDoc}
-              onChange={(e) => {
-                setSearchDoc(e.target.value);
-                setCurrentPage(1); // Resetear a primera página al buscar
-              }}
-            />
-            <Select
-              className="w-[210px]   font-poppins"
-              size="small"
-              value={filterRole}
-              onChange={(e) => {
-                setFilterRole(e.target.value);
-                setCurrentPage(1); // Resetear a primera página al filtrar
-              }}
-            >
-              <option value="ALL">Todos los roles</option>
-              {roles.map(role => (
-                <option key={role.id} value={role.id}>{role.name}</option>
-              ))}
-            </Select>
-            <Select
-              className="w-[180px] font-poppins"
-              value={filterStatus}
-              size="small"
-              onChange={(e) => {
-                setFilterStatus(e.target.value);
-                setCurrentPage(1); // Resetear a primera página al filtrar
-              }}
-            >
-              <option value="ALL">Todos</option>
-              <option value="ACTIVO">Activo</option>
-              <option value="INACTIVO">Inactivo</option>
-            </Select>
-          </div>
-        </div>
+        {/* REEMPLAZAR la sección de filtros con FilterBar */}
+        <FilterBar
+          searchValue={searchTerm}
+          onSearchChange={(e) => setSearchTerm(e.target.value)}
+          filters={filterConfig}
+          onPageReset={resetToFirstPage}
+          searchPlaceholder="Buscar por documento, nombres o apellidos"
+          searchAriaLabel="Buscar usuario por documento, nombres o apellidos"
+          className="max-w-[1000px]"
+        />
 
         {/* Tabla de usuarios con scroll vertical */}
-        <div className="w-full max-w-[1000px] bg-white rounded-[12px] shadow-md overflow-x-auto"
+        <div className="w-full max-w-[1200px] bg-white rounded-[12px] shadow-md overflow-x-auto"
           style={{ maxHeight: "calc(100vh - 226px)", overflowY: "auto" }}>
           <table className="w-full border-collapse">
             <thead className="sticky top-0 z-10 h-10">
@@ -340,6 +475,7 @@ function UserManagement() {
                 <th className={tableHeaderClass}>Apellido</th>
                 <th className={tableHeaderClass}>Correo</th>
                 <th className={tableHeaderClass}>Teléfono</th>
+                <th className={tableHeaderClass}>Fecha Nac.</th> 
                 <th className={tableHeaderClass}>Rol</th>
                 <th className={tableHeaderClass}>Especialidad</th>
                 <th className={tableHeaderClass}>Estado</th>
@@ -355,6 +491,16 @@ function UserManagement() {
                   <td className={tableCellClass}>{user.last_name}</td>
                   <td className={tableCellClass}>{user.email}</td>
                   <td className={tableCellClass}>{user.phone}</td>
+                  <td className={tableCellClass}> 
+                    {user.birthdate ? 
+                      new Date(user.birthdate).toLocaleDateString('es-ES', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      }) 
+                      : '-'
+                    }
+                  </td>
                   <td className={tableCellClass}>{user.role_name}</td>
                   <td className={tableCellClass}>{user.specialty || "-"}</td>
                   <td className={tableCellClass}>
@@ -406,8 +552,8 @@ function UserManagement() {
               ))}
               {currentUsers.length === 0 && (
                 <tr>
-                  <td colSpan="6" className="text-center py-8 text-gray-500 font-poppins text-16">
-                    {searchDoc ? "La información proporcionada no corresponde a ningún registro existente" : "No hay usuarios registrados"}
+                  <td colSpan="11" className="text-center py-8 text-gray-500 font-poppins text-16">  
+                    {searchTerm ? "La información proporcionada no corresponde a ningún registro existente" : "No hay usuarios registrados"}
                   </td>
                 </tr>
               )}
@@ -547,7 +693,7 @@ function UserManagement() {
 
         {/* Modal de edición */}
         {editUser && (
-          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(255, 255, 255, 0.3)' }}>
+          <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[1000px] max-h-[90vh] overflow-y-auto">
               {/* Header del modal */}
               <div className="bg-gradient-to-br from-primary-blue to-header-blue text-white p-6 rounded-t-[24px] relative overflow-hidden">
@@ -624,7 +770,7 @@ function UserManagement() {
                       <Input
                         name="first_name"
                         value={editForm.first_name}
-                        onChange={e => setEditForm(f => ({ ...f, first_name: e.target.value }))}
+                        onChange={handleEditFormChange} 
                         className="w-full"
                         error={!!editFormErrors.first_name}
                       />
@@ -637,7 +783,7 @@ function UserManagement() {
                       <Input
                         name="last_name"
                         value={editForm.last_name}
-                        onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))}
+                        onChange={handleEditFormChange} 
                         className="w-full"
                         error={!!editFormErrors.last_name}
                       />
@@ -689,28 +835,39 @@ function UserManagement() {
                         <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.role_id}</p>
                       )}
                     </div>
+                    {isDoctor && (
+                      <div>
+                        <label className="block font-poppins font-medium text-gray-700 mb-2">
+                          Especialidad <span className="text-red-500">*</span>
+                        </label>
+                        <Select
+                          name="specialty"
+                          value={editForm.specialty || ""}
+                          onChange={handleEditFormChange}
+                          className="w-full"
+                          error={!!editFormErrors.specialty}
+                        >
+                          <option value="">Seleccione una especialidad</option>
+                          {specialties.map((specialty) => (
+                            <option key={specialty} value={specialty}>{specialty}</option>
+                          ))}
+                        </Select>
+                        {editFormErrors.specialty && (
+                          <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.specialty}</p>
+                        )}
+                      </div>
+                    )}
                     <div>
-                      <label className="block font-poppins font-medium text-gray-700 mb-2">
-                        Especialidad {isDoctor && <span className="text-red-500">*</span>}
-                      </label>
-                      <Select
-                        name="specialty"
-                        value={editForm.specialty || ""}
+                      <label className="block font-poppins font-medium text-gray-700 mb-2">Fecha de nacimiento</label>
+                      <DateInput
+                        name="birthdate"
+                        value={editForm.birthdate}
                         onChange={handleEditFormChange}
-                        disabled={!isDoctor}
-                        className={`w-full ${!isDoctor ? 'bg-gray-100' : ''}`}
-                        error={!!editFormErrors.specialty}
-                      >
-                        <option value="">Seleccione una especialidad</option>
-                        {specialties.map((specialty) => (
-                          <option key={specialty} value={specialty}>{specialty}</option>
-                        ))}
-                      </Select>
-                      {editFormErrors.specialty && (
-                        <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.specialty}</p>
-                      )}
-                      {!isDoctor && (
-                        <p className="text-gray-500 text-sm font-poppins mt-1">Solo requerido para usuarios con rol de Doctor</p>
+                        error={!!editFormErrors.birthdate}
+                        className="w-full"
+                      />
+                      {editFormErrors.birthdate && (
+                        <p className="text-red-500 text-sm font-poppins mt-1">{editFormErrors.birthdate}</p>
                       )}
                     </div>
                   </div>

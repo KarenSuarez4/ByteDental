@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
+from datetime import date
 import secrets
 import string
 
@@ -50,7 +51,14 @@ class UserCreate(BaseModel):
     phone: Optional[str] = None
     role_id: int
     specialty: Optional[str] = None
-    # Nota: password será generada automáticamente por el sistema
+    birthdate: date  
+
+    @field_validator('birthdate')
+    @classmethod
+    def validate_birthdate(cls, v):
+        if v > date.today():
+            raise ValueError('La fecha de nacimiento no puede ser futura')
+        return v
 
 class UserUpdate(BaseModel):
     document_number: Optional[str] = None
@@ -62,6 +70,14 @@ class UserUpdate(BaseModel):
     role_id: Optional[int] = None
     specialty: Optional[str] = None
     is_active: Optional[bool] = None
+    birthdate: Optional[date] = None  
+
+    @field_validator('birthdate')
+    @classmethod
+    def validate_birthdate(cls, v):
+        if v and v > date.today():
+            raise ValueError('La fecha de nacimiento no puede ser futura')
+        return v
 
 class UserResponse(BaseModel):
     uid: str
@@ -77,6 +93,7 @@ class UserResponse(BaseModel):
     must_change_password: bool
     created_at: str
     updated_at: str
+    birthdate: Optional[str] = None  
     role_name: Optional[str] = None
 
     class Config:
@@ -115,9 +132,10 @@ def user_to_dict(user: User) -> Dict[str, Any]:
         "specialty": user.specialty,
         "is_active": user.is_active,
         "must_change_password": user.must_change_password,
-        "created_at": user.created_at.isoformat() if user.created_at is not None else None,
-        "updated_at": user.updated_at.isoformat() if user.updated_at is not None else None,
-        "role_name": user.role.name if hasattr(user, 'role') and user.role else None
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+        "birthdate": user.birthdate.isoformat() if user.birthdate else None, 
+        "role_name": user.role.name if user.role else None
     }
 
 def get_client_ip(request: Request) -> str:
@@ -215,6 +233,7 @@ async def create_user(
             phone=user_data.phone,
             role_id=user_data.role_id,
             specialty=user_data.specialty,
+            birthdate=user_data.birthdate,  
             is_active=True,
             must_change_password=True  # Usuario debe cambiar contraseña en primer login
         )

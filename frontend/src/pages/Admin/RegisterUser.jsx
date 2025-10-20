@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Button from "../../components/Button";
 import Input from "../../components/Input";
 import Select from "../../components/Select";
+import DateInput from "../../components/DateInput";  
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -23,6 +24,7 @@ const RegisterUser = () => {
     email: "",
     role: "",
     specialty: "",
+    birthdate: "",  
   });
 
   const [rolesList, setRolesList] = useState([]);
@@ -35,6 +37,7 @@ const RegisterUser = () => {
   const [loading, setLoading] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const { currentUser, token } = useAuth();
+  const [age, setAge] = useState(null);  
 
   const specialties = [
     "Periodoncia",
@@ -42,6 +45,34 @@ const RegisterUser = () => {
     "Cirugía oral y maxilofacial",
     "Odontopediatría",
   ];
+
+  const calculateAge = (birthDate) => {
+    if (!birthDate || birthDate.length !== 10) return null;
+    
+    const today = new Date();
+    const birth = new Date(birthDate);
+    
+    if (isNaN(birth.getTime())) return null;
+    
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
+
+  useEffect(() => {
+    if (formData.birthdate) {
+      const calculatedAge = calculateAge(formData.birthdate);
+      setAge(calculatedAge);
+    } else {
+      setAge(null);
+    }
+  }, [formData.birthdate]);
 
   useEffect(() => {
     async function fetchRoles() {
@@ -108,19 +139,26 @@ const RegisterUser = () => {
       return;
     }
 
-    // Validación inmediata de nombres y apellidos
+    // Validación inmediata de nombres y apellidos - SOLO PERMITIR LETRAS Y ESPACIOS
     if (name === "firstName" || name === "lastName") {
-      const newErrors = { ...formErrors };
+      // Prevenir entrada de números y caracteres especiales
       if (value && !isValidName(value)) {
-        newErrors[name] = name === "firstName" ? 
-          "El nombre solo puede contener letras y espacios" : 
-          "El apellido solo puede contener letras y espacios";
-      } else if (!value) {
+        return; // No actualizar el estado si contiene caracteres inválidos
+      }
+      
+      // Convertir a mayúsculas automáticamente
+      const upperCaseValue = value.toUpperCase();
+      
+      setFormData((prev) => ({ ...prev, [name]: upperCaseValue }));
+      
+      const newErrors = { ...formErrors };
+      if (!upperCaseValue) {
         newErrors[name] = name === "firstName" ? "Nombre es obligatorio" : "Apellido es obligatorio";
       } else {
         delete newErrors[name];
       }
       setFormErrors(newErrors);
+      return;
     }
 
     // Validación inmediata de campos obligatorios
@@ -144,7 +182,55 @@ const RegisterUser = () => {
 
     if (name === "role") {
       const selectedRole = rolesList.find(role => role.id === parseInt(value));
-      setIsDoctor(selectedRole?.name === "Doctor");
+      const isDoctorRole = selectedRole?.name === "Doctor";
+      setIsDoctor(isDoctorRole);
+      
+      // Si no es doctor, limpiar la especialidad
+      if (!isDoctorRole) {
+        setFormData((prev) => ({ ...prev, [name]: value, specialty: "" }));
+        // También limpiar el error de especialidad si existe
+        const newErrors = { ...formErrors };
+        delete newErrors.specialty;
+        setFormErrors(newErrors);
+        return;
+      }
+    }
+
+    if (name === 'birthdate') {
+      setFormData(prev => ({ ...prev, [name]: value }));
+      
+      const newErrors = { ...formErrors };
+      
+      if (newErrors.birthdate) {
+        delete newErrors.birthdate;
+      }
+
+      if (value === '') {
+        newErrors.birthdate = 'Fecha de nacimiento es obligatoria';
+      } else if (value.length < 10) {
+        newErrors.birthdate = 'Ingrese la fecha completa (día/mes/año)';
+      } else if (value.length === 10) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const birthDate = new Date(value);
+
+        if (isNaN(birthDate.getTime())) {
+          newErrors.birthdate = 'Fecha de nacimiento inválida';
+        } else if (birthDate > today) {
+          newErrors.birthdate = 'La fecha de nacimiento no puede ser en el futuro';
+        } else {
+          const calculatedAge = calculateAge(value);
+          // ✅ Validación específica para usuarios: deben ser mayores de edad
+          if (calculatedAge < 18) {
+            newErrors.birthdate = 'Los usuarios del sistema deben ser mayores de 18 años';
+          } else if (calculatedAge > 80) {
+            newErrors.birthdate = 'Edad inválida - debe estar entre 18 y 80 años';
+          }
+        }
+      }
+
+      setFormErrors({ ...newErrors, _timestamp: Date.now() });
+      return;
     }
   };
 
@@ -163,10 +249,11 @@ const handleEmailChange = (e) => {
   setFormErrors(newErrors);
 };
 
-  // Función para validar solo letras y espacios
+  // Función para validar solo letras, espacios y caracteres acentuados
   const isValidName = (name) => {
-    const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/;
-    return nameRegex.test(name);
+    // Regex más estricta: solo letras (incluye acentos), espacios, y algunos caracteres especiales del español
+    const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]*$/;
+    return nameRegex.test(name) && name.trim().length > 0;
   };
 
   const validateForm = () => {
@@ -212,6 +299,30 @@ const handleEmailChange = (e) => {
       }
     }
 
+
+    if (!formData.birthdate) {
+      errors.birthdate = 'Fecha de nacimiento es obligatoria';
+    } else if (formData.birthdate.length !== 10) {
+      errors.birthdate = 'Ingrese la fecha completa';
+    } else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const birthDate = new Date(formData.birthdate);
+
+      if (isNaN(birthDate.getTime())) {
+        errors.birthdate = 'Fecha de nacimiento inválida';
+      } else if (birthDate > today) {
+        errors.birthdate = 'La fecha de nacimiento no puede ser en el futuro';
+      } else if (age !== null) {
+        // ✅ Validación específica para usuarios del sistema
+        if (age < 18) {
+          errors.birthdate = 'Los usuarios del sistema deben ser mayores de 18 años';
+        } else if (age > 80) {
+          errors.birthdate = 'Edad inválida - debe estar entre 18 y 80 años';
+        }
+      }
+    }
+
     setFormErrors(errors);
     
     if (Object.keys(errors).length > 0) {
@@ -245,7 +356,8 @@ const handleEmailChange = (e) => {
       last_name: formData.lastName,
       email: formData.email,
       role_id: parseInt(formData.role),
-      specialty: formData.specialty
+      specialty: formData.specialty,
+      birthdate: formData.birthdate  
     };
 
     try {
@@ -264,8 +376,10 @@ const handleEmailChange = (e) => {
         email: "",
         role: "",
         specialty: "",
+        birthdate: "",  
       });
       setIsDoctor(false);
+      setAge(null);  
     } catch (error) {
       console.error('Error al registrar el usuario:', error);
       setFormError(error.message || 'Error al registrar el usuario.');
@@ -285,6 +399,7 @@ const handleEmailChange = (e) => {
       email: "",
       role: "",
       specialty: "",
+      birthdate: "",
     });
     setIsDoctor(false);
     setEmailError('');
@@ -314,6 +429,62 @@ const handleEmailChange = (e) => {
           {successMessage}
         </div>
       )}
+      
+      {formData.birthdate && formData.birthdate.length > 0 && (
+        <div className={`mb-6 p-4 rounded-lg max-w-[700px] w-full ${
+          (age !== null && (age < 18 || age > 80)) || formErrors.birthdate
+            ? 'bg-red-50 border border-red-200'
+            : formData.birthdate.length === 10 && age !== null && age >= 18 && age <= 80
+              ? 'bg-blue-50 border border-blue-200'
+              : 'bg-yellow-50 border border-yellow-200'
+          }`}>
+          <p className={`font-poppins ${
+            (age !== null && (age < 18 || age > 80)) || formErrors.birthdate
+              ? 'text-red-700'
+              : formData.birthdate.length === 10 && age !== null && age >= 18 && age <= 80
+                ? 'text-blue-700'
+                : 'text-yellow-700'
+            }`}>
+            {formData.birthdate.length < 10 ? (
+              <>
+                <span className="font-semibold">⏳ Completando fecha de nacimiento...</span>
+                <span className="block text-sm mt-1">
+                  Fecha actual: {formData.birthdate}
+                </span>
+              </>
+            ) : formData.birthdate.length === 10 && age !== null && age >= 18 && age <= 80 ? (
+              <>
+                <span className="font-semibold">Fecha válida</span>
+                <span className="block text-sm mt-1">
+                  Fecha de nacimiento: {formData.birthdate} | Edad: {age} años
+                </span>
+              </>
+            ) : age !== null && age < 18 ? (
+              <>
+                <span className="font-semibold">⚠️ Edad insuficiente</span>
+                <span className="block text-sm mt-1">
+                  Los usuarios del sistema deben ser mayores de 18 años (Edad actual: {age} años)
+                </span>
+              </>
+            ) : age !== null && age > 90 ? (
+              <>
+                <span className="font-semibold">⚠️ Edad excesiva</span>
+                <span className="block text-sm mt-1">
+                  Edad máxima permitida: 90 años (Edad actual: {age} años)
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="font-semibold">⚠️ Fecha inválida</span>
+                <span className="block text-sm mt-1">
+                  Verifique el formato de la fecha de nacimiento
+                </span>
+              </>
+            )}
+          </p>
+        </div>
+      )}
+
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-[700px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-x-[80px] gap-y-4 justify-center"
@@ -329,7 +500,6 @@ const handleEmailChange = (e) => {
             placeholder="Seleccione tipo de documento"
           >
             <option value="CC">Cédula de Ciudadanía</option>
-            <option value="TI">Tarjeta de Identidad</option>
             <option value="CE">Cédula de Extranjería</option>
             <option value="PP">Pasaporte</option>
           </Select>
@@ -433,30 +603,47 @@ const handleEmailChange = (e) => {
             <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.role}</p>
           )}
         </div>
-        {/* Columna Derecha */}
+        {/* Columna Derecha - Especialidad (solo visible si es Doctor) */}
+        {isDoctor && (
+          <div className="flex flex-col items-center md:items-start w-full">
+            <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">
+              Especialidad del doctor *
+            </label>
+            <Select
+              name="specialty"
+              value={formData.specialty}
+              onChange={handleChange}
+              error={!!formErrors.specialty}
+              placeholder="Seleccione la especialidad"
+            >
+              {specialties.map((specialty) => (
+                <option key={specialty} value={specialty}>{specialty}</option>
+              ))}
+            </Select>
+            {formErrors.specialty && (
+              <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.specialty}</p>
+            )}
+          </div>
+        )}
+
+        {/* Fecha de nacimiento - PRIMERO para calcular edad */}
         <div className="flex flex-col items-center md:items-start w-full">
-          <label className={cn("block text-gray-700 font-poppins font-semibold mb-2 !text-18", !isDoctor && 'text-gray-400')}>
-            Especialidad del doctor {isDoctor && '*'}
+          <label className="block text-gray-700 font-poppins font-semibold mb-2 text-18">
+            Fecha de nacimiento *
           </label>
-          <Select
-            name="specialty"
-            value={formData.specialty}
+          <DateInput
+            name="birthdate"
+            value={formData.birthdate}
             onChange={handleChange}
-            disabled={!isDoctor}
-            error={!!formErrors.specialty}
-            placeholder="Seleccione la especialidad"
-          >
-            {specialties.map((specialty) => (
-              <option key={specialty} value={specialty}>{specialty}</option>
-            ))}
-          </Select>
-          {formErrors.specialty && (
-            <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.specialty}</p>
-          )}
-          {!isDoctor && (
-            <p className="text-gray-500 text-sm font-poppins mt-1">Solo requerido para usuarios con rol de Doctor</p>
+            error={!!formErrors.birthdate}
+          />
+          {formErrors.birthdate && (
+            <p className="text-red-500 text-sm mt-2 font-poppins">{formErrors.birthdate}</p>
           )}
         </div>
+
+        {/* Campo vacío para mantener grid */}
+        <div></div>
       </form>
       <div className="flex flex-col md:flex-row justify-center items-center md:space-x-6 space-y-4 md:space-y-0 mt-10 w-full max-w-[700px] mx-auto">
         <Button
