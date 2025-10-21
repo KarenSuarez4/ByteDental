@@ -5,6 +5,7 @@ import Input from "../../components/Input";
 import Select from "../../components/Select";
 import TextArea from "../../components/TextArea";
 import ConfirmDialog from "../../components/ConfirmDialog";
+import { toast } from "react-toastify";
 import {
   getDentalServices,
   updateDentalService,
@@ -179,6 +180,7 @@ function DentalServiceManagement() {
 
     if (nameExists) {
       setEditFormErrors({ name: "Ya existe un servicio con este nombre. Por favor, elija un nombre diferente." });
+      toast.error("Ya existe un servicio con este nombre.");
       return;
     }
 
@@ -194,6 +196,7 @@ function DentalServiceManagement() {
       await updateDentalService(editService.id, updateData, token);
 
       setSuccessMsg("Servicio actualizado correctamente");
+      toast.success("Servicio actualizado correctamente");
       setEditService(null);
       await loadServices();
       setEditFormErrors({});

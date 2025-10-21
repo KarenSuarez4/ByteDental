@@ -19,6 +19,8 @@ import PatientManagement from './pages/Asistente/PatientManagement';
 import DummyPage from './pages/DummyPage';
 import RegisterPatientFirstHistory from './pages/Doctor/RegisterPatientFirstHistory.jsx';
 import HistoryManagement from './pages/Doctor/HistoryManagement.jsx';
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function AppContent() {
   const { isAuthenticated, userRole, mustChangePassword, loading } = useAuth();
@@ -85,16 +87,18 @@ function App() {
     <Router>
       <AuthProvider>
         <AppContent />
-        {/* <Toaster
+        <ToastContainer
           position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-            },
-          }}
-        /> */}
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="colored"
+        />
       </AuthProvider>
     </Router>
   );

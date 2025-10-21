@@ -6,6 +6,7 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useAuth } from "../../contexts/AuthContext";
 import { createDentalService, getDentalServices } from "../../services/dentalServiceService";
+import { toast } from "react-toastify";
 
 function cn(...args) {
   return twMerge(clsx(args));
@@ -145,6 +146,7 @@ const RegisterDentalService = () => {
       await createDentalService(servicePayload, token);
       
       setSuccessMessage("¡Servicio odontológico registrado con éxito!");
+      toast.success("¡Servicio odontológico registrado con éxito.!");
       
       // Recargar servicios existentes para futuras validaciones
       try {
@@ -170,6 +172,7 @@ const RegisterDentalService = () => {
       
       if (errorMessage.includes("nombre") && errorMessage.includes("existe")) {
         setFormErrors({ name: "Ya existe un servicio con este nombre. Por favor, elija un nombre diferente." });
+        toast.error("Ya existe un servicio con este nombre.");
       } else {
         setFormError(errorMessage);
       }
