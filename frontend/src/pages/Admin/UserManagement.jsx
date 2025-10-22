@@ -7,7 +7,8 @@ import ConfirmDialog from "../../components/ConfirmDialog";
 import SearchInput from "../../components/SearchInput"; 
 import FilterBar from "../../components/FilterBar"; 
 import DateInput from "../../components/DateInput";  
-import toast from "react-toastify";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { getAllUsers as getUsers, updateUser, deactivateUser, activateUser, getRoles } from "../../services/userService";
 
 const tableHeaderClass = "bg-header-blue text-white font-semibold text-center font-poppins text-18";

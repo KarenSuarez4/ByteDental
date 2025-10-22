@@ -7,6 +7,7 @@ import { twMerge } from 'tailwind-merge';
 import { useAuth } from "../../contexts/AuthContext";
 import { createDentalService, getDentalServices } from "../../services/dentalServiceService";
 import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function cn(...args) {
   return twMerge(clsx(args));

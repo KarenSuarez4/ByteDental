@@ -6,6 +6,7 @@ import Select from "../../components/Select";
 import TextArea from "../../components/TextArea";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import {
   getDentalServices,
   updateDentalService,

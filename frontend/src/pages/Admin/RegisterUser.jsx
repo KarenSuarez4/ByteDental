@@ -10,6 +10,7 @@ import { createUser } from "../../services/userService";
 import { getRoles } from "../../services/userService";
 import { useAuth } from "../../contexts/AuthContext"; 
 import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function cn(...args) {
   return twMerge(clsx(args));

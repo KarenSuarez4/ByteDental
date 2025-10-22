@@ -7,6 +7,8 @@ import ProgressBar from "../../components/ProgressBar";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 import { createPatient } from "../../services/patientService";
 import { useAuth } from "../../contexts/AuthContext";
@@ -720,6 +722,7 @@ const RegisterPatient = () => {
 
     if (!validateForm()) {
       setFormError('Por favor, complete todos los campos obligatorios.');
+      toast.error("Complete todos los campos obligatorios");
       return;
     }
 
