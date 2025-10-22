@@ -6,6 +6,8 @@ import InputPassword from '../components/InputPassword';
 import Button from '../components/Button';
 import GoogleSignIn from '../components/GoogleSignIn';
 import LoadingScreen from '../components/LoadingScreen';
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { loginWithGoogle, loginWithEmailAndPassword, logout } from '../Firebase/client';
 import { 
   registerLoginEvent, 
@@ -191,6 +193,7 @@ const Login = () => {
             if (auditError.response.status === 401) {
               if (typeof errorData === 'object' && errorData.message) {
                 setLoginError(errorData.message);
+                toast.error(errorData.message);
                 errorHandled = true;
               } else if (typeof errorData === 'string') {
                 setLoginError(errorData);
@@ -241,6 +244,7 @@ const Login = () => {
           await registerLoginEvent(user.email, false, "Usuario desactivado", user.uid);
           await logout();
           setLoginError('Tu cuenta ha sido desactivada. Contacta al administrador.');
+          toast.error('Tu cuenta ha sido desactivada. Contacta al administrador.');
           return;
         } else if (isActive === null) {
           // Error al verificar estado - continuar con el login pero registrar warning

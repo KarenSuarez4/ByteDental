@@ -8,6 +8,8 @@ import ConfirmDialog from "../../components/ConfirmDialog";
 import SearchInput from "../../components/SearchInput"; 
 import FilterBar from "../../components/FilterBar"; 
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { getAllPatients, updatePatient, deactivatePatient, activatePatient } from "../../services/patientService";
 import { getClinicalHistoriesByPatient, checkPatientHasHistory } from "../../services/historyPatientService";
 import { FaEye } from "react-icons/fa";
@@ -298,6 +300,7 @@ function PatientManagement() {
       setEditForm((prev) => ({ ...prev, [name]: value }));
       if (value && value.length !== 10) {
         setPhoneEditError("El teléfono debe tener exactamente 10 dígitos.");
+        toast.error("El teléfono debe tener exactamente 10 dígitos")
       } else {
         setPhoneEditError("");
       }
@@ -683,6 +686,7 @@ function PatientManagement() {
 
       await updatePatient(editPatient.id, updateData, token);
       setSuccessMsg("Paciente actualizado correctamente");
+      toast.success("Paciente actualizado correctamentes");
       setEditPatient(null);
       setLoading(true);
       const updatedPatients = await getAllPatients(token);
@@ -692,6 +696,7 @@ function PatientManagement() {
       setGuardianFormErrors({});
     } catch (err) {
       setEditFormErrors({ general: err.message || "Error al actualizar paciente" });
+      toast.error(err.message || "Error al actualizar paciente");
     } finally {
       setEditLoading(false);
     }
@@ -726,6 +731,7 @@ function PatientManagement() {
   const handleDeactivate = async () => {
     if (!deactivationModal.reason.trim()) {
       setEditError("El motivo de desactivación es obligatorio");
+      toast.error("El motivo de desactivación es obligatorio");
       return;
     }
 
@@ -734,6 +740,7 @@ function PatientManagement() {
     try {
       await deactivatePatient(deactivationModal.patient.id, deactivationModal.reason.trim(), token);
       setSuccessMsg("Paciente desactivado correctamente");
+      toast.success("Paciente desactivado correctamente");
 
       // Cerrar modal
       setDeactivationModal({ open: false, patient: null, reason: '', loading: false });
@@ -746,6 +753,7 @@ function PatientManagement() {
     } catch (err) {
       console.error('Error al desactivar paciente:', err);
       setEditError(err.message || "Error al desactivar paciente");
+      toast.error(err.message || "Error al desactivar paciente");
       setDeactivationModal(prev => ({ ...prev, loading: false }));
     }
   };
@@ -755,12 +763,14 @@ function PatientManagement() {
     try {
       await activatePatient(patient.id, token);
       setSuccessMsg("Paciente activado correctamente");
+      toast.success("Paciente activado correctamente")
       setLoading(true);
       const updatedPatients = await getAllPatients(token);
       setPatients(updatedPatients);
       setLoading(false);
     } catch (err) {
       setEditError(err.message || "Error al activar paciente");
+      toast.error(err.message || "Error al activar paciente");
     }
   };
 
