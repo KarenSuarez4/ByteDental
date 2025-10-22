@@ -1158,7 +1158,7 @@ const RegisterPatient = () => {
           <Input
             name="occupation"
             type="text"
-            placeholder="ingrese la ocupación"
+            placeholder="Ingrese la ocupación"
             value={formData.occupation}
             onChange={handleChange}
             error={!!formErrors.occupation}
