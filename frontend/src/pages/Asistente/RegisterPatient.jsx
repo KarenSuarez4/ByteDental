@@ -225,9 +225,53 @@ const RegisterPatient = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    // Convertir nombres y apellidos a mayúsculas
-    if (["nombres", "apellidos", "guardian_nombres", "guardian_apellidos"].includes(name)) {
-      setFormData((prev) => ({ ...prev, [name]: value.toUpperCase() }));
+    // Validación preventiva y filtrado para campos de texto que solo deben contener letras
+    if (name === 'nombres' || name === 'apellidos' || name === 'guardian_nombres' || name === 'guardian_apellidos' || name === 'occupation') {
+      // Filtrar caracteres no válidos antes de establecer el valor
+      const filteredValue = filterValidNameChars(value);
+      
+      // Solo actualizar si el valor filtrado es diferente o si no había filtrado
+      if (filteredValue !== value) {
+        // Si hubo caracteres inválidos, no actualizar el estado y retornar
+        return;
+      }
+
+      // Convertir a mayúsculas para nombres y apellidos (pero no para ocupación)
+      const finalValue = ["nombres", "apellidos", "guardian_nombres", "guardian_apellidos"].includes(name) 
+        ? filteredValue.toUpperCase() 
+        : filteredValue;
+
+      const newErrors = { ...formErrors };
+
+      // Limpiar error anterior primero
+      if (newErrors[name]) {
+        delete newErrors[name];
+      }
+
+      if (filteredValue && !isValidName(filteredValue)) {
+        const fieldNames = {
+          nombres: 'Los nombres solo pueden contener letras y espacios',
+          apellidos: 'Los apellidos solo pueden contener letras y espacios',
+          guardian_nombres: 'Los nombres del tutor solo pueden contener letras y espacios',
+          guardian_apellidos: 'Los apellidos del tutor solo pueden contener letras y espacios',
+          occupation: 'La ocupación solo puede contener letras y espacios'
+        };
+        newErrors[name] = fieldNames[name];
+      } else if (!filteredValue) {
+        const requiredMessages = {
+          nombres: 'Nombres son obligatorios',
+          apellidos: 'Apellidos son obligatorios',
+          guardian_nombres: 'Nombres del tutor son obligatorios',
+          guardian_apellidos: 'Los apellidos del tutor son obligatorios',
+          occupation: 'Ocupación es obligatoria'
+        };
+        newErrors[name] = requiredMessages[name];
+      }
+
+      setFormErrors({ ...newErrors, _timestamp: Date.now() });
+      
+      // Actualizar el estado con el valor filtrado y convertido
+      setFormData((prev) => ({ ...prev, [name]: finalValue }));
       return;
     }
 
@@ -293,50 +337,7 @@ const RegisterPatient = () => {
       return;
     }
 
-    // Validación preventiva y filtrado para campos de texto que solo deben contener letras
-    if (name === 'nombres' || name === 'apellidos' || name === 'guardian_nombres' || name === 'guardian_apellidos' || name === 'occupation') {
-      // Filtrar caracteres no válidos antes de establecer el valor
-      const filteredValue = filterValidNameChars(value);
-      
-      // Solo actualizar si el valor filtrado es diferente o si no había filtrado
-      if (filteredValue !== value) {
-        // Si hubo caracteres inválidos, no actualizar el estado y retornar
-        return;
-      }
 
-      const newErrors = { ...formErrors };
-
-      // Limpiar error anterior primero
-      if (newErrors[name]) {
-        delete newErrors[name];
-      }
-
-      if (filteredValue && !isValidName(filteredValue)) {
-        const fieldNames = {
-          nombres: 'Los nombres solo pueden contener letras y espacios',
-          apellidos: 'Los apellidos solo pueden contener letras y espacios',
-          guardian_nombres: 'Los nombres del tutor solo pueden contener letras y espacios',
-          guardian_apellidos: 'Los apellidos del tutor solo pueden contener letras y espacios',
-          occupation: 'La ocupación solo puede contener letras y espacios'
-        };
-        newErrors[name] = fieldNames[name];
-      } else if (!filteredValue) {
-        const requiredMessages = {
-          nombres: 'Nombres son obligatorios',
-          apellidos: 'Apellidos son obligatorios',
-          guardian_nombres: 'Nombres del tutor son obligatorios',
-          guardian_apellidos: 'Los apellidos del tutor son obligatorios',
-          occupation: 'Ocupación es obligatoria'
-        };
-        newErrors[name] = requiredMessages[name];
-      }
-
-      setFormErrors({ ...newErrors, _timestamp: Date.now() });
-      
-      // Actualizar el estado con el valor filtrado
-      setFormData((prev) => ({ ...prev, [name]: filteredValue }));
-      return;
-    }
 
     // Validación inmediata para fecha de nacimiento
     if (name === 'birthdate') {
@@ -1157,7 +1158,7 @@ const RegisterPatient = () => {
           <Input
             name="occupation"
             type="text"
-            placeholder="Ingrese la ocupación"
+            placeholder="ingrese la ocupación"
             value={formData.occupation}
             onChange={handleChange}
             error={!!formErrors.occupation}
