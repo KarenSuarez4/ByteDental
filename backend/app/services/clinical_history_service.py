@@ -61,6 +61,7 @@ class ClinicalHistoryService:
                 medical_history=str(data.medical_history),
                 findings=data.findings,
                 doctor_signature=hashed_signature,  # Usar la firma hasheada
+                is_active=patient.is_active,  # Heredar el estado del paciente
             )
             self.db.add(clinical_history)
             self.db.commit()
