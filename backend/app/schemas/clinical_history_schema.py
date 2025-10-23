@@ -5,12 +5,14 @@ from datetime import datetime
 class TreatmentCreate(BaseModel):
     dental_service_id: int
     treatment_date: datetime
+    reason: str  # Motivo de consulta del tratamiento (obligatorio)
     notes: Optional[str] = None
 
 class TreatmentResponse(BaseModel):
     date: datetime
     name: str
     doctor_name: str
+    reason: str  # Motivo de consulta del tratamiento
     notes: Optional[str] = None
 
 class ClinicalHistoryCreate(BaseModel):

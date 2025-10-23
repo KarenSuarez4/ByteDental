@@ -119,10 +119,10 @@ class ClinicalHistoryService:
         treatments_response = []
         
         for treatment_data in treatments_data:
-            if not treatment_data.dental_service_id or not treatment_data.treatment_date:
+            if not treatment_data.dental_service_id or not treatment_data.treatment_date or not treatment_data.reason:
                 raise HTTPException(
                     status_code=400,
-                    detail="Datos de tratamiento incompletos."
+                    detail="Datos de tratamiento incompletos. Se requiere servicio dental, fecha y motivo de consulta."
                 )
 
             # Obtener el servicio dental
@@ -141,6 +141,7 @@ class ClinicalHistoryService:
                 dental_service_id=treatment_data.dental_service_id,
                 doctor_id=doctor_id,
                 treatment_date=treatment_data.treatment_date,
+                reason=treatment_data.reason,  # Agregar motivo de consulta
                 notes=treatment_data.notes
             )
             self.db.add(treatment)
@@ -150,6 +151,7 @@ class ClinicalHistoryService:
                 "date": treatment_data.treatment_date,
                 "name": dental_service.name,
                 "doctor_name": f"{self.current_user.first_name} {self.current_user.last_name}",
+                "reason": treatment_data.reason,  # Incluir en la respuesta
                 "notes": treatment_data.notes
             })
 
@@ -189,6 +191,7 @@ class ClinicalHistoryService:
                         "date": treatment.treatment_date,
                         "name": treatment.dental_service.name,
                         "doctor_name": treatment.doctor_id,
+                        "reason": treatment.reason,  # Agregar motivo de consulta
                         "notes": treatment.notes
                     }
                     for treatment in history.treatments
@@ -220,6 +223,14 @@ class ClinicalHistoryService:
         for treatment in treatments:
             service_name = treatment.dental_service.name if treatment.dental_service else "Servicio desconocido"
             doctor_name = f"{treatment.doctor.first_name} {treatment.doctor.last_name}" if treatment.doctor else "Doctor desconocido"
+            
+            previous_treatments.append({
+                "date": treatment.treatment_date,
+                "name": service_name,
+                "doctor_name": doctor_name,
+                "reason": treatment.reason,  # Agregar motivo de consulta
+                "notes": treatment.notes
+            })
 
             previous_treatments.append({
                 "date": treatment.treatment_date,
@@ -280,6 +291,7 @@ class ClinicalHistoryService:
                     "treatment_date": treatment.treatment_date,
                     "name": treatment.dental_service.name if treatment.dental_service else "Servicio no especificado",
                     "doctor_name": doctor_name,
+                    "reason": treatment.reason,  # Agregar motivo de consulta
                     "notes": treatment.notes,
                     "dental_service": {
                         "id": treatment.dental_service.id if treatment.dental_service else None,
@@ -582,12 +594,18 @@ class ClinicalHistoryService:
                 dental_service_id=treatment_data.get('dental_service_id'),
                 doctor_id=self.current_user.uid,
                 treatment_date=treatment_data.get('treatment_date'),
+                reason=treatment_data.get('reason'),  # Agregar motivo de consulta
                 notes=treatment_data.get('notes')
             )
             
             self.db.add(new_treatment)
             self.db.commit()
             self.db.refresh(new_treatment)
+            
+            # Actualizar el motivo de consulta de la historia clínica
+            clinical_history.reason = treatment_data.get('reason')
+            self.db.commit()
+            self.db.refresh(clinical_history)
             
             # Obtener IP del cliente
             ip_cliente = get_client_ip(request)
@@ -607,6 +625,7 @@ class ClinicalHistoryService:
                         "treatment_id": new_treatment.id,
                         "dental_service_name": dental_service.name,
                         "treatment_date": str(treatment_data.get('treatment_date')),
+                        "reason": treatment_data.get('reason'),  # Incluir motivo en auditoría
                         "notes": treatment_data.get('notes')
                     },
                     ip_origen=ip_cliente,
@@ -621,6 +640,7 @@ class ClinicalHistoryService:
                     "date": new_treatment.treatment_date,
                     "name": dental_service.name,
                     "doctor_name": f"{self.current_user.first_name} {self.current_user.last_name}",
+                    "reason": new_treatment.reason,  # Incluir en la respuesta
                     "notes": new_treatment.notes
                 }
             }
