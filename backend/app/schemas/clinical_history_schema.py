@@ -7,6 +7,7 @@ class TreatmentCreate(BaseModel):
     treatment_date: datetime
     reason: str  # Motivo de consulta del tratamiento (obligatorio)
     notes: Optional[str] = None
+    doctor_password: str  # Contraseña del doctor para firma digital
 
 class TreatmentResponse(BaseModel):
     date: datetime
@@ -21,7 +22,7 @@ class ClinicalHistoryCreate(BaseModel):
     symptoms: str
     medical_history: dict
     findings: Optional[str] = None  
-    doctor_signature: str
+    doctor_password: str  # Contraseña del doctor para firma digital
     treatments: List[TreatmentCreate]  
 
 class ClinicalHistoryResponse(BaseModel):

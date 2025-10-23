@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     
     # Firebase
     firebase_credentials_path: str = os.getenv("FIREBASE_CREDENTIALS_PATH", "firebase-credentials.json")
+    firebase_api_key: str = os.getenv("FIREBASE_API_KEY", "")  # API Key para verificar contraseñas
     
     class Config:
         env_file = ".env"

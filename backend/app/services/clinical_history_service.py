@@ -11,7 +11,8 @@ from app.models.user_models import User
 from app.models.dental_service_models import DentalService
 from app.schemas.clinical_history_schema import ClinicalHistoryCreate
 from fastapi import HTTPException, Request, status
-from app.services.auditoria_service import AuditoriaService  
+from app.services.auditoria_service import AuditoriaService
+from app.services.firebase_service import FirebaseService  
 
 def get_client_ip(request: Request) -> str:
     """Obtener la IP del cliente"""
@@ -40,6 +41,7 @@ class ClinicalHistoryService:
         patient = self.db.query(Patient).filter(Patient.id == data.patient_id).first()
         if not patient:
             raise HTTPException(status_code=404, detail="Paciente no encontrado")
+        
         existing_history = self.db.query(ClinicalHistory).filter(
             ClinicalHistory.patient_id == data.patient_id
         ).first()
@@ -50,9 +52,28 @@ class ClinicalHistoryService:
                 detail="El paciente ya tiene una historia clínica registrada."
             )
 
+        # ✅ VALIDAR CONTRASEÑA DEL DOCTOR (Firma Digital)
+        if not self.current_user or not self.current_user.email:
+            raise HTTPException(
+                status_code=401,
+                detail="No se pudo identificar al usuario actual"
+            )
+        
+        # Verificar contraseña con Firebase
+        is_password_valid = FirebaseService.verify_password(
+            email=self.current_user.email,
+            password=data.doctor_password
+        )
+        
+        if not is_password_valid:
+            raise HTTPException(
+                status_code=403,
+                detail="Contraseña incorrecta. La firma digital no pudo ser verificada."
+            )
+
         try:
-            # Hash de la firma del doctor
-            hashed_signature = hash_doctor_signature(data.doctor_signature)
+            # Hash de la contraseña como firma digital
+            hashed_signature = hash_doctor_signature(data.doctor_password)
             
             clinical_history = ClinicalHistory(
                 patient_id=data.patient_id,
@@ -567,6 +588,33 @@ class ClinicalHistoryService:
         Agregar un nuevo tratamiento a una historia clínica existente
         """
         try:
+            # ✅ VALIDAR CONTRASEÑA DEL DOCTOR (Firma Digital)
+            doctor_password = treatment_data.get('doctor_password')
+            
+            if not doctor_password:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="La contraseña del doctor es requerida para firmar el tratamiento"
+                )
+            
+            if not self.current_user or not self.current_user.email:
+                raise HTTPException(
+                    status_code=401,
+                    detail="No se pudo identificar al usuario actual"
+                )
+            
+            # Verificar contraseña con Firebase
+            is_password_valid = FirebaseService.verify_password(
+                email=self.current_user.email,
+                password=doctor_password
+            )
+            
+            if not is_password_valid:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Contraseña incorrecta. La firma digital no pudo ser verificada."
+                )
+            
             # Verificar que la historia clínica existe
             clinical_history = self.db.query(ClinicalHistory).filter(
                 ClinicalHistory.id == history_id
@@ -627,7 +675,8 @@ class ClinicalHistoryService:
                         "dental_service_name": dental_service.name,
                         "treatment_date": str(treatment_data.get('treatment_date')),
                         "reason": treatment_data.get('reason'),  # Incluir motivo en auditoría
-                        "notes": treatment_data.get('notes')
+                        "notes": treatment_data.get('notes'),
+                        "digital_signature_verified": True  # Indicar que se verificó la firma
                     },
                     ip_origen=ip_cliente,
                     usuario_rol=self.current_user.role.name if self.current_user.role else None,
