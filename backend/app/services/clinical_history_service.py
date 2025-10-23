@@ -654,4 +654,296 @@ class ClinicalHistoryService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error al agregar tratamiento: {str(e)}"
             )
+    
+    def change_clinical_history_status(
+        self, 
+        history_id: int, 
+        new_status: bool, 
+        closure_reason: Optional[str],
+        request: Request
+    ) -> dict:
+        """
+        Cambiar estado de historia clínica (cerrar/reabrir) con validación y auditoría
+        
+        Args:
+            history_id: ID de la historia clínica
+            new_status: True para activa, False para cerrada
+            closure_reason: Motivo de cierre (requerido si new_status=False)
+            request: Request para obtener IP del cliente
+        
+        Returns:
+            dict con información del cambio realizado
+        
+        Raises:
+            HTTPException: Si las validaciones fallan
+        """
+        try:
+            # Verificar que la historia clínica existe
+            clinical_history = self.db.query(ClinicalHistory).filter(
+                ClinicalHistory.id == history_id
+            ).first()
+            
+            if not clinical_history:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Historia clínica no encontrada"
+                )
+            
+            # Obtener información del paciente
+            patient = self.db.query(Patient).filter(
+                Patient.id == clinical_history.patient_id
+            ).first()
+            
+            if not patient:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Paciente no encontrado"
+                )
+            
+            # Guardar estado anterior para auditoría
+            previous_status = clinical_history.is_active
+            previous_closure_reason = clinical_history.closure_reason
+            patient_name = f"{patient.person.first_name} {patient.person.first_surname}"
+            
+            # Validar transición de estado
+            if previous_status == new_status:
+                status_text = "activa" if new_status else "cerrada"
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"La historia clínica ya está {status_text}"
+                )
+            
+            # Validar motivo para cierre
+            if not new_status and not closure_reason:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="El motivo de cierre es requerido para cerrar una historia clínica"
+                )
+            
+            if new_status and closure_reason:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No se debe proporcionar motivo al reabrir una historia clínica"
+                )
+            
+            # Actualizar estado y motivo de cierre
+            clinical_history.is_active = new_status
+            
+            if new_status:
+                # Si se está reabriendo, limpiar el motivo y fecha de cierre
+                clinical_history.closure_reason = None
+                clinical_history.closed_at = None
+            else:
+                # Si se está cerrando, guardar el motivo y fecha de cierre
+                from datetime import datetime
+                clinical_history.closure_reason = closure_reason
+                clinical_history.closed_at = datetime.now()
+            
+            self.db.commit()
+            self.db.refresh(clinical_history)
+            
+            # Obtener IP del cliente
+            ip_cliente = get_client_ip(request)
+            
+            # Preparar detalles para auditoría
+            change_details = {
+                "is_active": {
+                    "antes": previous_status,
+                    "despues": new_status
+                },
+                "closure_reason": {
+                    "antes": previous_closure_reason,
+                    "despues": closure_reason if not new_status else None
+                },
+                "closed_at": {
+                    "antes": None,
+                    "despues": str(clinical_history.closed_at) if clinical_history.closed_at else None
+                }
+            }
+            
+            # Preparar descripción del evento
+            if new_status:
+                event_description = f"Historia clínica reabierta - Paciente: {patient_name}"
+                event_type = "REACTIVATE"
+            else:
+                event_description = f"Historia clínica cerrada - Paciente: {patient_name} - Motivo: {closure_reason}"
+                event_type = "DEACTIVATE"
+            
+            # Registrar evento de auditoría
+            if self.current_user:
+                AuditoriaService.registrar_evento(
+                    db=self.db,
+                    usuario_id=str(self.current_user.uid),
+                    tipo_evento=event_type,
+                    registro_afectado_id=str(history_id),
+                    registro_afectado_tipo="clinical_histories",
+                    descripcion_evento=event_description,
+                    detalles_cambios=change_details,
+                    ip_origen=ip_cliente,
+                    usuario_rol=self.current_user.role.name if self.current_user.role else None,
+                    usuario_email=self.current_user.email
+                )
+            
+            return {
+                "clinical_history_id": history_id,
+                "patient_id": clinical_history.patient_id,
+                "patient_name": patient_name,
+                "previous_status": "activa" if previous_status else "cerrada",
+                "new_status": "activa" if new_status else "cerrada",
+                "closure_reason": closure_reason if not new_status else None,
+                "closed_at": clinical_history.closed_at,
+                "message": f"Historia clínica {'reabierta' if new_status else 'cerrada'} correctamente"
+            }
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error al cambiar estado de historia clínica: {str(e)}"
+            )
+    
+    def auto_close_inactive_histories(self, request: Request) -> dict:
+        """
+        Cierra automáticamente las historias clínicas que no tienen tratamientos
+        registrados en los últimos 5 años.
+        
+        Este método:
+        1. Identifica historias activas sin tratamientos en > 5 años
+        2. Las deshabilita automáticamente
+        3. Registra el motivo y fecha de cierre
+        4. Genera auditoría para cada cierre
+        
+        Args:
+            request: Request de FastAPI para obtener IP
+            
+        Returns:
+            dict: Información sobre las historias cerradas
+            
+        Raises:
+            HTTPException: Si hay error en el proceso
+        """
+        try:
+            from datetime import datetime, timedelta
+            from sqlalchemy import and_, not_, exists
+            from app.models.treatment_models import Treatment
+            
+            # Calcular fecha límite (5 años atrás desde hoy)
+            five_years_ago = datetime.now() - timedelta(days=5*365)
+            
+            # Buscar historias activas que:
+            # 1. Están activas (is_active = True)
+            # 2. NO tienen tratamientos posteriores a la fecha límite
+            # 3. O no tienen ningún tratamiento
+            
+            # Subconsulta: IDs de historias que SÍ tienen tratamientos recientes
+            recent_treatments_subquery = (
+                self.db.query(Treatment.clinical_history_id)
+                .filter(Treatment.treatment_date >= five_years_ago)
+                .subquery()
+            )
+            
+            # Query principal: historias activas SIN tratamientos recientes
+            inactive_histories = (
+                self.db.query(ClinicalHistory)
+                .filter(
+                    and_(
+                        ClinicalHistory.is_active == True,
+                        ClinicalHistory.id.notin_(
+                            self.db.query(recent_treatments_subquery.c.clinical_history_id)
+                        )
+                    )
+                )
+                .all()
+            )
+            
+            closed_histories = []
+            
+            # Cerrar cada historia inactiva
+            for history in inactive_histories:
+                try:
+                    # Obtener último tratamiento (si existe) para el mensaje
+                    last_treatment = (
+                        self.db.query(Treatment)
+                        .filter(Treatment.clinical_history_id == history.id)
+                        .order_by(Treatment.treatment_date.desc())
+                        .first()
+                    )
+                    
+                    # Datos del estado anterior
+                    old_is_active = history.is_active
+                    old_closure_reason = history.closure_reason
+                    old_closed_at = history.closed_at
+                    
+                    # Actualizar estado de la historia
+                    history.is_active = False
+                    history.closed_at = datetime.now()
+                    
+                    if last_treatment:
+                        days_inactive = (datetime.now() - last_treatment.treatment_date).days
+                        history.closure_reason = (
+                            f"Cierre automático por inactividad de {days_inactive} días "
+                            f"(último tratamiento: {last_treatment.treatment_date.strftime('%Y-%m-%d')})"
+                        )
+                    else:
+                        history.closure_reason = (
+                            "Cierre automático por inactividad - sin tratamientos registrados"
+                        )
+                    
+                    # Obtener información del paciente
+                    patient = self.db.query(Patient).filter(Patient.id == history.patient_id).first()
+                    
+                    # Registrar en auditoría
+                    self.auditoria_service.registrar_evento(
+                        tipo_evento="DEACTIVATE",
+                        descripcion=f"Cierre automático de historia clínica por inactividad superior a 5 años",
+                        registro_afectado_tipo="clinical_histories",
+                        registro_afectado_id=history.id,
+                        detalles_cambios={
+                            "is_active": {"old": old_is_active, "new": False},
+                            "closure_reason": {"old": old_closure_reason, "new": history.closure_reason},
+                            "closed_at": {"old": old_closed_at, "new": history.closed_at.isoformat()},
+                            "patient_id": patient.id if patient else None,
+                            "patient_name": f"{patient.person.first_name} {patient.person.last_name}" if patient and patient.person else None,
+                            "last_treatment_date": last_treatment.treatment_date.isoformat() if last_treatment else None,
+                            "auto_closed": True
+                        },
+                        usuario=self.current_user,
+                        request=request
+                    )
+                    
+                    # Agregar a la lista de cerradas
+                    closed_histories.append({
+                        "history_id": history.id,
+                        "patient_id": history.patient_id,
+                        "patient_name": f"{patient.person.first_name} {patient.person.last_name}" if patient and patient.person else "N/A",
+                        "closure_reason": history.closure_reason,
+                        "closed_at": history.closed_at.isoformat(),
+                        "last_treatment_date": last_treatment.treatment_date.isoformat() if last_treatment else None
+                    })
+                    
+                except Exception as e:
+                    # Si falla una historia individual, continuar con las demás
+                    print(f"Error al cerrar historia {history.id}: {str(e)}")
+                    continue
+            
+            # Commit de todos los cambios
+            self.db.commit()
+            
+            return {
+                "success": True,
+                "total_closed": len(closed_histories),
+                "closed_histories": closed_histories,
+                "execution_date": datetime.now().isoformat(),
+                "criteria": "Sin tratamientos en los últimos 5 años",
+                "message": f"Se cerraron automáticamente {len(closed_histories)} historia(s) clínica(s) por inactividad"
+            }
+            
+        except Exception as e:
+            self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error en el proceso de cierre automático: {str(e)}"
+            )
         

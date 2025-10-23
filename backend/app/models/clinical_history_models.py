@@ -13,6 +13,8 @@ class ClinicalHistory(Base):
     findings = Column(Text, nullable=True)
     doctor_signature = Column(String(128), nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)  # Estado de activación sincronizado con paciente
+    closure_reason = Column(Text, nullable=True)  # Motivo de cierre de la historia clínica
+    closed_at = Column(DateTime, nullable=True)  # Fecha de cierre de la historia clínica
     created_at = Column(DateTime, server_default=func.now())  
     updated_at = Column(DateTime, onupdate=func.now())        
 

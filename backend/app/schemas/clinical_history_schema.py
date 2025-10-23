@@ -48,3 +48,16 @@ class PaginatedResponse(BaseModel):
     page: int
     limit: int
     results: List[ClinicalHistoryResponse]
+
+class ClinicalHistoryStatusChange(BaseModel):
+    """Schema para cambiar el estado (cerrar/reabrir) de una historia clínica"""
+    is_active: bool
+    closure_reason: Optional[str] = None
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "is_active": False,
+                "closure_reason": "Historia clínica cerrada por finalización de tratamiento completo"
+            }
+        }
