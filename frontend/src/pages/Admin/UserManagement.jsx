@@ -7,6 +7,8 @@ import ConfirmDialog from "../../components/ConfirmDialog";
 import SearchInput from "../../components/SearchInput"; 
 import FilterBar from "../../components/FilterBar"; 
 import DateInput from "../../components/DateInput";  
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { getAllUsers as getUsers, updateUser, deactivateUser, activateUser, getRoles } from "../../services/userService";
 
 const tableHeaderClass = "bg-header-blue text-white font-semibold text-center font-poppins text-18";
@@ -77,7 +79,7 @@ function UserManagement() {
     setLoading(true);
     getUsers(token)
       .then(setUsers)
-      .catch(() => setEditError("Error cargando usuarios"))
+      .catch(() => setEditError("Error cargando usuarios")) //toast.error("Error cargando usuarios")
       .finally(() => setLoading(false));
     getRoles(token)
       .then(setRoles)
@@ -302,6 +304,7 @@ function UserManagement() {
       await updateUser(editUser.uid, updateData, token);
       
       setSuccessMsg("Usuario actualizado exitosamente");
+      toaast.success("Usuario actualizado exitosamente");
       setEditUser(null);
       setEditForm({});
       setEditFormErrors({});
@@ -313,6 +316,7 @@ function UserManagement() {
       
     } catch (error) {
       setEditError(error.message || "Error al actualizar usuario");
+      toast.error(error.message || "Error al actualizar usuario");
     } finally {
       setEditLoading(false);
     }
@@ -331,12 +335,14 @@ function UserManagement() {
     try {
       await deactivateUser(user.uid, token);
       setSuccessMsg("Usuario desactivado correctamente");
+      toaast.success("Usuario desactivado correctamente");
       setLoading(true);
       const updatedUsers = await getUsers(token);
       setUsers(updatedUsers);
       setLoading(false);
     } catch (err) {
       setEditError(err.message || "Error al desactivar usuario");
+      toast.error(err.message || "Error al desactivar usuario");
     }
   };
 
@@ -534,12 +540,14 @@ function UserManagement() {
                             try {
                               await activateUser(user.uid, token);
                               setSuccessMsg("Usuario activado correctamente");
+                              toaast.success("Usuario activado correctamente");
                               setLoading(true);
                               const updatedUsers = await getUsers(token);
                               setUsers(updatedUsers);
                               setLoading(false);
                             } catch (err) {
                               setEditError(err.message || "Error al activar usuario");
+                              toast.error(err.message || "Error al activar usuario");
                             }
                           }}
                         >

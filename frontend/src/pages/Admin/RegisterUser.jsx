@@ -9,6 +9,8 @@ import { twMerge } from 'tailwind-merge';
 import { createUser } from "../../services/userService";
 import { getRoles } from "../../services/userService";
 import { useAuth } from "../../contexts/AuthContext"; 
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function cn(...args) {
   return twMerge(clsx(args));
@@ -327,6 +329,7 @@ const handleEmailChange = (e) => {
     
     if (Object.keys(errors).length > 0) {
       setFormError("Por favor, complete todos los campos obligatorios correctamente.");
+      toast.error("Por favor, complete los campos obligatorios");
       return false;
     }
     
@@ -380,10 +383,12 @@ const handleEmailChange = (e) => {
       });
       setIsDoctor(false);
       setAge(null);  
+      toast.success("Usuario registrado exitosamente");
     } catch (error) {
       console.error('Error al registrar el usuario:', error);
       setFormError(error.message || 'Error al registrar el usuario.');
       setSuccessMessage('');
+      toast.error("Error al registrar usuario");
     } finally {
       setLoading(false);
     }

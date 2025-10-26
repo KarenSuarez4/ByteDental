@@ -7,6 +7,8 @@ import ProgressBar from "../../components/ProgressBar";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 import { createPatient } from "../../services/patientService";
 import { useAuth } from "../../contexts/AuthContext";
@@ -229,7 +231,7 @@ const RegisterPatient = () => {
     if (name === 'nombres' || name === 'apellidos' || name === 'guardian_nombres' || name === 'guardian_apellidos' || name === 'occupation') {
       // Filtrar caracteres no válidos antes de establecer el valor
       const filteredValue = filterValidNameChars(value);
-      
+
       // Solo actualizar si el valor filtrado es diferente o si no había filtrado
       if (filteredValue !== value) {
         // Si hubo caracteres inválidos, no actualizar el estado y retornar
@@ -269,7 +271,7 @@ const RegisterPatient = () => {
       }
 
       setFormErrors({ ...newErrors, _timestamp: Date.now() });
-      
+
       // Actualizar el estado con el valor filtrado y convertido
       setFormData((prev) => ({ ...prev, [name]: finalValue }));
       return;
@@ -337,7 +339,50 @@ const RegisterPatient = () => {
       return;
     }
 
+    // Validación preventiva y filtrado para campos de texto que solo deben contener letras
+    if (name === 'nombres' || name === 'apellidos' || name === 'guardian_nombres' || name === 'guardian_apellidos' || name === 'occupation') {
+      // Filtrar caracteres no válidos antes de establecer el valor
+      const filteredValue = filterValidNameChars(value);
+      
+      // Solo actualizar si el valor filtrado es diferente o si no había filtrado
+      if (filteredValue !== value) {
+        // Si hubo caracteres inválidos, no actualizar el estado y retornar
+        return;
+      }
 
+      const newErrors = { ...formErrors };
+
+      // Limpiar error anterior primero
+      if (newErrors[name]) {
+        delete newErrors[name];
+      }
+
+      if (filteredValue && !isValidName(filteredValue)) {
+        const fieldNames = {
+          nombres: 'Los nombres solo pueden contener letras y espacios',
+          apellidos: 'Los apellidos solo pueden contener letras y espacios',
+          guardian_nombres: 'Los nombres del tutor solo pueden contener letras y espacios',
+          guardian_apellidos: 'Los apellidos del tutor solo pueden contener letras y espacios',
+          occupation: 'La ocupación solo puede contener letras y espacios'
+        };
+        newErrors[name] = fieldNames[name];
+      } else if (!filteredValue) {
+        const requiredMessages = {
+          nombres: 'Nombres son obligatorios',
+          apellidos: 'Apellidos son obligatorios',
+          guardian_nombres: 'Nombres del tutor son obligatorios',
+          guardian_apellidos: 'Los apellidos del tutor son obligatorios',
+          occupation: 'Ocupación es obligatoria'
+        };
+        newErrors[name] = requiredMessages[name];
+      }
+
+      setFormErrors({ ...newErrors, _timestamp: Date.now() });
+      
+      // Actualizar el estado con el valor filtrado
+      setFormData((prev) => ({ ...prev, [name]: filteredValue }));
+      return;
+    }
 
     // Validación inmediata para fecha de nacimiento
     if (name === 'birthdate') {
@@ -721,6 +766,7 @@ const RegisterPatient = () => {
 
     if (!validateForm()) {
       setFormError('Por favor, complete todos los campos obligatorios.');
+      toast.error("Complete todos los campos obligatorios");
       return;
     }
 

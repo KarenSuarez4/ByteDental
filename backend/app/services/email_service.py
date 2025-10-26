@@ -13,7 +13,7 @@ from app.config import settings
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content
 
-# Configurar logging
+# Configurar de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

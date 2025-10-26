@@ -408,6 +408,21 @@ class PatientService:
                 print(f"DEBUG: Estableciendo {field} = {value}")
                 setattr(patient, field, value)
             
+            # Sincronizar is_active con las historias clínicas del paciente
+            if 'is_active' in patient_fields:
+                from app.models.clinical_history_models import ClinicalHistory
+                new_status = patient_fields['is_active']
+                
+                # Actualizar todas las historias clínicas del paciente
+                clinical_histories = self.db.query(ClinicalHistory).filter(
+                    ClinicalHistory.patient_id == patient_id
+                ).all()
+                
+                for clinical_history in clinical_histories:
+                    clinical_history.is_active = new_status
+                
+                print(f"DEBUG: Sincronizado is_active={new_status} en {len(clinical_histories)} historias clínicas")
+            
             # Registrar evento de auditoría
             person_updates = patient_data.person.model_dump(exclude_unset=True) if patient_data.person else {}
             self.auditoria_service.registrar_evento(
@@ -599,6 +614,17 @@ class PatientService:
                 # Si se está desactivando, guardar el motivo
                 setattr(patient, 'deactivation_reason', deactivation_reason)
             
+            # Sincronizar is_active con las historias clínicas del paciente
+            from app.models.clinical_history_models import ClinicalHistory
+            clinical_histories = self.db.query(ClinicalHistory).filter(
+                ClinicalHistory.patient_id == patient_id
+            ).all()
+            
+            for clinical_history in clinical_histories:
+                clinical_history.is_active = new_status
+            
+            print(f"DEBUG change_patient_status: Sincronizado is_active={new_status} en {len(clinical_histories)} historias clínicas del paciente {patient_id}")
+            
             # LÓGICA DE GUARDIAN: Manejar estado del guardian basado en sus pacientes asociados
             guardian_status_changes = []
             if patient.guardian_id:
@@ -617,6 +643,11 @@ class PatientService:
                 "deactivation_reason": {
                     "antes": getattr(patient, 'deactivation_reason', None) if not new_status else None,
                     "despues": deactivation_reason if not new_status else None
+                },
+                "clinical_histories_updated": {
+                    "count": len(clinical_histories),
+                    "ids": [ch.id for ch in clinical_histories],
+                    "new_status": new_status
                 }
             }
             

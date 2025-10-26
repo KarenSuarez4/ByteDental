@@ -5,12 +5,15 @@ from datetime import datetime
 class TreatmentCreate(BaseModel):
     dental_service_id: int
     treatment_date: datetime
+    reason: str  # Motivo de consulta del tratamiento (obligatorio)
     notes: Optional[str] = None
+    doctor_password: str  # Contraseña del doctor para firma digital
 
 class TreatmentResponse(BaseModel):
     date: datetime
     name: str
     doctor_name: str
+    reason: str  # Motivo de consulta del tratamiento
     notes: Optional[str] = None
 
 class ClinicalHistoryCreate(BaseModel):
@@ -19,7 +22,7 @@ class ClinicalHistoryCreate(BaseModel):
     symptoms: str
     medical_history: dict
     findings: Optional[str] = None  
-    doctor_signature: str
+    doctor_password: str  # Contraseña del doctor para firma digital
     treatments: List[TreatmentCreate]  
 
 class ClinicalHistoryResponse(BaseModel):
@@ -46,3 +49,16 @@ class PaginatedResponse(BaseModel):
     page: int
     limit: int
     results: List[ClinicalHistoryResponse]
+
+class ClinicalHistoryStatusChange(BaseModel):
+    """Schema para cambiar el estado (cerrar/reabrir) de una historia clínica"""
+    is_active: bool
+    closure_reason: Optional[str] = None
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "is_active": False,
+                "closure_reason": "Historia clínica cerrada por finalización de tratamiento completo"
+            }
+        }
