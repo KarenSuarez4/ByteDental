@@ -241,3 +241,5 @@ generate_test_*.py
 *.sql.gz
 *.dump
 database_backup_*
+
+test_dashboard.py

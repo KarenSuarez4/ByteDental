@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import email_router, otp_router, users, auditoria, auth, patients, guardians, persons, dental_services, clinical_histories
+from app.routers import email_router, otp_router, users, auditoria, auth, patients, guardians, persons, dental_services, clinical_histories, dashboard_router
 from app.config import settings
 from app.database import engine, Base  # Asegúrate de importar Base y engine
 import logging
@@ -44,6 +44,7 @@ app.include_router(patients.router, prefix="/api")
 app.include_router(guardians.router, prefix="/api")
 app.include_router(dental_services.router, prefix="/api")
 app.include_router(clinical_histories.router, prefix="/api/clinical-histories")
+app.include_router(dashboard_router.router, prefix="/api")
 
 # Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
