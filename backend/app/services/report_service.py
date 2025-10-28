@@ -18,7 +18,12 @@ class ReportService:
     def __init__(self, db: Session):
         self.db = db
 
-    def generate_activity_report(self, start_date: datetime, end_date: datetime) -> ActivityReport:
+    def generate_activity_report(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        generated_by: str = "Administrador"  
+    ) -> ActivityReport:
         """Genera un reporte de actividades odontológicas entre dos fechas."""
         query = self.db.query(
             Treatment.treatment_date,
@@ -69,9 +74,11 @@ class ReportService:
         return ActivityReport(
             start_date=start_date,
             end_date=end_date,
+            generated_by=generated_by,
             activities=activities,
             total_activities=len(activities)
         )
+
 
     def generate_monthly_report(self, report_date: datetime, generated_by: str = "Administrador") -> MonthlyReport:
         """Genera un reporte mensual agrupado por tipo de procedimiento."""

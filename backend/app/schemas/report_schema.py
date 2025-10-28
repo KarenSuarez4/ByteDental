@@ -21,6 +21,7 @@ class TreatmentActivityDetail(BaseModel):
 class ActivityReport(BaseModel):
     start_date: datetime
     end_date: datetime
+    generated_by: str
     activities: List[TreatmentActivityDetail]
     total_activities: int
 

@@ -1,392 +1,335 @@
-# app/utils/pdf_generator.py
+"""
+PDF Generator utility for dental clinic reports using ReportLab.
+Handles both detailed activity reports and monthly consolidated reports.
+"""
+
 from io import BytesIO
 from datetime import datetime
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, landscape
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer, Image, KeepInFrame
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer,
+    Image, KeepInFrame
+)
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from app.schemas.report_schema import ActivityReport, MonthlyReport
 import os
 
-def generate_activity_pdf(report_data: ActivityReport) -> bytes:
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter),
-                            leftMargin=30, rightMargin=30, topMargin=30, bottomMargin=30) 
-    elements = []
+# -------------------------------------------------------------------
+# Common color palette and table row backgrounds
+# -------------------------------------------------------------------
+PALETTE_COLOR = colors.Color(0x1C / 255, 0x62 / 255, 0x8C / 255)
+LIGHT_ROW = colors.whitesmoke
+ALT_ROW = colors.Color(0.93, 0.96, 0.98)
+
+
+def get_common_styles():
+    """
+    Define and return common paragraph styles used across all reports.
+    """
     styles = getSampleStyleSheet()
 
-    # --- Configuración de Colores y Estilos Personalizados ---
-    # Color de la paleta (1c628c) en el formato RGB para ReportLab (valores de 0 a 1)
-    PALETTE_COLOR = colors.Color(red=0x1C/255, green=0x62/255, blue=0x8C/255)
-    
-    # Estilo para el título de la clínica con el color de la paleta
-    clinic_title_style = ParagraphStyle('ClinicTitle', 
-                                        parent=styles['Heading3'], 
-                                        textColor=PALETTE_COLOR, 
-                                        alignment=1) # 1 = CENTER
-    
-    # Estilo para el título principal con el color de la paleta
-    main_title_style = ParagraphStyle('MainTitle', 
-                                      parent=styles['Heading1'], 
-                                      textColor=PALETTE_COLOR, 
-                                      alignment=1, 
-                                      spaceAfter=6) 
-    
-    # Estilo para la fecha del periodo (centrado)
-    period_style = ParagraphStyle('PeriodInfo', 
-                                  parent=styles['Normal'], 
-                                  alignment=1, 
-                                  spaceAfter=12)
-    
-    # Estilo para el pie de página (alineado a la derecha)
-    footer_style = ParagraphStyle('FooterInfo', 
-                                  parent=styles['Normal'], 
-                                  alignment=2, # 2 = RIGHT
-                                  fontSize=9,
-                                  spaceBefore=12) 
-    
-    # Estilo para el texto dentro de la tabla (Alineación a la izquierda para el tratamiento, y ajuste de texto)
-    table_text_style = ParagraphStyle('TableText', 
-                                      parent=styles['Normal'], 
-                                      alignment=1, # 1 = CENTER
-                                      fontSize=10,
-                                      leading=12, # Espaciado entre líneas para mejorar la lectura
-                                      wordWrap='CJK') # Permite que las palabras se corten y envuelvan
-    
-    # Estilo para subtítulos o textos informativos centrados
-    centered_text_style = ParagraphStyle(
-        'CenteredText',
-        parent=styles['Normal'],
-        alignment=1,  # 1 = CENTRADO
-        fontSize=10,
-        leading=12
-    )
+    return {
+        'title': ParagraphStyle(
+            'Title',
+            parent=styles['Heading1'],
+            textColor=PALETTE_COLOR,
+            alignment=1,  # Center alignment
+            spaceAfter=10
+        ),
+        'period': ParagraphStyle(
+            'PeriodInfo',
+            parent=styles['Normal'],
+            alignment=1,
+            spaceAfter=12
+        ),
+        'footer': ParagraphStyle(
+            'Footer',
+            parent=styles['Normal'],
+            fontSize=9,
+            alignment=2,  # Right alignment
+            textColor=PALETTE_COLOR
+        ),
+        'centered_text': ParagraphStyle(
+            'CenteredText',
+            parent=styles['Normal'],
+            alignment=1,
+            fontSize=10,
+            leading=12
+        )
+    }
 
 
-    # --- Encabezado ---
+def get_clinic_header(elements):
+    """
+    Generates the header section for the clinic reports, including logo and contact info.
+
+    Args:
+        elements (list): The list of elements to append header components to.
+    """
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     logo_path = os.path.join(BASE_DIR, "..", "static", "bytedental-logoAzul.png")
+
+    # Try to load the clinic logo
     try:
         logo = Image(logo_path, width=100, height=60)
         logo.hAlign = 'CENTER'
         elements.append(logo)
-    except Exception as e:
-        elements.append(Paragraph(f"<b>ORALCENTER WHITE</b> (Logo no encontrado: {str(e)})", clinic_title_style))
-    elements.append(Spacer(1, 6))    
-    elements.append(Paragraph("Sonrisas sanas, brillantes y naturales", centered_text_style))
-    elements.append(Paragraph("Odontología general · Blanqueamiento · Ortodoncia", centered_text_style))
-    elements.append(Paragraph("<b>DR. CARLOS MORENO - ODONTÓLOGO</b>", centered_text_style))
-    elements.append(Paragraph(
+    except Exception:
+        # Fallback if the logo is missing
+        elements.append(Paragraph("<b>ORALCENTER WHITE</b>", get_common_styles()['title']))
+
+    elements.append(Spacer(1, 6))
+    common_styles = get_common_styles()
+
+    # Clinic contact and description text
+    clinic_info = [
+        "Sonrisas sanas, brillantes y naturales",
+        "Odontología general · Blanqueamiento · Ortodoncia",
+        "<b>DR. CARLOS MORENO - ODONTÓLOGO</b>",
         "Calle 16 # 13-40, Centro-Sur, Duitama, Boyacá, Colombia, "
-        "Cel: 316 5181414 Email: oralcenterw@gmail.com", 
-        centered_text_style
-    ))
-
-    
-    elements.append(Spacer(1, 12)) # Espacio antes del título
-
-    # --- Título Principal y Periodo ---
-    # Título Principal
-    elements.append(Paragraph("<b>FORMULARIO CONSOLIDADO DE ACTIVIDADES ODONTOLÓGICAS</b>", main_title_style))
-    
-    # Periodo
-    period_text = f"Periodo: {report_data.start_date.strftime('%Y-%m-%d')} a {report_data.end_date.strftime('%Y-%m-%d')}"
-    elements.append(Paragraph(period_text, period_style))
-
-    # --- Datos de la tabla ---
-    data = [
-        ['FECHA/HORA', 'NOMBRE DEL PACIENTE', 'DOCUMENTO', 'TELÉFONO', 'PROCEDIMIENTO EJECUTADO', 'DOCTOR']
+        "Cel: 316 5181414 Email: oralcenterw@gmail.com"
     ]
 
+    for info in clinic_info:
+        elements.append(Paragraph(info, common_styles['centered_text']))
+
+
+def generate_activity_pdf(report_data: ActivityReport) -> bytes:
+    """
+    Generate a PDF report for dental activities performed within a specified date range.
+
+    Args:
+        report_data (ActivityReport): Data model containing activity details.
+
+    Returns:
+        bytes: The generated PDF as a byte stream.
+    """
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(letter),
+        leftMargin=30, rightMargin=30,
+        topMargin=30, bottomMargin=30
+    )
+    elements = []
+    common_styles = get_common_styles()
+
+    # --- Header Section ---
+    get_clinic_header(elements)
+    elements.append(Spacer(1, 12))
+
+    # --- Title and Period ---
+    elements.append(Paragraph(
+        "<b>FORMULARIO CONSOLIDADO DE ACTIVIDADES ODONTOLÓGICAS</b>",
+        common_styles['title']
+    ))
+    elements.append(Paragraph(
+        f"Periodo: {report_data.start_date.strftime('%Y-%m-%d')} "
+        f"a {report_data.end_date.strftime('%Y-%m-%d')}",
+        common_styles['period']
+    ))
+
+    # --- Generated By Section ---
+    if hasattr(report_data, "generated_by") and report_data.generated_by:
+        elements.append(Paragraph(
+            f"<b>Generado por:</b> {report_data.generated_by}",
+            common_styles['centered_text']
+        ))
+        elements.append(Spacer(1, 10))
+
+    # --- Table Data Preparation ---
+    headers = [
+        'FECHA/HORA', 'NOMBRE DEL PACIENTE', 'DOCUMENTO', 'TELÉFONO',
+        'PROCEDIMIENTO EJECUTADO', 'DOCTOR'
+    ]
+    data = [headers]
+
+    table_text_style = ParagraphStyle(
+        'TableText',
+        parent=common_styles['centered_text'],
+        wordWrap='CJK'
+    )
+
     for activity in report_data.activities:
-        # Se envuelve el 'PROCEDIMIENTO EJECUTADO' en un objeto Paragraph
-        # para que pueda ajustarse automáticamente al ancho de la columna.
-        procedure_cell = Paragraph(activity.procedure_name, table_text_style)
-        
         data.append([
             activity.treatment_date.strftime('%Y-%m-%d %H:%M'),
             activity.patient_name,
             activity.document_number,
             activity.phone,
-            procedure_cell, # Se usa el objeto Paragraph
+            Paragraph(activity.procedure_name, table_text_style),
             activity.doctor_name
         ])
 
-    # ColWidths: Se ajusta el ancho de la columna de 'PROCEDIMIENTO EJECUTADO' (5to elemento)
-    # y se reajustan las otras para mantener la suma total.
-    # Total de 11.5 pulgadas (ancho de letter landscape es ~11 pulgadas, con márgenes de 30)
-    colWidths = [1.2*inch, 1.8*inch, 1.4*inch, 1.4*inch, 3.2*inch, 1.5*inch]
-    
-    # No es necesario definir rowHeights, ReportLab lo calcula automáticamente
-    # cuando las celdas contienen objetos Paragraph que necesitan ajuste de línea.
-    
+    # --- Table Configuration ---
+    colWidths = [1.2 * inch, 1.8 * inch, 1.4 * inch, 1.4 * inch, 3.2 * inch, 1.5 * inch]
     table = Table(data, colWidths=colWidths, hAlign='CENTER')
 
-    
-    # Estilo de la tabla
+    # --- Table Styling ---
     table.setStyle(TableStyle([
-        # Fila de encabezado
-        ('BACKGROUND', (0, 0), (-1, 0), PALETTE_COLOR), # Usando el color de la paleta
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),   # Texto blanco para contraste
+        ('BACKGROUND', (0, 0), (-1, 0), PALETTE_COLOR),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 10),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
-        
-        # Cuerpo de la tabla
-        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 10),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'), # Alineación superior para el cuerpo, para ver mejor el ajuste de texto
-        ('ALIGN', (0, 1), (4, -1), 'LEFT'), # Alineación a la izquierda para las celdas de texto
-        ('ALIGN', (0, 1), (0, -1), 'CENTER'), # Centrar FECHA/HORA
-        ('ALIGN', (2, 1), (3, -1), 'CENTER'), # Centrar DOCUMENTO y TELÉFONO
-        ('ALIGN', (5, 1), (5, -1), 'CENTER'), # Centrar DOCTOR
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('ALIGN', (0, 1), (4, -1), 'LEFT'),
+        ('ALIGN', (2, 1), (3, -1), 'CENTER'),
+        ('ALIGN', (5, 1), (5, -1), 'CENTER'),
         ('LEFTPADDING', (0, 0), (-1, -1), 3),
         ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3)
     ]))
-    
+
     elements.append(table)
 
-    
+    # --- Footer Section ---
+    elements.append(Spacer(1, 10))
+    elements.append(Paragraph(
+        f"Reporte generado el: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
+        f"por {report_data.generated_by}",
+        common_styles['footer']
+    ))
 
-    # --- Pie de página (Reporte generado) ---
-    report_generated_text = f"Reporte generado el: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    elements.append(Paragraph(report_generated_text, footer_style))
-
-    # Generar PDF
     doc.build(elements)
     return buffer.getvalue()
 
+
+
 def generate_monthly_pdf(report_data: MonthlyReport) -> bytes:
     """
-    Genera un reporte mensual en PDF con un diseño mejorado.
+    Generate a monthly consolidated PDF report summarizing dental activities and adverse events.
+
+    Args:
+        report_data (MonthlyReport): Data model containing monthly summary information.
+
+    Returns:
+        bytes: The generated PDF as a byte stream.
     """
-    from reportlab.lib.units import inch
-    from reportlab.platypus import KeepInFrame
-
-
-
-
     buffer = BytesIO()
     doc = SimpleDocTemplate(
-        buffer, 
+        buffer,
         pagesize=letter,
-        leftMargin=40, rightMargin=40, topMargin=50, bottomMargin=40
+        leftMargin=40, rightMargin=40,
+        topMargin=50, bottomMargin=40
     )
     elements = []
-    styles = getSampleStyleSheet()
+    common_styles = get_common_styles()
 
-    # --- Colores de la paleta ---
-    PALETTE_COLOR = colors.Color(0x1C/255, 0x62/255, 0x8C/255)
-    LIGHT_ROW = colors.whitesmoke
-    ALT_ROW = colors.Color(0.93, 0.96, 0.98) # Un azul muy claro
-
-    # --- Estilos personalizados ---
-    title_style = ParagraphStyle(
-        'Title',
-        parent=styles['Heading1'],
-        textColor=PALETTE_COLOR,
-        alignment=1, # 1 = CENTER
-        spaceAfter=10
-    )
-    period_style = ParagraphStyle(
-        'PeriodInfo', 
-        parent=styles['Normal'], 
-        alignment=1, 
-        spaceAfter=12
-    )
-    # Estilo para las etiquetas "RESPONSABLE:", "MES:", "AÑO:"
-    responsible_label_style = ParagraphStyle(
-        'ResponsibleLabel',
-        parent=styles['Normal'],
-        fontSize=10,
-        alignment=0 # 0 = LEFT
-    )
-    # Estilo para los valores (Nombre, Mes, Año)
-    responsible_value_style = ParagraphStyle(
-        'ResponsibleValue',
-        parent=styles['Normal'],
-        fontSize=10,
-        alignment=0 # 0 = LEFT
-    )
-    footer_style = ParagraphStyle(
-        'Footer',
-        parent=styles['Normal'],
-        fontSize=9,
-        alignment=2, # 2 = RIGHT
-        textColor=PALETTE_COLOR
-    )
-
-    # --- Encabezado con logo y datos (sin cambios) ---
-    try:
-        # Intenta encontrar el logo en una ruta relativa
-        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-        logo_path = os.path.join(BASE_DIR, "..", "static", "bytedental-logoAzul.png")
-        
-        # Fallback si la ruta anterior no existe (para pruebas)
-        if not os.path.exists(logo_path):
-            logo_path = os.path.join(BASE_DIR, "bytedental-logoAzul.png") # Asume que está en la misma carpeta
-
-        logo = Image(logo_path, width=90, height=50)
-        logo.mask = 'auto' # Para transparencia
-    except Exception as e:
-        print(f"Advertencia: No se pudo cargar el logo. {e}")
-        logo = Paragraph("ORALCENTER WHITE", styles['Heading3'])
-
-    header_table_data = [[
-        logo, 
-        Paragraph(
-            "Sonrisas sanas, brillantes y naturales<br/>"
-            "Odontología general · Blanqueamiento · Ortodoncia<br/>"
-            "<b>DR. CARLOS MORENO - ODONTÓLOGO</b><br/>"
-            "Calle 16 # 13-40, Centro-Sur, Duitama, Boyacá, Colombia<br/>"
-            "Cel: 316 5181414 · oralcenterw@gmail.com", 
-            styles['Normal']
-        )
-    ]]
-
-    header_table = Table(header_table_data, colWidths=[1.5*inch, 5.5*inch]) # Ancho ajustado
-    header_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6)
-    ]))
-    elements.append(header_table)
-    
-    # Esta es la línea azul que te gusta
-    elements.append(Table([['']], colWidths=[7*inch], style=[('LINEBELOW', (0, 0), (-1, -1), 0.75, PALETTE_COLOR)]))
+    # --- Header Section ---
+    get_clinic_header(elements)
+    elements.append(Table(
+        [['']],
+        colWidths=[7 * inch],
+        style=[('LINEBELOW', (0, 0), (-1, -1), 0.75, PALETTE_COLOR)]
+    ))
     elements.append(Spacer(1, 16))
 
-    # --- Título principal ---
-    elements.append(Paragraph("<b>REPORTE MENSUAL DE ACTIVIDADES ODONTOLÓGICAS</b>", title_style))
-    period_text = f"Periodo: {report_data.start_date.strftime('%Y-%m-%d')} a {report_data.end_date.strftime('%Y-%m-%d')}"
-    elements.append(Paragraph(period_text, period_style))
+    # --- Title and Period ---
+    elements.append(Paragraph(
+        "<b>FORMULARIO CONSOLIDADO MENSUAL DE ACTIVIDADES "
+        "ODONTOLÓGICAS Y EVENTOS ADVERSOS</b>",
+        common_styles['title']
+    ))
+    elements.append(Paragraph(
+        f"Periodo: {report_data.start_date.strftime('%Y-%m-%d')} "
+        f"a {report_data.end_date.strftime('%Y-%m-%d')}",
+        common_styles['period']
+    ))
 
-    # --- (CORREGIDO) Información del responsable ---
-    # Se eliminó la tabla y el párrafo con líneas de guiones bajos.
-    # Se reemplazó con una tabla que imita la imagen de ejemplo.
-    
-    # Mapeo de número de mes a nombre en español
-    MONTH_NAMES = ["", "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", 
-                   "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"]
-    try:
-        month_name = MONTH_NAMES[report_data.month].upper()
-    except IndexError:
-        month_name = f"{report_data.month:02d}" # Fallback si el mes no es válido
+    # --- Responsible and Period Information ---
+    MONTH_NAMES = [
+        "", "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+        "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
+    ]
+    month_name = MONTH_NAMES[report_data.month] if 0 < report_data.month <= 12 else f"{report_data.month:02d}"
+
+    label_style = ParagraphStyle('Label', parent=common_styles['centered_text'], fontSize=9, textColor=PALETTE_COLOR)
+    value_style = ParagraphStyle('Value', parent=common_styles['centered_text'], fontSize=10, leading=12)
 
     responsible_data = [[
-        Paragraph("<b>RESPONSABLE:</b>", responsible_label_style),
-        Paragraph(report_data.generated_by, responsible_value_style),
-        Paragraph("<b>MES:</b>", responsible_label_style),
-        Paragraph(month_name, responsible_value_style),
-        Paragraph("<b>AÑO:</b>", responsible_label_style),
-        Paragraph(str(report_data.year), responsible_value_style)
+        Paragraph("<b>RESPONSABLE:</b>", label_style),
+        Paragraph(report_data.generated_by, value_style),
+        Paragraph("<b>MES:</b>", label_style),
+        Paragraph(month_name, value_style),
+        Paragraph("<b>AÑO:</b>", label_style),
+        Paragraph(str(report_data.year), value_style)
     ]]
 
-    # Ajusta los anchos de columna para que coincidan con la imagen
-    responsible_table = Table(responsible_data, colWidths=[
-        1.4*inch, 2.0*inch,  # Col 1: Etiqueta, Col 2: Valor (largo)
-        0.6*inch, 1.0*inch,  # Col 3: Etiqueta, Col 4: Valor
-        0.6*inch, 1.0*inch   # Col 5: Etiqueta, Col 6: Valor
-    ]) # Total 7.0 inches
-
+    responsible_table = Table(
+        responsible_data,
+        colWidths=[1.2 * inch, 2.2 * inch, 0.5 * inch, 1.0 * inch, 0.5 * inch, 1.0 * inch]
+    )
     responsible_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('WORDWRAP', (0, 0), (-1, -1), 'CJK'),  # mejor gestión del texto largo
-        ('LINEBELOW', (1, 0), (1, 0), 0.5, colors.black),
-        ('LINEBELOW', (3, 0), (3, 0), 0.5, colors.black),
-        ('LINEBELOW', (5, 0), (5, 0), 0.5, colors.black),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('LINEBELOW', (1, 0), (1, 0), 0.6, colors.black),
+        ('LINEBELOW', (3, 0), (3, 0), 0.6, colors.black),
+        ('LINEBELOW', (5, 0), (5, 0), 0.6, colors.black),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
     ]))
 
-    responsible_table_wrapped = KeepInFrame(7*inch, 0.6*inch, [responsible_table], hAlign='CENTER')
-    elements.append(responsible_table_wrapped)
-    elements.append(Spacer(1, 16)) # Espacio antes de la tabla principal
+    elements.append(KeepInFrame(7 * inch, 0.5 * inch, [responsible_table], hAlign='CENTER'))
+    elements.append(Spacer(1, 14))
 
-    # --- Datos de la tabla ---
+    # --- Main Data Table ---
     data = [['PROCEDIMIENTOS EJECUTADOS', 'CANTIDAD DE PACIENTES']]
     for procedure in report_data.procedures:
-        # Envuelve los nombres largos de procedimientos en Párrafos
-        # para que se ajusten automáticamente si es necesario.
         data.append([
-            Paragraph(procedure.procedure_name, styles['Normal']), 
-            procedure.patient_count
+            Paragraph(procedure.procedure_name, common_styles['centered_text']),
+            Paragraph(str(procedure.patient_count), common_styles['centered_text'])
         ])
-    
-    # Estilo para la fila de Total
-    total_style = ParagraphStyle(
-        'TotalRow',
-        parent=styles['Normal'],
-        fontSize=10,
-        textColor=PALETTE_COLOR,
-        alignment=1 # Centrado
-    )
 
+    # Total row
     data.append([
-        Paragraph("<b>Total, de pacientes atendidos durante el mes</b>", total_style),
-        Paragraph(f"<b>{report_data.total_patients}</b>", total_style)
+        Paragraph("<b>Total de pacientes atendidos durante el mes</b>", common_styles['centered_text']),
+        Paragraph(f"<b>{report_data.total_patients}</b>", common_styles['centered_text'])
     ])
 
-    # --- (CORREGIDO) Estilo de la Tabla de datos ---
-    table_style_commands = [
-        # Encabezado
+    table = Table(data, colWidths=[5.0 * inch, 2.0 * inch], hAlign='CENTER')
+
+    # --- Enhanced Table Styling ---
+    style_commands = [
+        # Header
         ('BACKGROUND', (0, 0), (-1, 0), PALETTE_COLOR),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
         ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('TOPPADDING', (0, 0), (-1, 0), 8), # Añadido para centrar mejor
+        ('TOPPADDING', (0, 0), (-1, 0), 8),
 
-        # Celdas y bordes
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('ALIGN', (1, 1), (1, -1), 'CENTER'),
+        # General layout and grid
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        
-        # Estilo para la primera columna (procedimientos)
-        ('ALIGN', (0, 1), (0, -2), 'LEFT'), # Alinea a la izquierda
-        ('LEFTPADDING', (0, 1), (0, -2), 6), # Añade padding
-        ('RIGHTPADDING', (0, 1), (0, -2), 6),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
 
-        # Fila total
-        ('BACKGROUND', (0, -1), (-1, -1), colors.Color(0.85, 0.93, 0.98)),
+        # Total row
+        ('BACKGROUND', (0, -1), (-1, -1), colors.Color(0.9, 0.95, 0.98)),
         ('TEXTCOLOR', (0, -1), (-1, -1), PALETTE_COLOR),
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-        ('LINEABOVE', (0, -1), (-1, -1), 1, PALETTE_COLOR)
+        ('LINEABOVE', (0, -1), (-1, -1), 1, PALETTE_COLOR),
     ]
-    
-    # --- (CORREGIDO) Lógica de filas alternas ---
-    # Se aplica en un bucle para que funcione correctamente
-    # Itera desde la fila 1 (después del encabezado) hasta la -2 (antes del total)
-    for i in range(1, len(data) - 1):
-        if i % 2 == 0: # Fila par
-            color = ALT_ROW
-        else: # Fila impar
-            color = LIGHT_ROW
-        table_style_commands.append(('BACKGROUND', (0, i), (-1, i), color))
 
-    # --- (CORREGIDO) Tabla de datos ---
-    # Se ajustaron los anchos de columna. 5.0 + 2.0 = 7.0 pulgadas
-    table = Table(data, colWidths=[5.0*inch, 2.0*inch])
-    table.setStyle(TableStyle(table_style_commands))
+    # Alternating row background colors
+    for i in range(1, len(data) - 1):
+        color = ALT_ROW if i % 2 == 0 else LIGHT_ROW
+        style_commands.append(('BACKGROUND', (0, i), (-1, i), color))
+
+    table.setStyle(TableStyle(style_commands))
     elements.append(table)
 
-    # --- Pie de página ---
-    elements.append(Spacer(1, 20))
-    elements.append(Paragraph(f"Reporte generado el: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", footer_style))
-
-
-    # --- Generar PDF ---
-    doc.build(elements)
-
+    # --- Footer ---
+    elements.append(Spacer(1, 18))
+    elements.append(Paragraph(
+        f"Reporte generado el: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
+        f"por {report_data.generated_by}",
+        common_styles['footer']
+    ))
     
-    # Regresa al inicio del buffer
-    buffer.seek(0)
+    doc.build(elements)
     return buffer.getvalue()
