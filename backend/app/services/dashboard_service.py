@@ -3,9 +3,9 @@ Servicio para el dashboard del sistema odontológico
 """
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, extract, case
-from datetime import datetime
+from datetime import datetime, date
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from ..models.patient_models import Patient
 from ..models.clinical_history_models import ClinicalHistory
@@ -21,43 +21,75 @@ class DashboardService:
     """Servicio para obtener estadísticas del dashboard"""
     
     @staticmethod
-    def get_active_patients_stats(db: Session) -> dict:
+    def get_active_patients_stats(
+        db: Session,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        doctor_id: Optional[str] = None
+    ) -> dict:
         """
         Obtiene estadísticas de pacientes activos
+        
+        Args:
+            db: Sesión de base de datos
+            start_date: Fecha de inicio para filtrar (opcional). Si solo se proporciona esta, filtra desde esta fecha hasta hoy
+            end_date: Fecha de fin para filtrar (opcional). Si solo se proporciona esta, filtra desde el inicio hasta esta fecha
+            doctor_id: UID del doctor para filtrar pacientes atendidos (opcional)
+        
+        Lógica de filtros:
+            - start_date solo: Filtra desde start_date hasta hoy
+            - end_date solo: Filtra desde el inicio hasta end_date
+            - Ambos: Filtra el rango específico
+            - Ninguno: Mes actual por defecto
         
         Returns:
             dict: {
                 "total_active_patients": int,  # Total de pacientes activos
-                "active_patients_month": int   # Pacientes activos con atención este mes
+                "active_patients_period": int  # Pacientes activos con atención en el período
             }
         """
         try:
-            # Total de pacientes activos
+            # Total de pacientes activos (no filtrado)
             total_active_patients = db.query(func.count(Patient.id)).filter(
                 Patient.is_active == True
             ).scalar()
             
-            # Pacientes activos con atención en el mes actual
-            current_year = datetime.now().year
-            current_month = datetime.now().month
-            
-            active_patients_month = db.query(func.count(func.distinct(Patient.id))).join(
+            # Construir query para pacientes activos con atención
+            query = db.query(func.count(func.distinct(Patient.id))).join(
                 ClinicalHistory, Patient.id == ClinicalHistory.patient_id
             ).join(
                 Treatment, ClinicalHistory.id == Treatment.clinical_history_id
             ).filter(
-                and_(
-                    Patient.is_active == True,
+                Patient.is_active == True
+            )
+            
+            # Aplicar filtros de fecha con lógica flexible
+            if start_date or end_date:
+                # Si se proporciona al menos una fecha, aplicar filtros parciales
+                if start_date:
+                    query = query.filter(Treatment.treatment_date >= start_date)
+                if end_date:
+                    query = query.filter(Treatment.treatment_date <= end_date)
+            else:
+                # Default: mes actual (solo si no se especifica ninguna fecha)
+                current_year = datetime.now().year
+                current_month = datetime.now().month
+                query = query.filter(
                     extract('year', Treatment.treatment_date) == current_year,
                     extract('month', Treatment.treatment_date) == current_month
                 )
-            ).scalar()
             
-            logger.info(f"Estadísticas de pacientes activos obtenidas: total={total_active_patients}, mes_actual={active_patients_month}")
+            # Aplicar filtro de doctor si se proporciona
+            if doctor_id:
+                query = query.filter(Treatment.doctor_id == doctor_id)
+            
+            active_patients_period = query.scalar()
+            
+            logger.info(f"Estadísticas de pacientes activos obtenidas: total={total_active_patients}, período={active_patients_period}")
             
             return {
                 "total_active_patients": total_active_patients or 0,
-                "active_patients_month": active_patients_month or 0
+                "active_patients_period": active_patients_period or 0
             }
             
         except Exception as e:
@@ -65,9 +97,18 @@ class DashboardService:
             raise Exception(f"Error obteniendo estadísticas de pacientes activos: {str(e)}")
     
     @staticmethod
-    def get_employees_by_role_stats(db: Session) -> dict:
+    def get_employees_by_role_stats(
+        db: Session,
+        role: Optional[str] = None,
+        is_active: Optional[bool] = True
+    ) -> dict:
         """
-        Obtiene estadísticas de empleados activos agrupados por rol
+        Obtiene estadísticas de empleados agrupados por rol
+        
+        Args:
+            db: Sesión de base de datos
+            role: Filtrar por rol específico (opcional)
+            is_active: Filtrar por estado activo/inactivo (default: True)
         
         Returns:
             dict: {
@@ -81,20 +122,36 @@ class DashboardService:
             }
         """
         try:
-            # Obtener el total general de empleados activos
-            total_general = db.query(func.count(User.uid)).filter(
-                User.is_active == True
-            ).scalar()
+            # Construir query base
+            base_filter_conditions = []
             
-            # Obtener empleados activos agrupados por rol
-            employees_by_role = db.query(
+            # Aplicar filtro de estado activo
+            if is_active is not None:
+                base_filter_conditions.append(User.is_active == is_active)
+            
+            # Obtener el total general de empleados
+            total_query = db.query(func.count(User.uid))
+            if base_filter_conditions:
+                total_query = total_query.filter(*base_filter_conditions)
+            total_general = total_query.scalar()
+            
+            # Construir query para empleados agrupados por rol
+            employees_query = db.query(
                 Role.name.label('role'),
                 func.count(User.uid).label('total')
             ).join(
                 User, Role.id == User.role_id
-            ).filter(
-                User.is_active == True
-            ).group_by(
+            )
+            
+            # Aplicar filtros
+            if base_filter_conditions:
+                employees_query = employees_query.filter(*base_filter_conditions)
+            
+            # Filtrar por rol específico si se proporciona
+            if role:
+                employees_query = employees_query.filter(Role.name == role)
+            
+            employees_by_role = employees_query.group_by(
                 Role.name
             ).order_by(
                 Role.name
@@ -118,9 +175,28 @@ class DashboardService:
             raise Exception(f"Error obteniendo estadísticas de empleados por rol: {str(e)}")
     
     @staticmethod
-    def get_procedures_distribution(db: Session) -> dict:
+    def get_procedures_distribution(
+        db: Session,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        doctor_id: Optional[str] = None,
+        procedure_id: Optional[int] = None
+    ) -> dict:
         """
         Obtiene la distribución de procedimientos realizados con cantidad y porcentaje
+        
+        Args:
+            db: Sesión de base de datos
+            start_date: Fecha de inicio para filtrar (opcional). Si solo se proporciona esta, filtra desde esta fecha hasta hoy
+            end_date: Fecha de fin para filtrar (opcional). Si solo se proporciona esta, filtra desde el inicio hasta esta fecha
+            doctor_id: UID del doctor para filtrar (opcional)
+            procedure_id: ID del procedimiento dental para filtrar (opcional)
+        
+        Lógica de filtros:
+            - start_date solo: Filtra desde start_date en adelante
+            - end_date solo: Filtra hasta end_date
+            - Ambos: Filtra el rango específico
+            - Ninguno: Todos los procedimientos históricos
         
         Usa función de ventana (OVER) para calcular porcentajes en una sola consulta SQL.
         
@@ -131,6 +207,7 @@ class DashboardService:
             ROUND((COUNT(t.id) * 100.0 / SUM(COUNT(t.id)) OVER ()), 2) AS porcentaje
         FROM treatments t
         JOIN dental_service ds ON t.dental_service_id = ds.id
+        WHERE [filtros opcionales]
         GROUP BY ds.name
         ORDER BY cantidad DESC;
         
@@ -148,20 +225,36 @@ class DashboardService:
             }
         """
         try:
-            # Calcular el total de tratamientos primero
-            total_treatments = db.query(func.count(Treatment.id)).filter(
+            # Construir query base con filtros
+            base_query = db.query(Treatment).filter(
                 Treatment.dental_service_id.isnot(None)
-            ).scalar() or 0
+            )
+            
+            # Aplicar filtros de fecha
+            if start_date:
+                base_query = base_query.filter(Treatment.treatment_date >= start_date)
+            if end_date:
+                base_query = base_query.filter(Treatment.treatment_date <= end_date)
+            
+            # Aplicar filtro de doctor
+            if doctor_id:
+                base_query = base_query.filter(Treatment.doctor_id == doctor_id)
+            
+            # Aplicar filtro de procedimiento
+            if procedure_id:
+                base_query = base_query.filter(Treatment.dental_service_id == procedure_id)
+            
+            # Calcular el total de tratamientos con filtros aplicados
+            total_treatments = base_query.count()
             
             if total_treatments == 0:
-                logger.info("No hay tratamientos registrados con servicios dentales")
+                logger.info("No hay tratamientos registrados con los filtros aplicados")
                 return {
                     "total_procedures": 0,
                     "distribution": []
                 }
             
             # Usar función de ventana para calcular porcentajes en una sola query
-            # COUNT(t.id) * 100.0 / SUM(COUNT(t.id)) OVER ()
             count_column = func.count(Treatment.id).label('quantity')
             total_over_window = func.sum(func.count(Treatment.id)).over()
             percentage_column = func.round(
@@ -175,10 +268,22 @@ class DashboardService:
                 percentage_column
             ).join(
                 Treatment, DentalService.id == Treatment.dental_service_id
-            ).group_by(
+            )
+            
+            # Aplicar los mismos filtros
+            if start_date:
+                procedures_query = procedures_query.filter(Treatment.treatment_date >= start_date)
+            if end_date:
+                procedures_query = procedures_query.filter(Treatment.treatment_date <= end_date)
+            if doctor_id:
+                procedures_query = procedures_query.filter(Treatment.doctor_id == doctor_id)
+            if procedure_id:
+                procedures_query = procedures_query.filter(Treatment.dental_service_id == procedure_id)
+            
+            procedures_query = procedures_query.group_by(
                 DentalService.name
             ).order_by(
-                count_column.desc()  # Ordenar por cantidad descendente
+                count_column.desc()
             ).all()
             
             # Construir la respuesta
@@ -203,9 +308,26 @@ class DashboardService:
             raise Exception(f"Error obteniendo distribución de procedimientos: {str(e)}")
     
     @staticmethod
-    def get_procedures_by_doctor(db: Session) -> list:
+    def get_procedures_by_doctor(
+        db: Session,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        procedure_id: Optional[int] = None
+    ) -> list:
         """
-        Obtiene los procedimientos realizados por cada doctor activo con percentage
+        Obtiene los procedimientos realizados por cada doctor activo con porcentaje
+        
+        Args:
+            db: Sesión de base de datos
+            start_date: Fecha de inicio para filtrar (opcional). Si solo se proporciona esta, filtra desde esta fecha en adelante
+            end_date: Fecha de fin para filtrar (opcional). Si solo se proporciona esta, filtra hasta esta fecha
+            procedure_id: ID del procedimiento dental para filtrar (opcional)
+        
+        Lógica de filtros:
+            - start_date solo: Filtra desde start_date en adelante
+            - end_date solo: Filtra hasta end_date
+            - Ambos: Filtra el rango específico
+            - Ninguno: Todos los procedimientos históricos
         
         Usa función de ventana (OVER) para calcular porcentajes en una sola consulta SQL.
         
@@ -218,6 +340,9 @@ class DashboardService:
         LEFT JOIN treatments t ON t.doctor_id = u.uid
         JOIN roles r ON u.role_id = r.id
         WHERE r.name = 'Doctor' AND u.is_active = true
+          [AND t.treatment_date >= start_date]
+          [AND t.treatment_date <= end_date]
+          [AND t.dental_service_id = procedure_id]
         GROUP BY doctor
         ORDER BY total_procedures DESC;
         
@@ -245,7 +370,7 @@ class DashboardService:
                 2
             ).label('percentage')
             
-            # Ejecutar query
+            # Construir query base
             doctors_query = db.query(
                 doctor_name,
                 count_treatments,
@@ -257,7 +382,39 @@ class DashboardService:
             ).filter(
                 Role.name == 'Doctor',
                 User.is_active == True
-            ).group_by(
+            )
+            
+            # Crear subquery para aplicar filtros solo a los tratamientos
+            # Esto es necesario para que el LEFT JOIN funcione correctamente con filtros
+            if start_date or end_date or procedure_id:
+                # Crear condiciones para el WHERE del LEFT JOIN
+                treatment_conditions = []
+                if start_date:
+                    treatment_conditions.append(Treatment.treatment_date >= start_date)
+                if end_date:
+                    treatment_conditions.append(Treatment.treatment_date <= end_date)
+                if procedure_id:
+                    treatment_conditions.append(Treatment.dental_service_id == procedure_id)
+                
+                # Aplicar filtros en el ON clause del JOIN
+                doctors_query = db.query(
+                    doctor_name,
+                    count_treatments,
+                    percentage_column
+                ).outerjoin(
+                    Treatment,
+                    and_(
+                        Treatment.doctor_id == User.uid,
+                        *treatment_conditions
+                    )
+                ).join(
+                    Role, User.role_id == Role.id
+                ).filter(
+                    Role.name == 'Doctor',
+                    User.is_active == True
+                )
+            
+            doctors_query = doctors_query.group_by(
                 doctor_name
             ).order_by(
                 count_treatments.desc()
@@ -282,9 +439,20 @@ class DashboardService:
             raise Exception(f"Error obteniendo procedimientos por doctor: {str(e)}")
     
     @staticmethod
-    def get_treatments_per_month(db: Session) -> list:
+    def get_treatments_per_month(
+        db: Session,
+        year: Optional[int] = None,
+        doctor_id: Optional[str] = None,
+        procedure_id: Optional[int] = None
+    ) -> list:
         """
-        Obtiene el total de tratamientos por mes durante los últimos 12 meses
+        Obtiene el total de tratamientos por mes durante los últimos 12 meses o un año específico
+        
+        Args:
+            db: Sesión de base de datos
+            year: Año específico para filtrar (opcional, por defecto últimos 12 meses)
+            doctor_id: UID del doctor para filtrar (opcional)
+            procedure_id: ID del procedimiento dental para filtrar (opcional)
         
         Genera una serie de los últimos 12 meses e incluye meses sin tratamientos con valor 0.
         
@@ -302,6 +470,8 @@ class DashboardService:
             COALESCE(COUNT(t.id), 0) AS total_tratamientos
         FROM meses m
         LEFT JOIN treatments t ON TO_CHAR(t.treatment_date, 'YYYY-MM') = m.mes
+          [AND t.doctor_id = doctor_id]
+          [AND t.dental_service_id = procedure_id]
         GROUP BY m.mes
         ORDER BY m.mes;
         
@@ -318,42 +488,60 @@ class DashboardService:
             from datetime import datetime, timedelta
             from dateutil.relativedelta import relativedelta
             
-            # Calcular el rango de los últimos 12 meses
+            # Calcular el rango de fechas
             current_date = datetime.now()
-            # Primer día del mes actual
-            end_month = current_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            # Primer día del mes hace 11 meses
-            start_month = end_month - relativedelta(months=11)
             
-            # Generar lista de los últimos 12 meses
+            if year:
+                # Si se proporciona un año, usar todos los meses de ese año
+                start_month = datetime(year, 1, 1)
+                end_month = datetime(year, 12, 1)
+            else:
+                # Por defecto: últimos 12 meses
+                end_month = current_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                start_month = end_month - relativedelta(months=11)
+            
+            # Generar lista de meses
             months_list = []
             current_month = start_month
             while current_month <= end_month:
                 months_list.append(current_month.strftime('%Y-%m'))
                 current_month += relativedelta(months=1)
             
-            # Obtener tratamientos agrupados por mes
-            # Usar func.to_char para PostgreSQL o func.strftime para SQLite
+            # Construir query base para tratamientos
             try:
                 # Intentar con PostgreSQL (to_char)
-                treatments_by_month = db.query(
+                treatments_query = db.query(
                     func.to_char(Treatment.treatment_date, 'YYYY-MM').label('month'),
                     func.count(Treatment.id).label('total')
-                ).filter(
-                    Treatment.treatment_date >= start_month,
-                    Treatment.treatment_date < end_month + relativedelta(months=1)
-                ).group_by(
+                )
+            except Exception:
+                # Fallback para SQLite (strftime)
+                treatments_query = db.query(
+                    func.strftime('%Y-%m', Treatment.treatment_date).label('month'),
+                    func.count(Treatment.id).label('total')
+                )
+            
+            # Aplicar filtro de rango de fechas
+            treatments_query = treatments_query.filter(
+                Treatment.treatment_date >= start_month,
+                Treatment.treatment_date < end_month + relativedelta(months=1)
+            )
+            
+            # Aplicar filtro de doctor si se proporciona
+            if doctor_id:
+                treatments_query = treatments_query.filter(Treatment.doctor_id == doctor_id)
+            
+            # Aplicar filtro de procedimiento si se proporciona
+            if procedure_id:
+                treatments_query = treatments_query.filter(Treatment.dental_service_id == procedure_id)
+            
+            # Agrupar por mes
+            try:
+                treatments_by_month = treatments_query.group_by(
                     func.to_char(Treatment.treatment_date, 'YYYY-MM')
                 ).all()
             except Exception:
-                # Fallback para SQLite (strftime)
-                treatments_by_month = db.query(
-                    func.strftime('%Y-%m', Treatment.treatment_date).label('month'),
-                    func.count(Treatment.id).label('total')
-                ).filter(
-                    Treatment.treatment_date >= start_month,
-                    Treatment.treatment_date < end_month + relativedelta(months=1)
-                ).group_by(
+                treatments_by_month = treatments_query.group_by(
                     func.strftime('%Y-%m', Treatment.treatment_date)
                 ).all()
             

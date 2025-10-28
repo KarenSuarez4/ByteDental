@@ -243,3 +243,4 @@ generate_test_*.py
 database_backup_*
 
 test_dashboard.py
+test_dashboard_filters.py
