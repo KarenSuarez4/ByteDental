@@ -546,7 +546,10 @@ class ClinicalHistoryService:
                     },
                     "guardian": guardian_data  # Guardian ya estaba bien
                 },
-                "treatments": treatment_list
+                "treatments": treatment_list,
+                "is_active": clinical_history.is_active,
+                "closure_reason": clinical_history.closure_reason,
+                "closed_at": clinical_history.closed_at,
             }
 
             # Registrar auditoría
@@ -995,4 +998,3 @@ class ClinicalHistoryService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error en el proceso de cierre automático: {str(e)}"
             )
-        
