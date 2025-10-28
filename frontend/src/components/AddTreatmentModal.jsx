@@ -42,6 +42,7 @@ const AddTreatmentModal = ({
     const [formData, setFormData] = useState({
         dental_service_id: '',
         treatment_date: '',
+        reason: '', // Nuevo campo
         notes: ''
     });
 
@@ -54,6 +55,7 @@ const AddTreatmentModal = ({
             setFormData({
                 dental_service_id: '',
                 treatment_date: dateConstraints.today, // ✅ Current date by default
+                reason: '', // Nuevo campo
                 notes: ''
             });
             setErrors({});
@@ -107,6 +109,9 @@ const AddTreatmentModal = ({
                 if (selectedDate < oneYearAgo) {
                     return 'La fecha no puede ser mayor a un año en el pasado';
                 }
+                break;
+            case 'reason':
+                if (!value || value.trim() === '') return 'El motivo de la consulta es obligatorio';
                 break;
             default:
                 break;
@@ -182,6 +187,7 @@ const AddTreatmentModal = ({
         setTouched({
             dental_service_id: true,
             treatment_date: true,
+            reason: true, // Nuevo campo
             notes: true
         });
 
@@ -190,6 +196,7 @@ const AddTreatmentModal = ({
             const treatmentData = {
                 dental_service_id: parseInt(formData.dental_service_id),
                 treatment_date: new Date(formData.treatment_date).toISOString(),
+                reason: formData.reason.trim(), // Nuevo campo
                 notes: formData.notes.trim() || null
             };
 
@@ -242,6 +249,32 @@ const AddTreatmentModal = ({
 
                     {/* Body */}
                     <form onSubmit={handleSubmit} className="p-8 space-y-6">
+                                                {/* Motivo de la consulta */}
+                        <div className="group">
+                            <label
+                                htmlFor="reason"
+                                className="block text-sm font-semibold text-gray-700 mb-2"
+                            >
+                                Motivo de la consulta <span className="text-red-500 ml-1">*</span>
+                            </label>
+                            <input
+                                id="reason"
+                                name="reason"
+                                type="text"
+                                value={formData.reason}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                placeholder="Ingrese el motivo de la consulta"
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue focus:border-primary-blue transition-all duration-200"
+                                disabled={loading}
+                                required
+                            />
+                            {errors.reason && touched.reason && (
+                                <p className="text-red-500 text-sm mt-2 flex items-center animate-fadeIn">
+                                    {errors.reason}
+                                </p>
+                            )}
+                        </div>
                         {/* Servicio Dental */}
                         <div className="group">
                             <label
@@ -299,7 +332,6 @@ const AddTreatmentModal = ({
                                 <p className="text-red-500 text-sm font-poppins mt-1">{errors.treatment_date}</p>
                             )}
                         </div>
-
 
                         {/* Notas/Observaciones */}
                         <div className="group">

@@ -441,7 +441,11 @@ const HistoryManagement = () => {
                 doctorSignature={medicalRecord.doctor_signature}
               />
               <ConsultationReason
-                reason={medicalRecord.reason}
+                reason={
+                  medicalRecord.treatments.length > 0
+                    ? medicalRecord.treatments[medicalRecord.treatments.length - 1].reason
+                    : medicalRecord.reason
+                }
                 symptoms={medicalRecord.symptoms}
                 findings={medicalRecord.findings}
                 showFindings={true}
