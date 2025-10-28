@@ -37,6 +37,7 @@ const UserHeader = ({ userRole }) => {
       { path: "/users/manage", label: "Gestión de usuarios" },
       { path: "/dental-services/register", label: "Crear servicios" },
       { path: "/dental-services/manage", label: "Gestionar servicios" },
+      { path: "/admin/statistics", label: "Dashboard de Estadísticas" },
       { path: "/reports", label: "Reportes" },
     ],
     'Asistente': [
