@@ -249,7 +249,32 @@ const AddTreatmentModal = ({
 
                     {/* Body */}
                     <form onSubmit={handleSubmit} className="p-8 space-y-6">
-                                                {/* Motivo de la consulta */}
+                        {/* Fecha del Tratamiento */}
+                        <div className="group">
+                            <label
+                                htmlFor="treatment_date"
+                                className="flex items-center text-sm font-semibold text-gray-700 mb-2"
+                            >
+                                <FaCalendarAlt className="mr-2 text-primary-blue" />
+                                Fecha del Tratamiento <span className="text-red-500 ml-1">*</span>
+                            </label>
+
+                            <DateInput
+                                name="treatment_date"
+                                value={formData.treatment_date}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                minDate={dateConstraints.oneYearAgoDate}
+                                maxDate={dateConstraints.todayDate}
+                                className="w-full"
+                                error={!!errors.treatment_date}
+                            />
+                            {errors.treatment_date && (
+                                <p className="text-red-500 text-sm font-poppins mt-1">{errors.treatment_date}</p>
+                            )}
+                        </div>
+
+                        {/* Motivo de la consulta */}
                         <div className="group">
                             <label
                                 htmlFor="reason"
@@ -305,31 +330,6 @@ const AddTreatmentModal = ({
                                     <span className="mr-1">⚠️</span>
                                     {errors.dental_service_id}
                                 </p>
-                            )}
-                        </div>
-
-                        {/* Fecha del Tratamiento */}
-                        <div className="group">
-                            <label
-                                htmlFor="treatment_date"
-                                className="flex items-center text-sm font-semibold text-gray-700 mb-2"
-                            >
-                                <FaCalendarAlt className="mr-2 text-primary-blue" />
-                                Fecha del Tratamiento <span className="text-red-500 ml-1">*</span>
-                            </label>
-
-                            <DateInput
-                                name="treatment_date"
-                                value={formData.treatment_date}
-                                onChange={handleChange}
-                                onBlur={handleBlur}
-                                minDate={dateConstraints.oneYearAgoDate}
-                                maxDate={dateConstraints.todayDate}
-                                className="w-full"
-                                error={!!errors.treatment_date}
-                            />
-                            {errors.treatment_date && (
-                                <p className="text-red-500 text-sm font-poppins mt-1">{errors.treatment_date}</p>
                             )}
                         </div>
 
