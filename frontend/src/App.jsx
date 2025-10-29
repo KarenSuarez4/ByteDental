@@ -22,6 +22,7 @@ import RegisterPatientFirstHistory from './pages/Doctor/RegisterPatientFirstHist
 import HistoryManagement from './pages/Doctor/HistoryManagement.jsx';
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import StatisticsDashboard from './pages/Admin/StatisticsDashboard';
 
 function AppContent() {
   const { isAuthenticated, userRole, mustChangePassword, loading } = useAuth();
@@ -53,6 +54,7 @@ function AppContent() {
             <Route path="/dental-services/register" element={<ProtectedRoute><RegisterDentalService /></ProtectedRoute>} />
             <Route path="/dental-services/manage" element={<ProtectedRoute><DentalServiceManagement /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+            <Route path="/admin/statistics" element={<ProtectedRoute><StatisticsDashboard /></ProtectedRoute>} />
           </>
         )}
         {isAuthenticated && userRole === "Asistente" && (
