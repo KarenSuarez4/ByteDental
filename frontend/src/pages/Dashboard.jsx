@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Button from '../components/Button';
 import { getUserById } from '../services/userService';
 import { auth } from '../Firebase/client';
@@ -78,6 +78,22 @@ const Dashboard = () => {
           </h2>
           <p className="text-gray-600">
           </p>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md p-6 mt-6">
+          <h2 className="text-2xl font-bold text-header-blue mb-4">
+            Funcionalidades del Sistema
+          </h2>
+          {user.role_name === 'ADMINISTRADOR' && (
+            <div className="mb-4">
+              <Link 
+                to="/admin/statistics" 
+                className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+              >
+                Ver Dashboard de Estadísticas
+              </Link>
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6 mt-6">

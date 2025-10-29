@@ -5,7 +5,8 @@ from app.database import get_db
 from app.schemas.clinical_history_schema import (
     ClinicalHistoryCreate, 
     ClinicalHistoryResponse,
-    ClinicalHistoryCreateResponse
+    ClinicalHistoryCreateResponse,
+    ClinicalHistoryStatusChange
 )
 from app.services.clinical_history_service import ClinicalHistoryService
 from app.middleware.auth_middleware import RolePermissions
@@ -127,3 +128,120 @@ def add_treatment_to_history(
     
     service = ClinicalHistoryService(db, current_user=current_user)
     return service.add_treatment_to_history(history_id, treatment_data, request)
+
+@router.patch("/{history_id}/status", response_model=dict)
+def change_clinical_history_status(
+    history_id: int,
+    status_data: ClinicalHistoryStatusChange,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Cerrar o reabrir una historia clínica (Solo Doctor)
+    
+    - **is_active=False**: Cerrar historia clínica (requiere motivo de cierre)
+    - **is_active=True**: Reabrir historia clínica (limpia motivo y fecha de cierre)
+    
+    **Validaciones:**
+    - Si se cierra (is_active=False), debe proporcionar closure_reason
+    - Si se reabre (is_active=True), NO debe proporcionar closure_reason
+    - No se puede cambiar a un estado que ya tiene
+    """
+    # Verificar rol
+    if not current_user.role or current_user.role.name != RolePermissions.DENTIST:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos para realizar esta acción"
+        )
+    
+    service = ClinicalHistoryService(db, current_user=current_user)
+    
+    try:
+        result = service.change_clinical_history_status(
+            history_id=history_id,
+            new_status=status_data.is_active,
+            closure_reason=status_data.closure_reason,
+            request=request
+        )
+        
+        action = "reabierta" if status_data.is_active else "cerrada"
+        return {
+            "message": f"Historia clínica {action} correctamente",
+            "history_id": history_id,
+            "new_status": status_data.is_active,
+            **result
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno del servidor: {str(e)}"
+        )
+
+
+@router.post("/auto-close-inactive", response_model=dict)
+def auto_close_inactive_histories(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Cierra automáticamente las historias clínicas sin tratamientos en los últimos 5 años.
+    
+    **Descripción:**
+    - Identifica historias clínicas activas sin tratamientos en > 5 años
+    - Las deshabilita automáticamente
+    - Registra motivo y fecha de cierre
+    - Genera auditoría para cada cierre
+    
+    **Permisos requeridos:**
+    - Solo usuarios con rol Administrador
+    
+    **Returns:**
+    - **total_closed**: Número de historias cerradas
+    - **closed_histories**: Lista de historias cerradas con detalles
+    - **execution_date**: Fecha de ejecución del proceso
+    
+    **Ejemplo de respuesta:**
+    ```json
+    {
+        "success": true,
+        "total_closed": 5,
+        "closed_histories": [
+            {
+                "history_id": 15,
+                "patient_id": 10,
+                "patient_name": "Juan Pérez",
+                "closure_reason": "Cierre automático por inactividad de 2190 días...",
+                "closed_at": "2025-10-23T10:30:00",
+                "last_treatment_date": "2019-01-15T09:00:00"
+            }
+        ],
+        "execution_date": "2025-10-23T10:30:00",
+        "criteria": "Sin tratamientos en los últimos 5 años",
+        "message": "Se cerraron automáticamente 5 historia(s) clínica(s) por inactividad"
+    }
+    ```
+    """
+    # Verificar que el usuario sea Administrador
+    if not hasattr(current_user, 'role') or current_user.role.role_name != "Administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo los administradores pueden ejecutar el cierre automático de historias clínicas"
+        )
+    
+    service = ClinicalHistoryService(db, current_user)
+    
+    try:
+        result = service.auto_close_inactive_histories(request=request)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno del servidor: {str(e)}"
+        )
+

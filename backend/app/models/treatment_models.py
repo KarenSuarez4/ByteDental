@@ -10,6 +10,7 @@ class Treatment(Base):
     dental_service_id = Column(Integer, ForeignKey("dental_service.id", ondelete="SET NULL"), nullable=True)
     doctor_id = Column(String(128), nullable=False)
     treatment_date = Column(DateTime, nullable=False)
+    reason = Column(Text, nullable=False)  # Motivo de consulta del tratamiento
     notes = Column(Text, nullable=True)
 
     # Relaciones

@@ -48,6 +48,9 @@ class RolePermissions:
     # Permisos para servicios dentales
     DENTAL_SERVICE_READ = [ADMIN, ASSISTANT, DENTIST]  # Solo ADMIN, ASSISTANT y DENTIST pueden leer servicios dentales
     DENTAL_SERVICE_WRITE = [ADMIN]  # Solo ADMIN puede crear, actualizar, eliminar servicios dentales
+    
+    # Permisos para reportes
+    REPORT_ACCESS = [ADMIN]  # Solo ADMIN puede acceder a reportes
 
 def get_current_user_from_header(request: Request, db: Session = Depends(get_db)) -> Optional[User]:
     """
