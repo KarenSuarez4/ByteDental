@@ -13,6 +13,7 @@ import RegisterUser from './pages/Admin/RegisterUser';
 import UserManagement from './pages/Admin/UserManagement.jsx';
 import RegisterDentalService from './pages/Admin/RegisterDentalService';
 import DentalServiceManagement from './pages/Admin/DentalServiceManagement';
+import Reports from './pages/Admin/Reports';
 import AuditLog from './pages/Auditor/AuditLog.jsx';
 import RegisterPatient from './pages/Asistente/RegisterPatient';
 import PatientManagement from './pages/Asistente/PatientManagement';
@@ -51,7 +52,7 @@ function AppContent() {
             <Route path="/users/manage" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
             <Route path="/dental-services/register" element={<ProtectedRoute><RegisterDentalService /></ProtectedRoute>} />
             <Route path="/dental-services/manage" element={<ProtectedRoute><DentalServiceManagement /></ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute><DummyPage title="Reportes" /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           </>
         )}
         {isAuthenticated && userRole === "Asistente" && (
