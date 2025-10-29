@@ -1,243 +1,92 @@
-"""
-Servicio de reportes para ByteDental
-"""
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-from datetime import datetime
-from typing import List, Dict
+from datetime import datetime, timedelta
+from fastapi import HTTPException, status
+from sqlalchemy import func, and_
 import logging
-from io import BytesIO
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+from app.models.treatment_models import Treatment
+from app.models.dental_service_models import DentalService
+from app.schemas.report_schema import MonthlyReport
 
 logger = logging.getLogger(__name__)
 
 class ReportService:
-    """Servicio para generar reportes del sistema"""
+    """Capa de negocio encargada de generar reportes clínicos y mensuales."""
 
-    @staticmethod
-    def get_consolidated_activities(
-        db: Session,
-        start_date: str,
-        end_date: str
-    ) -> List[Dict]:
+    def __init__(self, db):
+        self.db = db
+
+    def generate_monthly_report(self, report_date: datetime, generated_by: str = "Administrador") -> MonthlyReport:
         """
-        Obtiene el consolidado de actividades odontológicas en un rango de fechas
-        
-        Args:
-            db: Sesión de base de datos
-            start_date: Fecha de inicio (YYYY-MM-DD)
-            end_date: Fecha de fin (YYYY-MM-DD)
-            
-        Returns:
-            Lista de diccionarios con los datos del reporte
+        Genera un reporte mensual agrupado por tipo de procedimiento.
+        Incluye todos los tratamientos realizados entre el primer y último día del mes.
         """
         try:
-            query = text("""
-                SELECT
-                    t.treatment_date AS fecha,
-                    CONCAT(per.first_name, ' ', per.first_surname) AS paciente,
-                    per.document_number AS documento,
-                    per.phone AS telefono,
-                    ds.name AS procedimiento,
-                    CONCAT(u.first_name, ' ', u.last_name) AS doctor
-                FROM treatments t
-                JOIN clinical_histories ch ON t.clinical_history_id = ch.id
-                JOIN patients p ON ch.patient_id = p.id
-                JOIN persons per ON p.person_id = per.id
-                JOIN users u ON t.doctor_id = u.uid
-                JOIN dental_service ds ON t.dental_service_id = ds.id
-                WHERE t.treatment_date BETWEEN :start_date AND :end_date
-                ORDER BY t.treatment_date DESC
-            """)
-            
-            result = db.execute(query, {"start_date": start_date, "end_date": end_date})
-            
-            # Convertir los resultados a lista de diccionarios
-            data = []
-            for row in result:
-                data.append({
-                    "fecha": row.fecha.strftime("%Y-%m-%d %H:%M") if row.fecha else "",
-                    "paciente": row.paciente or "",
-                    "documento": row.documento or "",
-                    "telefono": row.telefono or "",
-                    "procedimiento": row.procedimiento or "",
-                    "doctor": row.doctor or ""
-                })
-            
-            logger.info(f"Se obtuvieron {len(data)} registros para el reporte consolidado")
-            return data
-            
-        except Exception as e:
-            logger.error(f"Error al obtener consolidado de actividades: {str(e)}")
-            raise
+            if not report_date:
+                report_date = datetime.now()
 
-    @staticmethod
-    def generate_consolidated_activities_pdf(
-        data: List[Dict],
-        start_date: str,
-        end_date: str
-    ) -> BytesIO:
-        """
-        Genera un PDF con el consolidado de actividades odontológicas
-        
-        Args:
-            data: Lista de diccionarios con los datos del reporte
-            start_date: Fecha de inicio (YYYY-MM-DD)
-            end_date: Fecha de fin (YYYY-MM-DD)
-            
-        Returns:
-            BytesIO con el contenido del PDF
-        """
-        try:
-            # Crear un buffer en memoria para el PDF
-            buffer = BytesIO()
-            
-            # Crear el documento PDF
-            doc = SimpleDocTemplate(
-                buffer,
-                pagesize=A4,
-                rightMargin=30,
-                leftMargin=30,
-                topMargin=30,
-                bottomMargin=30
+            start_date = report_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            next_month = (start_date.replace(day=28) + timedelta(days=4)).replace(day=1)
+            end_date = next_month - timedelta(seconds=1)
+
+            logger.info(
+                f"[ReportService] Generando reporte mensual del "
+                f"{start_date.strftime('%Y-%m-%d')} al {end_date.strftime('%Y-%m-%d')} "
+                f"por {generated_by}"
             )
-            
-            # Contenedor para los elementos del PDF
-            elements = []
-            
-            # Estilos
-            styles = getSampleStyleSheet()
-            title_style = ParagraphStyle(
-                'CustomTitle',
-                parent=styles['Heading1'],
-                fontSize=16,
-                textColor=colors.HexColor('#1a365d'),
-                spaceAfter=12,
-                alignment=TA_CENTER,
-                fontName='Helvetica-Bold'
-            )
-            
-            subtitle_style = ParagraphStyle(
-                'CustomSubtitle',
-                parent=styles['Normal'],
-                fontSize=12,
-                textColor=colors.HexColor('#2d3748'),
-                spaceAfter=20,
-                alignment=TA_CENTER,
-                fontName='Helvetica'
-            )
-            
-            # Título
-            title = Paragraph("Consolidado de Actividades Odontológicas", title_style)
-            elements.append(title)
-            
-            # Subtítulo con el periodo
-            subtitle = Paragraph(f"Periodo: {start_date} a {end_date}", subtitle_style)
-            elements.append(subtitle)
-            
-            # Espacio
-            elements.append(Spacer(1, 0.2*inch))
-            
-            # Tabla de datos
-            if data:
-                # Encabezados
-                table_data = [
-                    ['Fecha', 'Paciente', 'Documento', 'Teléfono', 'Procedimiento', 'Doctor']
-                ]
-                
-                # Datos
-                for row in data:
-                    table_data.append([
-                        row['fecha'],
-                        row['paciente'],
-                        row['documento'],
-                        row['telefono'],
-                        row['procedimiento'],
-                        row['doctor']
-                    ])
-                
-                # Crear tabla
-                table = Table(table_data, colWidths=[
-                    1.2*inch,  # Fecha
-                    1.3*inch,  # Paciente
-                    0.9*inch,  # Documento
-                    0.9*inch,  # Teléfono
-                    1.3*inch,  # Procedimiento
-                    1.3*inch   # Doctor
-                ])
-                
-                # Estilo de la tabla
-                table.setStyle(TableStyle([
-                    # Encabezado
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2b6cb0')),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                    ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 9),
-                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                    ('TOPPADDING', (0, 0), (-1, 0), 12),
-                    
-                    # Cuerpo de la tabla
-                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                    ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-                    ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
-                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                    ('FONTSIZE', (0, 1), (-1, -1), 8),
-                    ('TOPPADDING', (0, 1), (-1, -1), 6),
-                    ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
-                    
-                    # Bordes
-                    ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                    
-                    # Alternancia de colores en filas
-                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f7fafc')])
-                ]))
-                
-                elements.append(table)
-            else:
-                # Mensaje cuando no hay datos
-                no_data_style = ParagraphStyle(
-                    'NoData',
-                    parent=styles['Normal'],
-                    fontSize=12,
-                    textColor=colors.HexColor('#718096'),
-                    alignment=TA_CENTER,
-                    fontName='Helvetica'
+
+            query = (
+                self.db.query(
+                    DentalService.name.label("procedure_name"),
+                    func.count(Treatment.id).label("patient_count")
                 )
-                no_data_msg = Paragraph("No se encontraron registros en el periodo especificado.", no_data_style)
-                elements.append(no_data_msg)
-            
-            # Espacio
-            elements.append(Spacer(1, 0.3*inch))
-            
-            # Pie de página con fecha de generación
-            footer_style = ParagraphStyle(
-                'Footer',
-                parent=styles['Normal'],
-                fontSize=8,
-                textColor=colors.HexColor('#a0aec0'),
-                alignment=TA_CENTER,
-                fontName='Helvetica'
+                .join(Treatment, Treatment.dental_service_id == DentalService.id)
+                .filter(
+                    and_(
+                        Treatment.treatment_date >= start_date,
+                        Treatment.treatment_date <= end_date
+                    )
+                )
+                .group_by(DentalService.name)
             )
-            generation_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            footer = Paragraph(f"Reporte generado el: {generation_date}", footer_style)
-            elements.append(footer)
-            
-            # Construir el PDF
-            doc.build(elements)
-            
-            # Mover el puntero del buffer al inicio
-            buffer.seek(0)
-            
-            logger.info(f"PDF generado exitosamente con {len(data)} registros")
-            return buffer
-            
-        except Exception as e:
-            logger.error(f"Error al generar PDF del consolidado: {str(e)}")
+
+            results = query.all()
+
+            if not results:
+                logger.warning(
+                    f"[ReportService] No se encontraron tratamientos en el periodo "
+                    f"{start_date.strftime('%Y-%m-%d')} a {end_date.strftime('%Y-%m-%d')}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="No se encontraron actividades en el período especificado"
+                )
+
+            procedures = [
+                {"procedure_name": r.procedure_name, "patient_count": r.patient_count}
+                for r in results
+            ]
+            total_patients = sum(p["patient_count"] for p in procedures)
+
+            logger.info(
+                f"[ReportService] Reporte mensual generado con {len(procedures)} procedimientos "
+                f"y {total_patients} pacientes atendidos."
+            )
+
+            return MonthlyReport(
+                generated_by=generated_by,
+                month=start_date.month,
+                year=start_date.year,
+                start_date=start_date,
+                end_date=end_date,
+                procedures=procedures,
+                total_patients=total_patients
+            )
+
+        except HTTPException:
             raise
+        except Exception as e:
+            logger.error(f"[ReportService] Error al generar el reporte mensual: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error interno al generar el reporte mensual"
+            )
