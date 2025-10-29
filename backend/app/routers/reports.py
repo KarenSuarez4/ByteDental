@@ -76,6 +76,11 @@ async def validate_date_range(start_date: datetime, end_date: datetime):
     """
     # Ensure dates are not in the future
     now = datetime.now(timezone.utc)
+    if start_date.tzinfo is None:
+        start_date = start_date.replace(tzinfo=timezone.utc)
+    if end_date.tzinfo is None:
+        end_date = end_date.replace(tzinfo=timezone.utc)
+    
     if start_date > now or end_date > now:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
