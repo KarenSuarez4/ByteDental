@@ -333,3 +333,48 @@ export const addTreatmentToHistory = async (
     throw error;
   }
 };
+
+/**
+ * Cambiar el estado de una historia clínica (activa/inactiva)
+ * @param {number} historyId - ID de la historia clínica
+ * @param {boolean} isActive - Estado activo/inactivo
+ * @param {string} [closureReason] - Motivo de cierre (opcional, requerido si inactiva)
+ * @param {string} token - Token de autenticación
+ * @returns {Promise<Object>} Respuesta de la API con el estado actualizado
+ */
+export const changeClinicalHistoryStatus = async (
+  historyId,
+  isActive,
+  closureReason,
+  token
+) => {
+  try {
+    const body = {
+      is_active: isActive,
+      closure_reason: isActive ? undefined : closureReason,
+    };
+
+    const response = await fetch(
+      `${API_URL}/api/clinical-histories/${historyId}/status`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(
+        error.detail || "Error al cambiar el estado de la historia clínica"
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    return { error: error.message };
+  }
+};

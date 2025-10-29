@@ -5,10 +5,13 @@ const TreatmentsTable = ({ treatments }) => {
         if (!dateString) return 'N/A';
 
         const date = new Date(dateString);
-        return date.toLocaleDateString('es-CO', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
+        return date.toLocaleString('es-CO', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
         });
     };
 
@@ -42,6 +45,9 @@ const TreatmentsTable = ({ treatments }) => {
                             <th className="px-4 py-4 text-center text-24 font-semibold font-poppins" scope="col">
                                 Fecha
                             </th>
+                            <th className="px-4 py-4 text-center text-24 font-semibold font-poppins" scope="col">
+                                Motivo
+                            </th>
                             <th className="px-4 py-4 text-center text-24    font-semibold font-poppins" scope="col">
                                 Nombre del Tratamiento
                             </th>
@@ -65,6 +71,9 @@ const TreatmentsTable = ({ treatments }) => {
                                 </td>
                                 <td className="text-center px-4 py-4 text-18 text-gray-600 font-poppins">
                                     {formatDate(treatment.date)}
+                                </td>
+                                <td className="text-center px-4 py-4 text-18 text-gray-800 font-poppins">
+                                    {treatment.reason || 'N/A'}
                                 </td>
                                 <td className="text-center px-4 py-4 text-18 text-gray-800 font-poppins">
                                     {treatment.name || 'N/A'}

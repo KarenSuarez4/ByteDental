@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getClinicalHistoryById, addTreatmentToHistory } from '../../services/historyPatientService';
+import { getClinicalHistoryById, addTreatmentToHistory, changeClinicalHistoryStatus } from '../../services/historyPatientService';
 import { getDentalServices } from '../../services/dentalServiceService';
 import PatientProfileCard from '../../components/PatientProfileCard';
 import TreatmentsTable from '../../components/TreatmentsTable';
@@ -11,6 +11,7 @@ import AlertMessage from '../../components/AlertMessage';
 import ConsultationReason from '../../components/ConsultationReason';
 import MedicalInfoCarousel from '../../components/MedicalInfoCarousel';
 import AddTreatmentModal from '../../components/AddTreatmentModal';
+import ClosureReasonModal from '../../components/ClosureReasonModal';
 
 import {
   FaSyringe,
@@ -30,7 +31,7 @@ import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 const HistoryManagement = () => {
   const { historyId } = useParams();
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const { token, userRole } = useAuth();
 
   // Component state management
   const [medicalRecord, setMedicalRecord] = useState(null);
@@ -43,6 +44,13 @@ const HistoryManagement = () => {
   const [dentalServices, setDentalServices] = useState([]);
   const [modalLoading, setModalLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Closure reason and status handling
+  const [closureReason, setClosureReason] = useState('');
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [statusError, setStatusError] = useState('');
+  const [statusSuccess, setStatusSuccess] = useState('');
+  const [showClosureModal, setShowClosureModal] = useState(false);
 
   /**
    * Scrolls the medical cards carousel in the specified direction
@@ -178,6 +186,7 @@ const HistoryManagement = () => {
       const mappedData = {
         id: response.id,
         patient_id: response.patient_id,
+        is_active: response.is_active,
         patient: {
           // Basic patient information
           first_name: response.patient?.person?.first_name || response.patient?.first_name || 'N/A',
@@ -361,6 +370,54 @@ const HistoryManagement = () => {
     navigate(-1);
   };
 
+  // Cerrar historia clínica
+  const handleCloseHistory = async () => {
+    if (!closureReason) {
+      setStatusError('Debes ingresar el motivo de cierre.');
+      return;
+    }
+    setStatusLoading(true);
+    setStatusError('');
+    setStatusSuccess('');
+    const result = await changeClinicalHistoryStatus(historyId, false, closureReason, token);
+    setStatusLoading(false);
+    if (result.error) {
+      setStatusError(result.error);
+    } else {
+      setShowClosureModal(false); // Cierra el modal
+      setSuccessMessage('Historia clínica cerrada exitosamente.'); // Notificación de éxito
+      // Recarga la historia clínica actualizada
+      const updatedData = await fetchMedicalRecord(historyId);
+      setMedicalRecord(updatedData);
+      // Limpia el mensaje después de unos segundos
+      setTimeout(() => setSuccessMessage(''), 5000);
+      setClosureReason('');
+    }
+  };
+
+  // Reabrir historia clínica
+  const handleReopenHistory = async () => {
+    // Validación: no permitir reactivar si el paciente está desactivado
+    if (!medicalRecord.patient.is_active) {
+      setError('No se puede reactivar la historia clínica porque el paciente está desactivado.'); //Agregar Toast de mensajes :)
+      setStatusError('No se puede reactivar la historia clínica porque el paciente está desactivado.');
+      return;
+    }
+    setStatusLoading(true);
+    setStatusError('');
+    setStatusSuccess('');
+    const result = await changeClinicalHistoryStatus(historyId, true, undefined, token);
+    setStatusLoading(false);
+    if (result.error) {
+      setStatusError(result.error);
+    } else {
+      setSuccessMessage('Historia clínica reactivada exitosamente.');
+      const updatedData = await fetchMedicalRecord(historyId);
+      setMedicalRecord(updatedData);
+      setTimeout(() => setSuccessMessage(''), 5000);
+    }
+  };
+
   // Loading state
   if (loading) {
     return <LoadingScreen message="Cargando historial médico..." />;
@@ -441,7 +498,11 @@ const HistoryManagement = () => {
                 doctorSignature={medicalRecord.doctor_signature}
               />
               <ConsultationReason
-                reason={medicalRecord.reason}
+                reason={
+                  medicalRecord.treatments.length > 0
+                    ? medicalRecord.treatments[medicalRecord.treatments.length - 1].reason
+                    : medicalRecord.reason
+                }
                 symptoms={medicalRecord.symptoms}
                 findings={medicalRecord.findings}
                 showFindings={true}
@@ -458,7 +519,31 @@ const HistoryManagement = () => {
 
               {/* Action buttons */}
               <div className="flex flex-col sm:flex-row gap-4 justify-center mt-6">
-                <Button
+
+                {userRole === 'Doctor' && medicalRecord.is_active && (
+                  <Button
+                    onClick={() => setShowClosureModal(true)}
+                    variant="danger"
+                    style={{ backgroundColor: '#ce0208', color: 'white', border: 'none' }}
+                    className="flex items-center justify-center hover:bg-red-700"
+                    loading={statusLoading}
+                  >
+                    <FaExclamationTriangle className="mr-2" />
+                    Cerrar historia clínica
+                  </Button>
+                )}
+                {userRole === 'Doctor' && !medicalRecord.is_active && (
+                  <Button
+                    onClick={handleReopenHistory}
+                    variant="success"
+                    className="flex items-center justify-center"
+                    loading={statusLoading}
+                  >
+                    <FaExclamationTriangle className="mr-2" />
+                    Reabrir historia clínica
+                  </Button>
+                )}
+                                <Button
                   onClick={handleAddTreatment}
                   variant="primary"
                   className="flex items-center justify-center"
@@ -466,7 +551,6 @@ const HistoryManagement = () => {
                   <FaPlus className="mr-2" />
                   Agregar Tratamiento
                 </Button>
-
 
               </div>
             </section>
@@ -482,6 +566,18 @@ const HistoryManagement = () => {
         onSubmit={handleSubmitTreatment}
         dentalServices={dentalServices}
         loading={modalLoading}
+      />
+
+      {/* Closure Reason Modal */}
+      <ClosureReasonModal
+        isOpen={showClosureModal}
+        onClose={() => setShowClosureModal(false)}
+        onSubmit={handleCloseHistory}
+        loading={statusLoading}
+        error={statusError}
+        success={statusSuccess}
+        closureReason={closureReason}
+        setClosureReason={setClosureReason}
       />
     </div>
   );

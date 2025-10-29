@@ -623,7 +623,7 @@ class PatientService:
             for clinical_history in clinical_histories:
                 clinical_history.is_active = new_status
             
-            print(f"DEBUG change_patient_status: Sincronizado is_active={new_status} en {len(clinical_histories)} historias clínicas del paciente {patient_id}")
+            print(f"DEBUG change_patient_status: Sincronizado is_active={new_status} en {len(clinical_histories)} historias clínicas")
             
             # LÓGICA DE GUARDIAN: Manejar estado del guardian basado en sus pacientes asociados
             guardian_status_changes = []
