@@ -3,7 +3,7 @@ from fastapi import (
     APIRouter, Depends, Request, Response, HTTPException, status, Query
 )
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import logging
 import re
@@ -75,7 +75,7 @@ async def validate_date_range(start_date: datetime, end_date: datetime):
         HTTPException: If date validation fails
     """
     # Ensure dates are not in the future
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     if start_date > now or end_date > now:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
