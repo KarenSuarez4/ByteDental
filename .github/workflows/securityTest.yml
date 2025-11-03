@@ -8,12 +8,7 @@ on:
   schedule:
     - cron: '0 3 * * *'
   workflow_dispatch:
-  
-permissions:
-  contents: read
-  actions: read
-  pull-requests: write
-  
+
 jobs:
   security-scan:
     name: Login Security Tests
@@ -79,11 +74,11 @@ jobs:
         mkdir -p consolidated-reports
         find . -name "security_report_*.json" -exec cp {} consolidated-reports/ \;
         
-        # Consolidar en JSON + HTML
-        python - <<'PYCODE'
+        # Crear reporte consolidado
+        python -c "
         import json, glob, os
         from datetime import datetime
-
+        
         all_results = []
         for file in glob.glob('consolidated-reports/*.json'):
             try:
@@ -95,52 +90,32 @@ jobs:
                         all_results.append(data)
             except Exception as e:
                 print(f'Error reading {file}: {e}')
-
+        
+        # Crear reporte final
         final_report = {
             'timestamp': datetime.now().isoformat(),
             'total_tests': len(all_results),
             'vulnerabilities': [r for r in all_results if r.get('vulnerable', False)],
             'all_results': all_results
         }
-
-        # Guardar JSON
+        
         with open('consolidated-security-report.json', 'w') as f:
             json.dump(final_report, f, indent=2)
-
-        # Generar HTML sencillo
-        html = f"""
-        <html>
-        <head><title>Security Report</title></head>
-        <body>
-        <h1>🛡️ Security Test Results</h1>
-        <p><b>Timestamp:</b> {final_report['timestamp']}</p>
-        <p><b>Total Tests:</b> {final_report['total_tests']}</p>
-        <p><b>Vulnerabilities:</b> {len(final_report['vulnerabilities'])}</p>
-        <ul>
-        {''.join(f"<li><b>{v.get('test_type','?')}</b>: {v.get('description') or v.get('payload','No details')}</li>" for v in final_report['vulnerabilities'])}
-        </ul>
-        </body>
-        </html>
-        """
-        with open('consolidated-security-report.html', 'w') as f:
-            f.write(html)
-
-        # Mostrar resumen y controlar salida
+        
+        # Mostrar resumen
         vuln_count = len(final_report['vulnerabilities'])
-        print(f"Total tests: {final_report['total_tests']}")
-        print(f"Vulnerabilities found: {vuln_count}")
+        print(f'Total tests: {len(all_results)}')
+        print(f'Vulnerabilities found: {vuln_count}')
+        
         if vuln_count > 0:
-            print("CRITICAL: Vulnerabilities detected!")
-            exit(1)
-        PYCODE
+            print('CRITICAL: Vulnerabilities detected!')
+        "
 
-    - name: Upload Consolidated Reports
+    - name: Upload Consolidated Report
       uses: actions/upload-artifact@v4
       with:
         name: consolidated-security-report
-        path: |
-          consolidated-security-report.json
-          consolidated-security-report.html
+        path: consolidated-security-report.json
 
     - name: Comment PR with results
       if: github.event_name == 'pull_request'

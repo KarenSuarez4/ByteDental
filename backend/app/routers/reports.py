@@ -312,8 +312,9 @@ async def get_monthly_report(
         report_date = filters.report_date or datetime.now()
         
         # Log report generation attempt
+        sanitized_email = str(current_admin.email).replace('\n', '').replace('\r', '')
         logger.info(
-            f"Generando reporte mensual - Admin: {current_admin.email} - "
+            f"Generando reporte mensual - Admin: {sanitized_email} - "
             f"Mes: {report_date.month}/{report_date.year}"
         )
         
