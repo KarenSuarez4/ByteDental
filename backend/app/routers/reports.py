@@ -5,7 +5,6 @@ from fastapi import (
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 import logging
-import re
 from pydantic import Field
 
 from app.database import get_db
