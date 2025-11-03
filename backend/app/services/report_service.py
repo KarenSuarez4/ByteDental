@@ -7,7 +7,6 @@ from app.models.treatment_models import Treatment
 from app.models.dental_service_models import DentalService
 from app.schemas.report_schema import MonthlyReport
 
-from sqlalchemy.orm import Session
 from app.models.clinical_history_models import ClinicalHistory
 from app.models.patient_models import Patient
 from app.models.person_models import Person
