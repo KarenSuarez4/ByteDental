@@ -4,7 +4,6 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
-from typing import Optional
 import logging
 import re
 from pydantic import Field
