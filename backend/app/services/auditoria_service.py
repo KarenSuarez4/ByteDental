@@ -1,14 +1,63 @@
 import uuid
 import hashlib
-import json
-from datetime import datetime
-from typing import Dict, Any, Optional
+from datetime import datetime, timezone, timedelta
+from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
+import pytz  # ✅ Agregar esta importación
 
 from ..models.auditoria_models import Audit
+from ..models.user_models import User
+from ..models.rol_models import Role
+
+# ✅ Zona horaria de Colombia usando pytz (más confiable)
+COLOMBIA_TZ = pytz.timezone('America/Bogota')
 
 class AuditoriaService:
     """Servicio para gestionar auditoría de cambios en el sistema"""
+    
+    @staticmethod
+    def convertir_a_hora_colombia(timestamp_utc):
+        """
+        Convertir un timestamp UTC a hora de Colombia
+        
+        Args:
+            timestamp_utc: datetime object en UTC
+            
+        Returns:
+            datetime object en zona horaria de Colombia
+        """
+        if timestamp_utc:
+            if timestamp_utc.tzinfo is None:
+                # Si no tiene timezone, asumir que es UTC
+                timestamp_utc = pytz.utc.localize(timestamp_utc)
+            return timestamp_utc.astimezone(COLOMBIA_TZ)
+        return timestamp_utc
+
+    @staticmethod
+    def obtener_hora_colombia_actual():
+        """
+        Obtener la hora actual de Colombia
+        
+        Returns:
+            datetime object con zona horaria de Colombia
+        """
+        return datetime.now(COLOMBIA_TZ)
+    
+    @staticmethod
+    def _obtener_datos_usuario(db: Session, usuario_id: str) -> tuple[Optional[str], Optional[str]]:
+        """
+        Obtener rol y email de un usuario
+        
+        Returns:
+            tuple (rol_name, email) o (None, None) si no se encuentra
+        """
+        try:
+            user = db.query(User).join(Role).filter(User.uid == usuario_id).first()
+            if user and user.role:
+                return str(user.role.name), str(user.email)
+            return None, None
+        except Exception:
+            return None, None
     
     @staticmethod
     def registrar_evento(
@@ -19,7 +68,9 @@ class AuditoriaService:
         registro_afectado_tipo: str,
         descripcion_evento: Optional[str] = None,
         detalles_cambios: Optional[Dict[str, Any]] = None,
-        ip_origen: Optional[str] = None
+        ip_origen: Optional[str] = None,
+        usuario_rol: Optional[str] = None,
+        usuario_email: Optional[str] = None
     ) -> Audit:
         """
         Registrar un evento de auditoría
@@ -33,6 +84,8 @@ class AuditoriaService:
             descripcion_evento: Descripción opcional del evento
             detalles_cambios: Detalles de los cambios en formato dict
             ip_origen: IP desde donde se originó la acción
+            usuario_rol: Rol del usuario que realizó la acción
+            usuario_email: Email del usuario que realizó la acción
             
         Returns:
             Objeto Audit creado
@@ -41,26 +94,81 @@ class AuditoriaService:
         # Generar UUID para el evento
         evento_id = str(uuid.uuid4())
         
-        # Crear hash de integridad
-        datos_hash = f"{usuario_id}:{tipo_evento}:{registro_afectado_id}:{datetime.utcnow().isoformat()}"
+        # Obtener hora actual de Colombia
+        hora_colombia = datetime.now(COLOMBIA_TZ)
+        
+        # Crear hash de integridad usando hora de Colombia
+        datos_hash = f"{usuario_id}:{tipo_evento}:{registro_afectado_id}:{hora_colombia.isoformat()}"
         hash_integridad = hashlib.sha256(datos_hash.encode()).hexdigest()
         
-        # Crear registro de auditoría
+        # Crear registro de auditoría con timestamp explícito de Colombia
         auditoria = Audit(
             id=evento_id,
             user_id=usuario_id,
+            user_role=usuario_rol,
+            user_email=usuario_email,
             event_type=tipo_evento,
             event_description=descripcion_evento,
             affected_record_id=registro_afectado_id,
             affected_record_type=registro_afectado_tipo,
             change_details=detalles_cambios,
             integrity_hash=hash_integridad,
-            source_ip=ip_origen
+            source_ip=ip_origen,
+            event_timestamp=hora_colombia
         )
         
         db.add(auditoria)
         db.commit()
         db.refresh(auditoria)
+        
+        return auditoria
+    
+    @staticmethod
+    def registrar_evento_sin_commit(
+        db: Session,
+        usuario_id: str,
+        tipo_evento: str,
+        registro_afectado_id: str,
+        registro_afectado_tipo: str,
+        descripcion_evento: Optional[str] = None,
+        detalles_cambios: Optional[Dict[str, Any]] = None,
+        ip_origen: Optional[str] = None,
+        usuario_rol: Optional[str] = None,
+        usuario_email: Optional[str] = None
+    ) -> Audit:
+        """
+        Registrar un evento de auditoría SIN hacer commit automático
+        El commit será responsabilidad del llamador
+        """
+        
+        # Generar UUID para el evento
+        evento_id = str(uuid.uuid4())
+        
+        # Obtener hora actual de Colombia
+        hora_colombia = datetime.now(COLOMBIA_TZ)
+        
+        # Crear hash de integridad usando hora de Colombia
+        datos_hash = f"{usuario_id}:{tipo_evento}:{registro_afectado_id}:{hora_colombia.isoformat()}"
+        hash_integridad = hashlib.sha256(datos_hash.encode()).hexdigest()
+        
+        # Crear registro de auditoría con timestamp explícito de Colombia
+        auditoria = Audit(
+            id=evento_id,
+            user_id=usuario_id,
+            user_role=usuario_rol,
+            user_email=usuario_email,
+            event_type=tipo_evento,
+            event_description=descripcion_evento,
+            affected_record_id=registro_afectado_id,
+            affected_record_type=registro_afectado_tipo,
+            change_details=detalles_cambios,
+            integrity_hash=hash_integridad,
+            source_ip=ip_origen,
+            event_timestamp=hora_colombia
+        )
+        
+        db.add(auditoria)
+        # NO hacemos commit - responsabilidad del llamador
         
         return auditoria
     
@@ -73,6 +181,9 @@ class AuditoriaService:
         ip_origen: Optional[str] = None
     ) -> Audit:
         """Registrar creación de usuario"""
+        # Obtener rol y email del usuario admin
+        admin_rol, admin_email = AuditoriaService._obtener_datos_usuario(db, usuario_admin_id)
+        
         return AuditoriaService.registrar_evento(
             db=db,
             usuario_id=usuario_admin_id,
@@ -84,7 +195,9 @@ class AuditoriaService:
                 "accion": "crear_usuario",
                 "datos_nuevos": datos_usuario
             },
-            ip_origen=ip_origen
+            ip_origen=ip_origen,
+            usuario_rol=admin_rol,
+            usuario_email=admin_email
         )
     
     @staticmethod
@@ -97,6 +210,9 @@ class AuditoriaService:
         ip_origen: Optional[str] = None
     ) -> Audit:
         """Registrar actualización de usuario"""
+        # Obtener rol y email del usuario admin
+        admin_rol, admin_email = AuditoriaService._obtener_datos_usuario(db, usuario_admin_id)
+        
         return AuditoriaService.registrar_evento(
             db=db,
             usuario_id=usuario_admin_id,
@@ -109,7 +225,9 @@ class AuditoriaService:
                 "datos_anteriores": datos_anteriores,
                 "datos_nuevos": datos_nuevos
             },
-            ip_origen=ip_origen
+            ip_origen=ip_origen,
+            usuario_rol=admin_rol,
+            usuario_email=admin_email
         )
     
     @staticmethod
@@ -121,6 +239,9 @@ class AuditoriaService:
         ip_origen: Optional[str] = None
     ) -> Audit:
         """Registrar eliminación física de usuario"""
+        # Obtener rol y email del usuario admin
+        admin_rol, admin_email = AuditoriaService._obtener_datos_usuario(db, usuario_admin_id)
+        
         return AuditoriaService.registrar_evento(
             db=db,
             usuario_id=usuario_admin_id,
@@ -132,7 +253,9 @@ class AuditoriaService:
                 "accion": "eliminar_usuario",
                 "datos_eliminados": datos_usuario
             },
-            ip_origen=ip_origen
+            ip_origen=ip_origen,
+            usuario_rol=admin_rol,
+            usuario_email=admin_email
         )
     
     @staticmethod
@@ -144,6 +267,9 @@ class AuditoriaService:
         ip_origen: Optional[str] = None
     ) -> Audit:
         """Registrar desactivación de usuario (soft delete)"""
+        # Obtener datos del usuario que realiza la acción
+        role_name, email = AuditoriaService._obtener_datos_usuario(db, usuario_admin_id)
+        
         return AuditoriaService.registrar_evento(
             db=db,
             usuario_id=usuario_admin_id,
@@ -157,7 +283,9 @@ class AuditoriaService:
                 "estado_nuevo": False,
                 "datos_usuario": datos_usuario
             },
-            ip_origen=ip_origen
+            ip_origen=ip_origen,
+            usuario_rol=role_name,
+            usuario_email=email
         )
     
     @staticmethod
@@ -165,12 +293,18 @@ class AuditoriaService:
         db: Session,
         usuario_id: str,
         exitoso: bool,
-        ip_origen: Optional[str] = None
+        ip_origen: Optional[str] = None,
+        usuario_email: Optional[str] = None 
     ) -> Audit:
         """Registrar intento de login"""
         tipo_evento = "LOGIN_SUCCESS" if exitoso else "LOGIN_FAILED"
         descripcion = "Inicio de sesión exitoso" if exitoso else "Intento de inicio de sesión fallido"
-        
+        role_name, email = (None, None)
+        if exitoso:
+            role_name, email = AuditoriaService._obtener_datos_usuario(db, usuario_id)
+        else:
+            email = usuario_email  # <-- usa el email ingresado si el login falló
+
         return AuditoriaService.registrar_evento(
             db=db,
             usuario_id=usuario_id,
@@ -182,7 +316,9 @@ class AuditoriaService:
                 "accion": "login",
                 "exitoso": exitoso
             },
-            ip_origen=ip_origen
+            ip_origen=ip_origen,
+            usuario_rol=role_name,
+            usuario_email=email
         )
     
     @staticmethod
@@ -192,6 +328,9 @@ class AuditoriaService:
         ip_origen: Optional[str] = None
     ) -> Audit:
         """Registrar cierre de sesión"""
+        # Obtener datos del usuario que realiza el logout
+        role_name, email = AuditoriaService._obtener_datos_usuario(db, usuario_id)
+        
         return AuditoriaService.registrar_evento(
             db=db,
             usuario_id=usuario_id,
@@ -202,5 +341,95 @@ class AuditoriaService:
             detalles_cambios={
                 "accion": "logout"
             },
-            ip_origen=ip_origen
+            ip_origen=ip_origen,
+            usuario_rol=role_name,
+            usuario_email=email
         )
+
+    @staticmethod
+    def obtener_eventos_por_registro(
+        db: Session,
+        registro_id: str,
+        tipo_registro: str,
+        skip: int = 0,
+        limit: int = 50
+    ) -> List[Audit]:
+        """
+        Obtener registros de auditoría para un registro específico
+        
+        Args:
+            db: Sesión de base de datos
+            registro_id: ID del registro a consultar
+            tipo_registro: Tipo de registro (patients, guardians, users, etc.)
+            skip: Número de registros a omitir
+            limit: Número máximo de registros a retornar
+            
+        Returns:
+            Lista de registros de auditoría
+        """
+        try:
+            query = db.query(Audit).filter(
+                Audit.affected_record_id == registro_id,
+                Audit.affected_record_type == tipo_registro
+            ).order_by(Audit.event_timestamp.desc())
+            
+            return query.offset(skip).limit(limit).all()
+        except Exception as e:
+            print(f"Error al obtener eventos de auditoría: {str(e)}")
+            return []
+
+    @staticmethod
+    def obtener_conteo_eventos_por_registro(
+        db: Session,
+        registro_id: str,
+        tipo_registro: str
+    ) -> int:
+        """
+        Obtener el conteo total de eventos de auditoría para un registro
+        
+        Args:
+            db: Sesión de base de datos
+            registro_id: ID del registro a consultar
+            tipo_registro: Tipo de registro (patients, guardians, users, etc.)
+            
+        Returns:
+            Número total de eventos de auditoría
+        """
+        try:
+            return db.query(Audit).filter(
+                Audit.affected_record_id == registro_id,
+                Audit.affected_record_type == tipo_registro
+            ).count()
+        except Exception as e:
+            print(f"Error al contar eventos de auditoría: {str(e)}")
+            return 0
+    @staticmethod
+    def registrar_creacion_historia_clinica(
+        db: Session,
+        usuario_id: str,
+        clinical_history_id: int,
+        ip_origen: Optional[str] = None
+    ) -> Audit:
+        """Registrar creación de historia clínica"""
+        # ✅ Obtener datos del usuario
+        usuario_rol, usuario_email = AuditoriaService._obtener_datos_usuario(db, usuario_id)
+        hora_colombia = AuditoriaService.obtener_hora_colombia_actual()
+        audit_record = AuditoriaService.registrar_evento(
+                db=db,
+                usuario_id=usuario_id,
+                tipo_evento="CREACION_HISTORIA_CLINICA",
+                registro_afectado_id=str(clinical_history_id),
+                registro_afectado_tipo="clinical_histories",
+                descripcion_evento="Creación de historia clínica",
+                detalles_cambios={
+                    "accion": "crear",
+                    "historia_clinica_id": clinical_history_id,
+                    "timestamp_colombia": hora_colombia.isoformat()
+                },
+                ip_origen=ip_origen,
+                usuario_rol=usuario_rol,
+                usuario_email=usuario_email
+            )
+            
+        print(f"✅ Auditoría registrada exitosamente: {audit_record.id}")
+        return audit_record

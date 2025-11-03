@@ -1,0 +1,33 @@
+POST http://127.0.0.1:8000/api/clinical-histories/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImE1YTAwNWU5N2NiMWU0MjczMDBlNTJjZGQ1MGYwYjM2Y2Q4MDYyOWIiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiRG9jdG9yIERvbGl0dGxlIiwiaXNzIjoiaHR0cHM6Ly9zZWN1cmV0b2tlbi5nb29nbGUuY29tL2J5dGVkZW50YWwtNjcwMWUiLCJhdWQiOiJieXRlZGVudGFsLTY3MDFlIiwiYXV0aF90aW1lIjoxNzU5ODIxMTQ1LCJ1c2VyX2lkIjoicmRvOFRJZjY3OWY3anR2Smc1MkpxYUtTZ0VWMiIsInN1YiI6InJkbzhUSWY2NzlmN2p0dkpnNTJKcWFLU2dFVjIiLCJpYXQiOjE3NTk4MjExNDUsImV4cCI6MTc1OTgyNDc0NSwiZW1haWwiOiJtYWZlc29nMzEyQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjpmYWxzZSwicGhvbmVfbnVtYmVyIjoiKzU3MzU2Nzg5ODc2NSIsImZpcmViYXNlIjp7ImlkZW50aXRpZXMiOnsiZW1haWwiOlsibWFmZXNvZzMxMkBnbWFpbC5jb20iXSwicGhvbmUiOlsiKzU3MzU2Nzg5ODc2NSJdfSwic2lnbl9pbl9wcm92aWRlciI6InBhc3N3b3JkIn19.pDe74OAbXuenVIS5BpEVkWzwR7FaJ47vZup0aVRy5Ee7ZhaoSsMkD7auZI5d3uYgK77VxhXMp61QdkRncFUwdGoWcrBsGxraJEo90CTqxME0Y56DpINUW3gVLc0uZ8yqLrTHrtI3VBXZE4-G42p72exiFAarNaCEozd8e2eeQ349IV9yZo1gsx7W474JKtIbAB32gxVI3plKl1N3hq3yau0Up_71EgWneD33yxfNxQXw5S9cPbYG1WBPbRVjz52DAuB48IB5m8Jf1M_BfXPN8pK9TDYujqRFYwBOIi9fn1qwTLlHlKghfJq2HyJl9qReMRReOZXM54qVz3pCzh2CnA
+
+{
+    "patient_id": 1,
+    "reason": "Dolor de muelas",
+    "symptoms": "Dolor intenso",
+    "medical_history": {
+        "tolerance_to_anesthesia": "Buena",
+        "general_health": "Saludable",
+        "breathing_status": "Normal",
+        "coagulation_status": "Normal",
+        "current_medication": "Ninguna",
+        "allergies": "Ninguna",
+        "previous_treatments": [
+            {
+                "date": "2025-10-06",
+                "service_name": "Ortodoncia",
+                "doctor_name": "Dr. Karen Suarez"
+            }
+        ]
+    },
+    "findings": "Inflamación en la encía",
+    "doctor_signature": "Dr. Karen Suarez",
+    "treatments": [
+        {
+            "dental_service_id": 1,
+            "treatment_date": "2025-10-07T10:30:00",
+            "notes": "Extracción exitosa"
+        }
+    ]
+}

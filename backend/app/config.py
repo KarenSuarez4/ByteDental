@@ -6,13 +6,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings(BaseSettings):
-    # Configuración SMTP
+    # Configuración SMTP (legacy - mantener por compatibilidad)
     smtp_host: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
     smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
     smtp_username: str = os.getenv("SMTP_USERNAME", "")
     smtp_password: str = os.getenv("SMTP_PASSWORD", "")
     smtp_tls: bool = os.getenv("SMTP_TLS", "True").lower() == "true"
     smtp_ssl: bool = os.getenv("SMTP_SSL", "False").lower() == "true"
+    
+    # Configuración SendGrid (recomendado para producción)
+    sendgrid_api_key: str = os.getenv("SENDGRID_API_KEY", "")
+    use_sendgrid: bool = os.getenv("USE_SENDGRID", "False").lower() == "true"
     
     # Configuración de la aplicación
     app_name: str = os.getenv("APP_NAME", "ByteDental Email Service")
@@ -32,6 +36,7 @@ class Settings(BaseSettings):
     
     # Firebase
     firebase_credentials_path: str = os.getenv("FIREBASE_CREDENTIALS_PATH", "firebase-credentials.json")
+    firebase_api_key: str = os.getenv("FIREBASE_API_KEY", "")  # API Key para verificar contraseñas
     
     class Config:
         env_file = ".env"

@@ -213,8 +213,9 @@ coverage.xml
 *.prof
 
 # Test and migration files (ByteDental specific)
-test_*.py
-*_test.py
+# NOTA: Comentadas para permitir tests en el repositorio
+# test_*.py  # ← Comentado para permitir test_patients.py
+# *_test.py  # ← Comentado para permitir archivos de test
 migrate_*.py
 *_migrate.py
 init_db_*.py
@@ -240,3 +241,6 @@ generate_test_*.py
 *.sql.gz
 *.dump
 database_backup_*
+
+test_dashboard.py
+test_dashboard_filters.py

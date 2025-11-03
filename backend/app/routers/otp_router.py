@@ -15,14 +15,20 @@ async def send_otp(request: OTPRequest):
     try:
         result = await otp_service.send_otp_email(request.email)
         
+        # Si el servicio retorna un error, lanzar HTTPException con el mensaje apropiado
         if not result.success:
             raise HTTPException(status_code=400, detail=result.message)
         
         return result
         
+    except HTTPException:
+        # Re-lanzar HTTPException sin modificar
+        raise
     except Exception as e:
-        logger.error(f"Error en endpoint send-otp: {e}")
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
+        logger.error(f"Error inesperado en endpoint send-otp: {e}")
+        import traceback
+        logger.error(f"Stack trace: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
 
 @router.post("/verify-otp", response_model=OTPResponse)
 async def verify_otp(request: OTPVerification):
@@ -32,14 +38,20 @@ async def verify_otp(request: OTPVerification):
     try:
         result = otp_service.verify_otp_code(request.email, request.otp_code)
         
+        # Si el servicio retorna un error, lanzar HTTPException con el mensaje apropiado
         if not result.success:
             raise HTTPException(status_code=400, detail=result.message)
         
         return result
         
+    except HTTPException:
+        # Re-lanzar HTTPException sin modificar
+        raise
     except Exception as e:
-        logger.error(f"Error en endpoint verify-otp: {e}")
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
+        logger.error(f"Error inesperado en endpoint verify-otp: {e}")
+        import traceback
+        logger.error(f"Stack trace: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
 
 @router.get("/otp-status/{email}")
 async def get_otp_status(email: str):
@@ -50,6 +62,11 @@ async def get_otp_status(email: str):
         status = otp_service.get_otp_status(email)
         return status
         
+    except HTTPException:
+        # Re-lanzar HTTPException sin modificar
+        raise
     except Exception as e:
-        logger.error(f"Error en endpoint otp-status: {e}")
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
+        logger.error(f"Error inesperado en endpoint otp-status: {e}")
+        import traceback
+        logger.error(f"Stack trace: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")

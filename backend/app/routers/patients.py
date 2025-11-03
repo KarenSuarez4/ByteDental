@@ -1,0 +1,364 @@
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy.orm import Session
+from typing import List, Optional
+import re
+from app.database import get_db
+from app.services.patient_service import get_patient_service
+from app.utils.audit_context import get_user_context
+from app.middleware.auth_middleware import (
+    require_patient_read, 
+    require_patient_write
+)
+from app.schemas.patient_schema import (
+    PatientCreate, 
+    PatientUpdate, 
+    PatientResponse, 
+    PatientWithGuardian,
+    PatientStatusChange
+)
+
+router = APIRouter(
+    prefix="/patients",
+    tags=["patients"],
+    responses={404: {"description": "Patient not found"}}
+)
+
+@router.post("/", response_model=PatientResponse, status_code=201)
+def create_patient(
+    patient_data: PatientCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_write)  # Solo ASSISTANT
+):
+    """Crear un nuevo paciente (incluye crear la persona)"""
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
+    
+    try:
+        return service.create_patient(patient_data)
+    except ValueError as e:
+        # Errores de validación de negocio (400 Bad Request)
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        # Log detallado para debugging
+        print(f"Error detallado en create_patient: {str(e)}")
+        print(f"Tipo de error: {type(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        # Manejo específico de errores comunes
+        error_message = str(e)
+        
+        if "A transaction is already begun" in error_message:
+            raise HTTPException(
+                status_code=500, 
+                detail="Error de transacción en base de datos. Verifique que los datos sean válidos y no existan conflictos."
+            )
+        elif "duplicate key" in error_message.lower():
+            raise HTTPException(
+                status_code=409, 
+                detail="Ya existe un registro con los mismos datos (documento, email o teléfono duplicado)."
+            )
+        elif "foreign key" in error_message.lower():
+            raise HTTPException(
+                status_code=400, 
+                detail="Referencias inválidas en los datos proporcionados."
+            )
+        elif "not null" in error_message.lower():
+            raise HTTPException(
+                status_code=400, 
+                detail="Faltan campos obligatorios en los datos proporcionados."
+            )
+        elif "fecha de nacimiento no puede ser futura" in error_message.lower():
+            raise HTTPException(
+                status_code=400, 
+                detail="La fecha de nacimiento no puede ser futura."
+            )
+        else:
+            # Error genérico
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Error interno del servidor. Por favor contacte al administrador. Detalle: {error_message[:200]}"
+            )
+
+@router.get("/", response_model=List[PatientWithGuardian])
+def get_patients(
+    request: Request,
+    db: Session = Depends(get_db),
+    _current_user = Depends(require_patient_read),  # ASSISTANT y DENTIST
+    skip: int = Query(0, ge=0, description="Número de registros a omitir"),
+    limit: int = Query(100, ge=1, le=1000, description="Número máximo de registros"),
+    active_only: bool = Query(True, description="Solo pacientes activos"),
+    search: Optional[str] = Query(None, min_length=1, max_length=100, description="Buscar en nombre, apellido, documento o email"),
+    requires_guardian: Optional[bool] = Query(None, description="Filtrar por requerimiento de guardian"),
+    has_guardian: Optional[bool] = Query(None, description="Filtrar por tener guardian asignado")
+):
+    """Obtener lista de pacientes con filtros"""
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
+    
+    # Sanitizar búsqueda si se proporciona
+    if search:
+        # Remover caracteres especiales que podrían ser problemáticos
+        search = re.sub(r'[<>"\';\\]', '', search.strip())
+    
+    return service.get_patients(
+        skip=skip, 
+        limit=limit, 
+        active_only=active_only, 
+        search=search,
+        requires_guardian=requires_guardian,
+        has_guardian=has_guardian
+    )
+
+@router.get("/{patient_id}", response_model=PatientWithGuardian)
+def get_patient(
+    patient_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    _current_user = Depends(require_patient_read),  # ASSISTANT y DENTIST
+    include_guardian: bool = Query(True, description="Incluir información del guardian")
+):
+    """Obtener paciente por ID"""
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
+    patient = service.get_patient_by_id(patient_id, include_person=True, include_guardian=include_guardian)
+    
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    
+    return patient
+
+@router.get("/document/{document_number}", response_model=PatientResponse)
+def get_patient_by_document(
+    document_number: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    _current_user = Depends(require_patient_read)  # ASSISTANT y DENTIST
+):
+    """Obtener paciente por número de documento"""
+    # Validar formato del documento
+    if not document_number or len(document_number.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Número de documento requerido")
+    
+    # Sanitizar documento
+    document_number = document_number.strip()
+    
+    # Validar longitud y caracteres permitidos
+    if len(document_number) < 5 or len(document_number) > 30:
+        raise HTTPException(status_code=400, detail="Número de documento debe tener entre 5 y 30 caracteres")
+    
+    # Solo permitir números, letras y algunos caracteres especiales
+    if not re.match(r'^[A-Za-z0-9\-\.]+$', document_number):
+        raise HTTPException(status_code=400, detail="Número de documento contiene caracteres no válidos")
+    
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
+    patient = service.get_patient_by_document(document_number)
+    
+    if not patient:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    
+    return patient
+
+@router.put("/{patient_id}", response_model=PatientWithGuardian)
+def update_patient(
+    patient_id: int,
+    patient_data: PatientUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_write)  # Solo ASSISTANT
+):
+    """Actualizar paciente (puede incluir datos de persona)"""
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
+    
+    try:
+        updated_patient = service.update_patient(patient_id, patient_data)
+        
+        if not updated_patient:
+            raise HTTPException(status_code=404, detail="Paciente no encontrado")
+        
+        return updated_patient
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error detallado en update_patient: {str(e)}")
+        print(f"Tipo de error: {type(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
+
+@router.delete("/{patient_id}")
+def delete_patient(
+    patient_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_write)  # Solo ASSISTANT
+):
+    """Eliminar paciente (eliminación lógica - soft delete)"""
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
+    
+    try:
+        # Usar el método change_patient_status con motivo estándar
+        _unused_result = service.change_patient_status(
+            patient_id=patient_id,
+            new_status=False,  # Desactivar
+            deactivation_reason="Eliminación administrativa"
+        )
+        
+        return {
+            "message": "Paciente eliminado correctamente",
+            "patient_id": patient_id,
+            "deactivation_reason": "Eliminación administrativa"
+        }
+    except ValueError as e:
+        # Si el paciente ya está inactivo
+        if "ya está inactivo" in str(e):
+            raise HTTPException(status_code=400, detail="El paciente ya está eliminado")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+# Endpoints para gestión de guardians de pacientes
+@router.patch("/{patient_id}/assign-guardian/{guardian_id}")
+def assign_guardian_to_patient(
+    patient_id: int,
+    guardian_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_write)  # Solo ASSISTANT
+):
+    """
+    Asignar un guardian a un paciente.
+    
+    Validaciones:
+    - El paciente debe existir y estar activo
+    - El guardian debe existir y estar activo  
+    - El paciente debe ser menor de 18 años o mayor de 64 años
+    - El paciente debe requerir guardián según su perfil
+    """
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
+    
+    try:
+        success = service.assign_guardian(patient_id, guardian_id)
+        
+        if success:
+            return {"message": f"Guardian {guardian_id} asignado correctamente al paciente {patient_id}"}
+        else:
+            raise HTTPException(status_code=400, detail="No se pudo realizar la asignación")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+@router.delete("/{patient_id}/unassign-guardian")
+def unassign_guardian_from_patient(
+    patient_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_write)  # Solo ASSISTANT
+):
+    """Desasignar el guardian de un paciente"""
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
+    
+    try:
+        success = service.unassign_guardian(patient_id)
+        
+        if success:
+            return {"message": f"Guardian desasignado correctamente del paciente {patient_id}"}
+        else:
+            raise HTTPException(status_code=400, detail="No se pudo realizar la desasignación")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+@router.patch("/{patient_id}/status")
+def change_patient_status(
+    patient_id: int,
+    status_data: PatientStatusChange,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_write)  # Solo ASSISTANT
+):
+    """Cambiar el estado de un paciente (activo/inactivo) con validación de motivo"""
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
+    
+    try:
+        result = service.change_patient_status(
+            patient_id=patient_id,
+            new_status=status_data.is_active,
+            deactivation_reason=status_data.deactivation_reason
+        )
+        
+        action = "activado" if status_data.is_active else "desactivado"
+        return {
+            "message": f"Paciente {action} correctamente",
+            "patient_id": patient_id,
+            "new_status": status_data.is_active,
+            **result
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+@router.patch("/update-guardian-requirements")
+def update_guardian_requirements_by_age(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_patient_write)  # Solo ASSISTANT
+):
+    """
+    Calcula la edad actual de todos los pacientes y actualiza automáticamente:
+    - El campo requires_guardian basándose en la edad actual
+    - Desasigna automáticamente guardianes de pacientes que ya no los requieren
+    
+    Reglas de edad:
+    - Menores de 18 años: REQUIEREN guardián
+    - Entre 18-64 años: NO requieren guardián (desasignación automática)
+    - Mayores de 64 años: REQUIEREN guardián
+    """
+    user_id, user_ip = get_user_context(request, db)
+    service = get_patient_service(db, user_id, user_ip)
+    
+    try:
+        result = service.update_guardian_requirements_by_age()
+        
+        # Preparar mensaje de respuesta más informativo
+        total_changes = result['requirements_updated_count'] + result['guardians_unassigned_count']
+        
+        if total_changes == 0:
+            message = "✅ Todos los pacientes ya tienen requirements correctos - No se realizaron cambios"
+        else:
+            changes = []
+            if result['requirements_updated_count'] > 0:
+                changes.append(f"{result['requirements_updated_count']} requirements actualizados")
+            if result['guardians_unassigned_count'] > 0:
+                changes.append(f"{result['guardians_unassigned_count']} guardianes desasignados automáticamente")
+            
+            message = f"🔄 Actualización completada: {', '.join(changes)}"
+        
+        return {
+            "success": True,
+            "message": message,
+            "summary": result['summary'],
+            "statistics": {
+                "total_patients_processed": result['total_processed'],
+                "requirements_updated": result['requirements_updated_count'],
+                "guardians_auto_unassigned": result['guardians_unassigned_count'],
+                "total_changes_made": total_changes
+            },
+            "details": {
+                "updated_patients": result['updated_patients'],
+                "unassigned_guardians": result['unassigned_guardians']
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error durante la actualización: {str(e)}")

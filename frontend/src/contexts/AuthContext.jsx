@@ -23,32 +23,65 @@ export function useAuth() {
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState(null);
+
+  // Función para refrescar el token
+  const refreshToken = async (user) => {
+    if (user) {
+      try {
+        const newToken = await user.getIdToken(true); // force refresh
+        setToken(newToken);
+        return newToken;
+      } catch (error) {
+        console.error('Error refreshing token:', error);
+        return null;
+      }
+    }
+    return null;
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChange(async (user) => {
       setCurrentUser(user);
       if (user) {
         const token = await user.getIdToken();
+        setToken(token);
         const uid = user.uid;
         const response = await fetch(`${API_BASE_URL}/api/users/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (response.ok) {
           const backendUser = await response.json();
-          // Mapea el rol del backend al nombre usado en el frontend
+          setMustChangePassword(backendUser.must_change_password);
           setUserRole(ROLE_MAP[backendUser.role_name] || backendUser.role_name);
         } else {
           setUserRole(null);
+          setMustChangePassword(false);
         }
       } else {
         setUserRole(null);
+        setMustChangePassword(false);
+        setToken(null);
       }
       setLoading(false);
     });
 
     return unsubscribe;
   }, []);
+
+  // Refrescar token automáticamente cada 50 minutos (antes de que expire)
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const interval = setInterval(async () => {
+      console.log('🔄 Refreshing Firebase token...');
+      await refreshToken(currentUser);
+    }, 50 * 60 * 1000); // 50 minutos
+
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
   const signOut = async () => {
     try {
@@ -59,6 +92,7 @@ export function AuthProvider({ children }) {
       
       await logout();
       setCurrentUser(null);
+      setToken(null);
     } catch (error) {
       throw error;
     }
@@ -67,14 +101,17 @@ export function AuthProvider({ children }) {
   const value = {
     currentUser,
     userRole,
+    mustChangePassword,
+    token,
     loading,
     signOut,
+    refreshToken: () => refreshToken(currentUser),
     isAuthenticated: !!currentUser
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {loading ? <div>Cargando autenticación...</div> : children}
     </AuthContext.Provider>
   );
 }

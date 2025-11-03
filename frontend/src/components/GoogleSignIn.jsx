@@ -11,8 +11,8 @@ const GoogleSignIn = ({ onClick, className = '',...props }) => {
     <button
       onClick={onClick}
       className={cn(
-        'w-[338px]', 
-        'h-[74px]',
+        'w-[300px]', 
+        'h-[48px]',
         'rounded-[40px]',
         'bg-white',
         'border border-gray-300',

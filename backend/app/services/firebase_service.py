@@ -1,6 +1,7 @@
 import firebase_admin
 from firebase_admin import auth, credentials
 import os
+import requests
 from typing import Optional
 from dotenv import load_dotenv
 
@@ -132,6 +133,47 @@ class FirebaseService:
         except Exception as e:
             print(f"Error verificando token de Firebase: {e}")
             return None
+    
+    @staticmethod
+    def verify_password(email: str, password: str) -> bool:
+        """
+        Verificar si la contraseña de un usuario es correcta usando Firebase REST API
+        
+        Args:
+            email: Email del usuario
+            password: Contraseña a verificar
+            
+        Returns:
+            True si la contraseña es correcta, False en caso contrario
+        """
+        try:
+            # Obtener la API key de Firebase desde variables de entorno
+            firebase_api_key = os.getenv("FIREBASE_API_KEY")
+            
+            if not firebase_api_key:
+                print("⚠️  FIREBASE_API_KEY no está configurada en .env")
+                return False
+            
+            # Endpoint de Firebase para verificar contraseña
+            url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={firebase_api_key}"
+            
+            payload = {
+                "email": email,
+                "password": password,
+                "returnSecureToken": True
+            }
+            
+            response = requests.post(url, json=payload)
+            
+            if response.status_code == 200:
+                return True
+            else:
+                # Contraseña incorrecta o usuario no existe
+                return False
+                
+        except Exception as e:
+            print(f"Error verificando contraseña en Firebase: {e}")
+            return False
 
 # Función legacy para compatibilidad
 def create_firebase_user(email, password, display_name=None, phone_number=None):

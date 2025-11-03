@@ -72,7 +72,7 @@ const SafetyMeter = ({ strength }) => {
           )}
         />
       </div>
-      <p className={cn("text-xs mt-1 font-poppins font-semibold", getLabelColor())}>
+      <p className={cn("text-18 mt-1 font-poppins font-semibold", getLabelColor())}>
         {getLabel()}
       </p>
     </div>

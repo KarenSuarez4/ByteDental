@@ -7,14 +7,14 @@ function cn(...args) {
   return twMerge(clsx(args));
 }
 
-const Input = ({ placeholder, className = '', error,...props }) => {
+const Input = ({ placeholder, className = '', error, type = 'text', ...props }) => {
   return (
     <input
-      type="email"
+      type={type}
       placeholder={placeholder}
       className={cn(
-        'w-[338px]',
-        'h-[74px]',
+        'w-[310px]',
+        'h-[48px]',
         'rounded-[40px]',
         'border',
         'bg-white',

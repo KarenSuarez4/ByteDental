@@ -71,7 +71,7 @@ describe('Firebase Authentication Tests', () => {
       const wrongPassword = 'contraseña_incorrecta';
       const authError = {
         code: 'auth/wrong-password',
-        message: 'Error 401: Credenciales inválidas'
+        message: 'Credenciales inválidas'
       };
 
       signInWithEmailAndPassword.mockRejectedValue(authError);
@@ -107,7 +107,7 @@ describe('Firebase Authentication Tests', () => {
       const password = '1234dental';
       const authError = {
         code: 'auth/invalid-email',
-        message: 'Error 400: Formato de email inválido'
+        message: 'Formato de email inválido'
       };
 
       signInWithEmailAndPassword.mockRejectedValue(authError);

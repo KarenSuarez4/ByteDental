@@ -1,10 +1,9 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import email_router, otp_router, users, auditoria, auth
+from app.routers import email_router, otp_router, users, auditoria, auth, patients, guardians, persons, dental_services, clinical_histories, dashboard_router, reports
 from app.config import settings
-from app.database import get_db, engine, Base  # Asegúrate de importar Base y engine
-from sqlalchemy.orm import Session
-from sqlalchemy import text
+from app.database import engine, Base  # Asegúrate de importar Base y engine
+from app.routers import reports
 import logging
 
 # Configurar logging
@@ -41,44 +40,16 @@ app.include_router(otp_router.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(auditoria.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
+app.include_router(persons.router, prefix="/api")
+app.include_router(patients.router, prefix="/api")
+app.include_router(guardians.router, prefix="/api")
+app.include_router(dental_services.router, prefix="/api")
+app.include_router(clinical_histories.router, prefix="/api/clinical-histories")
+app.include_router(reports.router, prefix="/api")
+app.include_router(dashboard_router.router, prefix="/api")
 
 # Crear tablas si no existen
 Base.metadata.create_all(bind=engine)
-
-@app.get("/health")
-async def health_check(db: Session = Depends(get_db)):
-    # Verificación básica del sistema
-    health_status = {
-        "status": "healthy",
-        "app_name": settings.app_name,
-        "version": "2.0.0",
-        "features": [
-            "gestión de usuarios",
-            "sistema de roles",
-            "auditoría completa",
-            "integración Firebase",
-            "base de datos PostgreSQL"
-        ]
-    }
-    
-    # Verificar la conexión a la base de datos
-    try:
-        result = db.execute(text("SELECT 1")).fetchone()
-        db_connected = result[0] == 1
-        health_status["database"] = {
-            "connected": db_connected,
-            "status": "ok" if db_connected else "error"
-        }
-    except Exception as e:
-        health_status["status"] = "unhealthy"
-        health_status["database"] = {
-            "connected": False,
-            "status": "error",
-            "error_message": str(e)
-        }
-        logging.error(f"Error de conexión a la base de datos: {str(e)}")
-    
-    return health_status
 
 if __name__ == "__main__":
     import uvicorn

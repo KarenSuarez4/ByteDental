@@ -127,7 +127,7 @@
         .cta-button {
             display: inline-block;
             background: linear-gradient(135deg, #2B5797 0%, #4A90E2 100%);
-            color: #ffffff;
+            color: #ffffff !important;
             text-decoration: none;
             padding: 18px 40px;
             border-radius: 50px;
@@ -222,21 +222,9 @@
                 {{ message_body | safe }}
             </div>
             
-            {% if features %}
-            <div class="highlight-box">
-                <strong>✨ Lo que ofrecemos:</strong>
-            </div>
-            
-            <ul class="features-list">
-                {% for feature in features %}
-                <li>{{ feature }}</li>
-                {% endfor %}
-            </ul>
-            {% endif %}
-            
             {% if cta_text and cta_url %}
             <div style="text-align: center; margin: 40px 0;">
-                <a href="{{ cta_url }}" class="cta-button">
+                <a href="{{ cta_url }}" class="cta-button" style="color: #ffffff !important;">
                     {{ cta_text }}
                 </a>
             </div>
