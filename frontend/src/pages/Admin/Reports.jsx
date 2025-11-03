@@ -290,17 +290,6 @@ const Reports = () => {
     }
   };
 
-  // Función de debug para verificar los datos
-  const handleDebugRequest = () => {
-    const requestBody = {
-      start_date: formatDateForAPI(startDate),
-      end_date: formatEndDateForAPI(endDate),
-      report_date: reportType === 'monthly' ? formatEndDateForAPI(endDate) : undefined
-    };
-
-    console.log('🔍 Datos de depuración:', requestBody);
-    toast.info('Datos de depuración en consola');
-  };
 
   const calculateDays = () => {
     if (!startDate || !endDate) return '0';
