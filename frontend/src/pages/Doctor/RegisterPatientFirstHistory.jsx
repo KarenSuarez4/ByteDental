@@ -17,6 +17,7 @@ import PatientInfoCard from "../../components/PatientInfoCard";
 import LegalConfirmationModal from "../../components/LegalConfirmationModal";
 import FormNavigationBar from "../../components/FormNavigationBar";
 import PatientSearchSelect from "../../components/PatientSearchSelect";
+import InputPassword from "../../components/InputPassword";
 
 // Hooks
 import { useAuth } from "../../contexts/AuthContext";
@@ -91,6 +92,7 @@ const INITIAL_FORM_STATE = {
   dental_services: [],
   findings: "",
   doctor_signature: "",
+  doctor_password: "", // <-- agregar
   treatments: []
 };
 
@@ -117,7 +119,26 @@ const RegisterPatientFirstHistory = () => {
   const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
   // Form State Management
-  const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+  const [formData, setFormData] = useState({
+    patient_id: "",
+    reason: "",
+    symptoms: "",
+    medical_history: {
+      general_pathologies: [],
+      anesthesia_tolerance: "",
+      breathing_condition: "",
+      coagulation_condition: "",
+      current_medication: [],
+      previous_treatments: [],
+      allergies: [],
+    },
+    diagnosis: "",
+    dental_services: [],
+    findings: "",
+    doctor_signature: "",
+    doctor_password: "", // <-- agregar
+    treatments: []
+  });
   const [formErrors, setFormErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -812,7 +833,13 @@ const RegisterPatientFirstHistory = () => {
           ) : doctorBackendInfo ? (
             <SignatureCredentialField
               value={formData.doctor_signature}
-              onChange={handleChange}
+              onChange={e => {
+                setFormData({
+                  ...formData,
+                  doctor_signature: e.target.value,
+                  doctor_password: e.target.value // sincroniza ambos
+                });
+              }}
               error={formErrors.doctor_signature}
               doctorName={`${doctorBackendInfo.first_name} ${doctorBackendInfo.last_name}`}
               doctorLicense={doctorBackendInfo.document_number}
