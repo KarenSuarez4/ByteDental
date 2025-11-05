@@ -300,7 +300,7 @@ function PatientManagement() {
       setEditForm((prev) => ({ ...prev, [name]: value }));
       if (value && value.length !== 10) {
         setPhoneEditError("El teléfono debe tener exactamente 10 dígitos.");
-        toast.error("El teléfono debe tener exactamente 10 dígitos")
+        toast.error("El teléfono debe tener exactamente 10 dígitos");
       } else {
         setPhoneEditError("");
       }

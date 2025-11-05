@@ -4,9 +4,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
-from typing import Optional
 import logging
-import re
 from pydantic import Field
 
 from app.database import get_db
@@ -196,9 +194,14 @@ async def get_activities_report(
         validate_output_format(format)
         
         # Log report generation attempt
+        # Sanitize user-controlled values for log safety
+        # Strip CR and LF chars from admin email and dates
+        safe_email = str(current_admin.email).replace('\r','').replace('\n','')
+        safe_start_date = str(filters.start_date).replace('\r','').replace('\n','')
+        safe_end_date = str(filters.end_date).replace('\r','').replace('\n','')
         logger.info(
-            f"Generando reporte de actividades - Admin: {current_admin.email} - "
-            f"Período: {filters.start_date} a {filters.end_date}"
+            f"Generando reporte de actividades - Admin: {safe_email} - "
+            f"Período: {safe_start_date} a {safe_end_date}"
         )
         
         # Generate report data
@@ -309,8 +312,9 @@ async def get_monthly_report(
         report_date = filters.report_date or datetime.now()
         
         # Log report generation attempt
+        sanitized_email = str(current_admin.email).replace('\n', '').replace('\r', '')
         logger.info(
-            f"Generando reporte mensual - Admin: {current_admin.email} - "
+            f"Generando reporte mensual - Admin: {sanitized_email} - "
             f"Mes: {report_date.month}/{report_date.year}"
         )
         

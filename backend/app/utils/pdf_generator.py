@@ -88,7 +88,7 @@ def get_clinic_header(elements):
         "Sonrisas sanas, brillantes y naturales",
         "Odontología general · Blanqueamiento · Ortodoncia",
         "<b>DR. CARLOS MORENO - ODONTÓLOGO</b>",
-        "Calle 16 # 13-40, Centro-Sur, Duitama, Boyacá, Colombia, "
+        "Calle 16 # 13-40, Centro-Sur, Duitama, Boyacá, Colombia, ",
         "Cel: 316 5181414 Email: oralcenterw@gmail.com"
     ]
 
