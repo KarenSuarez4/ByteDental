@@ -183,7 +183,6 @@ export const searchClinicalHistoriesByPatientName = async (
 export const validateClinicalHistoryData = (historyData) => {
   const errors = [];
 
-  // Validaciones requeridas
   if (!historyData.patient_id) {
     errors.push("El ID del paciente es requerido");
   }
@@ -196,11 +195,9 @@ export const validateClinicalHistoryData = (historyData) => {
     errors.push("Los síntomas son requeridos");
   }
 
-  if (
-    !historyData.doctor_signature ||
-    historyData.doctor_signature.trim() === ""
-  ) {
-    errors.push("La firma del doctor es requerida");
+  // Requerir contraseña del doctor en raíz
+  if (!historyData.doctor_password || historyData.doctor_password.trim() === "") {
+    errors.push("La contraseña es requerida");
   }
 
   if (
@@ -213,19 +210,20 @@ export const validateClinicalHistoryData = (historyData) => {
   if (!historyData.treatments || !Array.isArray(historyData.treatments)) {
     errors.push("Los tratamientos deben ser un array");
   } else {
-    // Validar cada tratamiento
     historyData.treatments.forEach((treatment, index) => {
       if (!treatment.dental_service_id) {
-        errors.push(
-          `El servicio dental es requerido para el tratamiento ${index + 1}`
-        );
+        errors.push(`El servicio dental es requerido para el tratamiento ${index + 1}`);
       }
       if (!treatment.treatment_date) {
-        errors.push(
-          `La fecha de tratamiento es requerida para el tratamiento ${
-            index + 1
-          }`
-        );
+        errors.push(`La fecha de tratamiento es requerida para el tratamiento ${index + 1}`);
+      }
+      // reason requerido por backend
+      if (!treatment.reason || String(treatment.reason).trim() === "") {
+        errors.push(`El motivo (reason) es requerido para el tratamiento ${index + 1}`);
+      }
+      // doctor_password por tratamiento (el backend lo pide para add_treatment)
+      if (!treatment.doctor_password || String(treatment.doctor_password).trim() === "") {
+        errors.push(`La contraseña es requerida para el tratamiento ${index + 1}`);
       }
     });
   }
@@ -242,22 +240,24 @@ export const validateClinicalHistoryData = (historyData) => {
  * @returns {Object} Datos formateados para la API
  */
 export const formatClinicalHistoryData = (formData) => {
-  // ✅ Asegurarse de que treatments tenga la estructura correcta
   const treatments = (formData.treatments || []).map((treatment) => {
-    // Si treatment ya es un objeto con la estructura correcta, usarlo directamente
     if (typeof treatment === "object" && treatment.dental_service_id) {
       return {
         dental_service_id: parseInt(treatment.dental_service_id),
         treatment_date: treatment.treatment_date,
         notes: treatment.notes?.trim() || null,
+        reason: treatment.reason?.trim() || formData.reason?.trim() || "Tratamiento",
+        // usar contraseña global si no hay por tratamiento
+        doctor_password: (treatment.doctor_password?.trim()) || (formData.doctor_password?.trim()) || ""
       };
     }
 
-    // Si treatment es solo un ID (string o número), crear la estructura
     return {
       dental_service_id: parseInt(treatment),
       treatment_date: new Date().toISOString(),
       notes: null,
+      reason: formData.reason?.trim() || "Tratamiento",
+      doctor_password: formData.doctor_password?.trim() || ""
     };
   });
 
@@ -267,8 +267,12 @@ export const formatClinicalHistoryData = (formData) => {
     symptoms: formData.symptoms?.trim() || "",
     medical_history: formData.medical_history || {},
     findings: formData.findings?.trim() || null,
-    doctor_signature: formData.doctor_signature?.trim() || "",
-    treatments: treatments,
+    doctor_signature: formData.doctor_signature,
+    doctor_password: formData.doctor_signature, // usa el mismo valor
+    treatments: treatments.map(t => ({
+      ...t,
+      doctor_password: formData.doctor_signature // usa el mismo valor
+    }))
   };
 
   return formatted;
