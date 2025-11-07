@@ -304,7 +304,7 @@ function UserManagement() {
       await updateUser(editUser.uid, updateData, token);
       
       setSuccessMsg("Usuario actualizado exitosamente");
-      toaast.success("Usuario actualizado exitosamente");
+      toast.success("Usuario actualizado exitosamente");
       setEditUser(null);
       setEditForm({});
       setEditFormErrors({});
@@ -335,7 +335,7 @@ function UserManagement() {
     try {
       await deactivateUser(user.uid, token);
       setSuccessMsg("Usuario desactivado correctamente");
-      toaast.success("Usuario desactivado correctamente");
+      toast.success("Usuario desactivado correctamente");
       setLoading(true);
       const updatedUsers = await getUsers(token);
       setUsers(updatedUsers);
@@ -540,7 +540,7 @@ function UserManagement() {
                             try {
                               await activateUser(user.uid, token);
                               setSuccessMsg("Usuario activado correctamente");
-                              toaast.success("Usuario activado correctamente");
+                              toast.success("Usuario activado correctamente");
                               setLoading(true);
                               const updatedUsers = await getUsers(token);
                               setUsers(updatedUsers);
