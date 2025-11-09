@@ -287,7 +287,7 @@ const StatisticsDashboard = () => {
             <button 
               onClick={handleApplyFilters}
               disabled={loading}
-              className="px-6 py-2 bg-header-blue hover:bg-primary-blue text-white rounded-md font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-primary-blue hover:bg-header-blue text-white rounded-md font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Aplicando...' : 'Aplicar Filtros'}
             </button>
