@@ -9,9 +9,10 @@ const Reports = () => {
   const [loading, setLoading] = useState(false);
   const [reportType, setReportType] = useState('activities');
 
-  // Obtener fecha actual y fecha hace 30 días para establecer valores por defecto
-  const today = new Date().toISOString().split('T')[0];
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  // Calcular ayer y usarlo como máximo
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
 
   // Opciones de reportes
   const reportOptions = [
@@ -30,23 +31,41 @@ const Reports = () => {
   ];
 
   useEffect(() => {
-    // Establecer fechas por defecto
-    setStartDate(thirtyDaysAgo);
-    setEndDate(today);
-  }, []);
+    // Calcular fechas por defecto al montar el componente
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    
+    const thirtyDaysBeforeYesterday = new Date(yesterday);
+    thirtyDaysBeforeYesterday.setDate(yesterday.getDate() - 30);
+    
+    setStartDate(thirtyDaysBeforeYesterday.toISOString().split('T')[0]);
+    setEndDate(yesterday.toISOString().split('T')[0]);
+  }, []); // Solo ejecutar al montar
 
   const handleQuickDateSelection = (type) => {
     const currentDate = new Date();
+    
+    // Calcular el día anterior (ayer)
+    const yesterday = new Date(currentDate);
+    yesterday.setDate(currentDate.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    
     let startDateCalc = '';
     
     switch (type) {
       case '30days':
-        startDateCalc = thirtyDaysAgo;
+        // 30 días antes de ayer
+        const thirtyDaysBeforeYesterday = new Date(yesterday);
+        thirtyDaysBeforeYesterday.setDate(yesterday.getDate() - 30);
+        startDateCalc = thirtyDaysBeforeYesterday.toISOString().split('T')[0];
         break;
       case 'thisMonth':
+        // Primer día del mes actual
         startDateCalc = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString().split('T')[0];
         break;
       case 'thisYear':
+        // Primer día del año actual
         startDateCalc = new Date(currentDate.getFullYear(), 0, 1).toISOString().split('T')[0];
         break;
       default:
@@ -54,7 +73,7 @@ const Reports = () => {
     }
     
     setStartDate(startDateCalc);
-    setEndDate(today);
+    setEndDate(yesterdayStr); // ← CAMBIO IMPORTANTE: usar yesterdayStr en lugar de today
   };
 
   // Función mejorada para formatear fechas
@@ -105,18 +124,16 @@ const Reports = () => {
 
     // Validación adicional solo para reporte de actividades
     if (reportType === 'activities') {
-      const start = new Date(startDate + 'T00:00:00');
-      const end = new Date(endDate + 'T23:59:59');
-      const today = new Date();
+      // Usar comparación de strings en formato YYYY-MM-DD
+      const todayStr = new Date().toISOString().split('T')[0];
 
-      if (start > end) {
+      if (startDate > endDate) {
         toast.error('La fecha de inicio no puede ser posterior a la fecha de fin');
         return;
       }
 
-      // Verificar que las fechas no sean futuras (con tolerancia de 1 día)
-      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      if (start > todayStart || end > todayStart) {
+      // Verificar que las fechas no sean futuras comparando strings
+      if (startDate > todayStr || endDate > todayStr) {
         toast.error('Las fechas no pueden ser futuras');
         return;
       }
@@ -307,16 +324,6 @@ const Reports = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Reportes del Sistema
-          </h1>
-          <p className="text-gray-600">
-            Genera reportes consolidados de las actividades odontológicas
-          </p>
-        </div>
-
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -366,13 +373,6 @@ const Reports = () => {
 
         {/* Filtros */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-            <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
-            </svg>
-            Filtros
-          </h2>
-          
           {/* Selector de tipo de reporte */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -408,7 +408,7 @@ const Reports = () => {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                max={today}
+                max={yesterdayStr}
                 disabled={reportType === 'monthly'}
                 className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
                   reportType === 'monthly' ? 'bg-gray-100 cursor-not-allowed' : ''
@@ -424,8 +424,8 @@ const Reports = () => {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                max={today}
-                min={reportType === 'activities' ? startDate : undefined}
+                max={yesterdayStr}
+                min={reportType === 'activities' && startDate ? startDate : undefined}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
@@ -454,28 +454,12 @@ const Reports = () => {
               </button>
             </div>
           )}
-
-          {/* Información del periodo seleccionado */}
-          {startDate && endDate && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                <strong>Periodo seleccionado:</strong>{' '}
-                {reportType === 'monthly' 
-                  ? `${new Date(endDate + 'T00:00:00').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`
-                  : `${new Date(startDate + 'T00:00:00').toLocaleDateString('es-ES')} - ${new Date(endDate + 'T00:00:00').toLocaleDateString('es-ES')}`
-                }
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Información del Reporte */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-2 flex items-center">
-              <svg className="w-6 h-6 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
               {getSelectedReportInfo()?.label || 'Reporte Seleccionado'}
             </h2>
             <p className="text-gray-600">
@@ -517,14 +501,6 @@ const Reports = () => {
                   <span className="text-blue-600 mr-2">•</span>
                   <span>Total de procedimientos por mes</span>
                 </li>
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-2">•</span>
-                  <span>Estadísticas de doctores y pacientes</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-2">•</span>
-                  <span>Tendencias y análisis comparativo</span>
-                </li>
               </ul>
             )}
           </div>
@@ -537,7 +513,7 @@ const Reports = () => {
               className={`inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white ${
                 loading || !endDate || (reportType === 'activities' && !startDate)
                   ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
+                  : 'bg-primary-blue hover:bg-header-blue focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
               }`}
             >
               {loading ? (
