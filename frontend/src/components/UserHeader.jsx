@@ -51,7 +51,7 @@ const UserHeader = ({ userRole }) => {
     ],
     'Auditor': [
       { path: "/audit-logs", label: "Registros de Auditoría" },
-      { path: "/user-activity", label: "Actividad de Usuarios" },
+      // { path: "/user-activity", label: "Actividad de Usuarios" },
     ],
   };
 

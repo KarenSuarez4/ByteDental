@@ -253,10 +253,29 @@ class PatientService:
         if not patient:
             return None
         
+        # Bandera para saber si hubo cambios reales en el paciente
+        hubo_cambios_paciente = False
+        hubo_cambios_persona = False
+        
         try:
             # Actualizar datos de la persona si se proporcionan
             if patient_data.person:
-                _unused_updated_person = self.person_service.update_person(patient.person.id, patient_data.person)
+                # Obtener los datos actuales de la persona para comparar
+                current_person = patient.person
+                person_update_dict = patient_data.person.model_dump(exclude_unset=True)
+                
+                # Verificar si hay cambios reales en los datos de la persona
+                person_changed = False
+                for field, new_value in person_update_dict.items():
+                    current_value = getattr(current_person, field, None)
+                    # Comparar valores, considerando None y valores vacíos
+                    if new_value != current_value:
+                        person_changed = True
+                        break
+                
+                if person_changed:
+                    _unused_updated_person = self.person_service.update_person(patient.person.id, patient_data.person)
+                    hubo_cambios_persona = True
             
             # Actualizar datos específicos del paciente
             patient_fields = patient_data.model_dump(exclude_unset=True, exclude={'person', 'guardian'})
@@ -295,6 +314,10 @@ class PatientService:
                     # Asegurar que se limpie el motivo al activar
                     patient_fields['deactivation_reason'] = None
             
+            # Variable para almacenar información del guardián actualizado
+            guardian_info_actualizado = None
+            hubo_cambios_guardian = False
+            
             # Manejar guardian si se proporciona
             if hasattr(patient_data, 'guardian') and patient_data.guardian:
                 from app.services.guardian_service import GuardianService
@@ -304,6 +327,11 @@ class PatientService:
                 
                 # Si el paciente ya tiene un guardian, actualizarlo
                 if current_guardian_id:
+                    # Obtener el guardian actual antes de actualizar
+                    current_guardian = self.db.query(Guardian).options(
+                        joinedload(Guardian.person)
+                    ).filter(Guardian.id == current_guardian_id).first()
+                    
                     # Actualizar guardian existente
                     from app.schemas.guardian_schema import GuardianUpdate
                     from app.schemas.person_schema import PersonUpdate
@@ -325,11 +353,43 @@ class PatientService:
                         person=person_update_data,
                         relationship_type=patient_data.guardian.relationship_type
                     )
-                    _unused_updated_guardian = guardian_service.update_guardian(
-                        current_guardian_id, 
-                        guardian_update_data,
-                        allow_duplicate_contact=True
-                    )
+                    
+                    # Verificar si realmente hay cambios en el guardian
+                    guardian_changed = False
+                    if current_guardian:
+                        # Verificar cambios en relationship_type
+                        if patient_data.guardian.relationship_type != current_guardian.relationship_type:
+                            guardian_changed = True
+                        
+                        # Verificar cambios en los datos de la persona del guardian
+                        current_person = current_guardian.person
+                        if current_person:
+                            person_data = patient_data.guardian.person
+                            if (person_data.document_type != current_person.document_type or
+                                person_data.document_number != current_person.document_number or
+                                person_data.first_name != current_person.first_name or
+                                person_data.middle_name != current_person.middle_name or
+                                person_data.first_surname != current_person.first_surname or
+                                person_data.second_surname != current_person.second_surname or
+                                person_data.email != current_person.email or
+                                person_data.phone != current_person.phone or
+                                person_data.birthdate != current_person.birthdate):
+                                guardian_changed = True
+                    
+                    if guardian_changed:
+                        updated_guardian = guardian_service.update_guardian(
+                            current_guardian_id, 
+                            guardian_update_data,
+                            allow_duplicate_contact=True
+                        )
+                        
+                        # Guardar info del guardián actualizado para auditoría
+                        guardian_info_actualizado = {
+                            "guardian_id": current_guardian_id,
+                            "tipo_cambio": "actualizacion_tutor",
+                            "guardian_nombre": f"{updated_guardian.person.first_name} {updated_guardian.person.first_surname}"
+                        }
+                        hubo_cambios_guardian = True
                 else:
                     # Crear nuevo guardian (permitiendo email/teléfono duplicado para casos familiares)
                     from app.schemas.guardian_schema import GuardianCreate
@@ -342,6 +402,15 @@ class PatientService:
                         allow_duplicate_contact=True
                     )
                     patient_fields['guardian_id'] = new_guardian.id
+                    hubo_cambios_paciente = True  # Sí cambió el paciente porque se asignó un nuevo guardián
+                    
+                    # Guardar info del guardián nuevo para auditoría
+                    guardian_info_actualizado = {
+                        "guardian_id": new_guardian.id,
+                        "tipo_cambio": "asignacion_tutor",
+                        "guardian_nombre": f"{new_guardian.person.first_name} {new_guardian.person.first_surname}"
+                    }
+                    hubo_cambios_guardian = True
             
             # Validar guardian_id si se proporciona directamente
             elif 'guardian_id' in patient_fields and patient_fields['guardian_id']:
@@ -403,6 +472,15 @@ class PatientService:
                     has_disability = patient_fields.get('has_disability', getattr(patient, 'has_disability', False))
                     raise ValueError(f"El paciente tiene {age} años, no tiene discapacidades y no requiere guardián. No debe tener guardian_id asignado")
             
+            # Verificar si hay cambios reales en los campos del paciente
+            if patient_fields:
+                for field, new_value in patient_fields.items():
+                    current_value = getattr(patient, field, None)
+                    # Comparar valores, considerando None y valores vacíos
+                    if new_value != current_value:
+                        hubo_cambios_paciente = True
+                        break
+            
             print(f"DEBUG: Actualizando paciente con campos: {patient_fields}")
             for field, value in patient_fields.items():
                 print(f"DEBUG: Estableciendo {field} = {value}")
@@ -423,26 +501,54 @@ class PatientService:
                 
                 print(f"DEBUG: Sincronizado is_active={new_status} en {len(clinical_histories)} historias clínicas")
             
-            # Registrar evento de auditoría
-            person_updates = patient_data.person.model_dump(exclude_unset=True) if patient_data.person else {}
-            self.auditoria_service.registrar_evento(
-                db=self.db,
-                usuario_id=self.user_id,
-                tipo_evento="UPDATE",
-                registro_afectado_id=str(patient_id),
-                registro_afectado_tipo="patients",
-                descripcion_evento=f"Paciente actualizado: {patient.person.first_name} {patient.person.first_surname}",
-                detalles_cambios={
-                    "data_anterior": "Datos anteriores no capturados en este método",
-                    "data_nueva": {
-                        "person_data": serialize_for_audit(person_updates),
-                        "patient_data": serialize_for_audit(patient_fields)
-                    }
-                },
-                ip_origen=self.user_ip,
-                usuario_rol=self.user_role,
-                usuario_email=self.user_email
-            )
+            # Registrar evento de auditoría SOLO si hubo cambios en el paciente, su persona, o su guardián
+            if hubo_cambios_paciente or hubo_cambios_persona or hubo_cambios_guardian:
+                person_updates = patient_data.person.model_dump(exclude_unset=True) if patient_data.person else {}
+                
+                # Determinar descripción del evento según el tipo de cambio
+                descripcion_evento = ""
+                
+                if guardian_info_actualizado:
+                    tipo_cambio = guardian_info_actualizado.get("tipo_cambio")
+                    guardian_nombre = guardian_info_actualizado.get("guardian_nombre")
+                    
+                    if tipo_cambio == "actualizacion_tutor":
+                        # Si SOLO se actualizó el tutor (sin otros cambios)
+                        if not hubo_cambios_paciente and not hubo_cambios_persona:
+                            descripcion_evento = f"Tutor actualizado para el paciente {patient.person.first_name} {patient.person.first_surname}: {guardian_nombre}"
+                        else:
+                            # Se actualizó el tutor Y el paciente/persona
+                            descripcion_evento = f"Paciente y tutor actualizados: {patient.person.first_name} {patient.person.first_surname} (Tutor: {guardian_nombre})"
+                    elif tipo_cambio == "asignacion_tutor":
+                        # Si SOLO se asignó el tutor (sin otros cambios)
+                        if not hubo_cambios_persona and not hubo_cambios_paciente:
+                            descripcion_evento = f"Tutor asignado al paciente {patient.person.first_name} {patient.person.first_surname}: {guardian_nombre}"
+                        else:
+                            # Se asignó el tutor Y se actualizó el paciente/persona
+                            descripcion_evento = f"Paciente actualizado y tutor asignado: {patient.person.first_name} {patient.person.first_surname} (Tutor: {guardian_nombre})"
+                else:
+                    # Solo se actualizó el paciente/persona (sin cambios en el tutor)
+                    descripcion_evento = f"Paciente actualizado: {patient.person.first_name} {patient.person.first_surname}"
+                
+                self.auditoria_service.registrar_evento(
+                    db=self.db,
+                    usuario_id=self.user_id,
+                    tipo_evento="UPDATE",
+                    registro_afectado_id=str(patient_id),
+                    registro_afectado_tipo="patients",
+                    descripcion_evento=descripcion_evento,
+                    detalles_cambios={
+                        "data_anterior": "Datos anteriores no capturados en este método",
+                        "data_nueva": {
+                            "person_data": serialize_for_audit(person_updates) if hubo_cambios_persona else None,
+                            "patient_data": serialize_for_audit(patient_fields) if hubo_cambios_paciente else None,
+                            "guardian_info": guardian_info_actualizado if guardian_info_actualizado else None
+                        }
+                    },
+                    ip_origen=self.user_ip,
+                    usuario_rol=self.user_role,
+                    usuario_email=self.user_email
+                )
             
             self.db.commit()
             self.db.refresh(patient)
