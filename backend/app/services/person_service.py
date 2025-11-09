@@ -81,25 +81,25 @@ class PersonService:
             self.db.refresh(person)
             
             # Registrar evento de auditoría
-            try:
-                # Convertir enums a strings para serialización JSON
-                audit_data = serialize_for_audit(person_data.model_dump())
-                
-                self.auditoria_service.registrar_evento(
-                    db=self.db,
-                    usuario_id=self.user_id,
-                    tipo_evento="CREATE",
-                    registro_afectado_id=str(person.id),
-                    registro_afectado_tipo="persons",
-                    descripcion_evento=f"Nueva persona creada: {person.first_name} {person.first_surname}",
-                    detalles_cambios=audit_data,
-                    ip_origen=self.user_ip,
-                    usuario_rol=self.user_role,
-                    usuario_email=self.user_email
-                )
-            except Exception as audit_error:
-                print(f"Error en auditoría: {audit_error}")
-                # No falla la operación principal si falla la auditoría
+            # try:
+            #     # Convertir enums a strings para serialización JSON
+            #     audit_data = serialize_for_audit(person_data.model_dump())
+            #     
+            #     self.auditoria_service.registrar_evento(
+            #         db=self.db,
+            #         usuario_id=self.user_id,
+            #         tipo_evento="CREATE",
+            #         registro_afectado_id=str(person.id),
+            #         registro_afectado_tipo="persons",
+            #         descripcion_evento=f"Nueva persona creada: {person.first_name} {person.first_surname}",
+            #         detalles_cambios=audit_data,
+            #         ip_origen=self.user_ip,
+            #         usuario_rol=self.user_role,
+            #         usuario_email=self.user_email
+            #     )
+            # except Exception as audit_error:
+            #     print(f"Error en auditoría: {audit_error}")
+            #     # No falla la operación principal si falla la auditoría
             
             return person
         except Exception as e:
@@ -228,21 +228,21 @@ class PersonService:
             self.db.refresh(person)
             
             # Registrar evento de auditoría
-            self.auditoria_service.registrar_evento(
-                db=self.db,
-                usuario_id=self.user_id,
-                tipo_evento="UPDATE",
-                registro_afectado_id=str(person.id),
-                registro_afectado_tipo="persons",
-                descripcion_evento=f"Persona actualizada: {person.first_name} {person.first_surname}",
-                detalles_cambios={
-                    "antes": datos_anteriores,
-                    "despues": serialize_for_audit(update_data)
-                },
-                ip_origen=self.user_ip,
-                usuario_rol=self.user_role,
-                usuario_email=self.user_email
-            )
+            # self.auditoria_service.registrar_evento(
+            #     db=self.db,
+            #     usuario_id=self.user_id,
+            #     tipo_evento="UPDATE",
+            #     registro_afectado_id=str(person.id),
+            #     registro_afectado_tipo="persons",
+            #     descripcion_evento=f"Persona actualizada: {person.first_name} {person.first_surname}",
+            #     detalles_cambios={
+            #         "antes": datos_anteriores,
+            #         "despues": serialize_for_audit(update_data)
+            #     },
+            #     ip_origen=self.user_ip,
+            #     usuario_rol=self.user_role,
+            #     usuario_email=self.user_email
+            # )
             
             return person
         except Exception as e:
