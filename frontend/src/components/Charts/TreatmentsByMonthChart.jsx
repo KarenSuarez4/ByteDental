@@ -24,11 +24,9 @@ const TreatmentsByMonthChart = ({ data, selectedYear, onYearChange, loading }) =
   }
 
   const maxTreatments = Math.max(...data.map(item => item.total_treatments));
-  const minTreatments = 0; // Siempre empezar desde 0
-  const padding = maxTreatments * 0.1; // 10% de padding solo arriba
+  const padding = maxTreatments * 0.1;
   const chartMax = maxTreatments + padding;
   
-  // Función para formatear el mes (de "2024-01" a "Ene 2024")
   const formatMonth = (monthStr) => {
     const [year, month] = monthStr.split('-');
     const monthNames = [
@@ -38,7 +36,6 @@ const TreatmentsByMonthChart = ({ data, selectedYear, onYearChange, loading }) =
     return `${monthNames[parseInt(month) - 1]}`;
   };
 
-  // Generar años para el selector (últimos 5 años + año actual)
   const generateYearOptions = () => {
     const currentYear = new Date().getFullYear();
     const years = [];
@@ -48,43 +45,42 @@ const TreatmentsByMonthChart = ({ data, selectedYear, onYearChange, loading }) =
     return years;
   };
 
-  // Función para calcular la posición Y corregida
   const calculateY = (value) => {
-    if (chartMax === 0) return 100; // Si no hay datos, poner en la parte inferior
+    if (chartMax === 0) return 100;
     return ((chartMax - value) / chartMax) * 100;
   };
 
-  // Separar la línea en segmentos cuando hay valores cero
-  const createLineSegments = () => {
-    const segments = [];
-    let currentSegment = [];
+  // Modificar la función renderLines para que conecte todos los puntos
+  const renderLines = () => {
+    const lines = [];
     
-    data.forEach((item, index) => {
-      const x = ((index + 0.5) / data.length) * 100;
-      const y = calculateY(item.total_treatments);
+    for (let i = 0; i < data.length - 1; i++) {
+      const current = data[i];
+      const next = data[i + 1];
       
-      if (item.total_treatments > 0) {
-        currentSegment.push(`${x},${y}`);
-      } else {
-        // Si hay un segmento en progreso, guardarlo
-        if (currentSegment.length > 0) {
-          segments.push(currentSegment.join(' '));
-          currentSegment = [];
-        }
-        // Para valores cero, crear un punto individual
-        segments.push(`${x},${y}`);
-      }
-    });
-    
-    // Agregar el último segmento si existe
-    if (currentSegment.length > 0) {
-      segments.push(currentSegment.join(' '));
+      // Dibujar línea entre TODOS los puntos (incluyendo los que tienen 0)
+      const x1 = ((i + 0.5) / data.length) * 100;
+      const y1 = calculateY(current.total_treatments);
+      const x2 = ((i + 1.5) / data.length) * 100;
+      const y2 = calculateY(next.total_treatments);
+      
+      lines.push(
+        <line
+          key={`line-${i}`}
+          x1={`${x1}%`}
+          y1={`${y1}%`}
+          x2={`${x2}%`}
+          y2={`${y2}%`}
+          stroke="#2563eb"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      );
     }
     
-    return segments;
+    return lines;
   };
 
-  const lineSegments = createLineSegments();
   const totalTreatments = data.reduce((sum, item) => sum + item.total_treatments, 0);
 
   return (
@@ -109,7 +105,7 @@ const TreatmentsByMonthChart = ({ data, selectedYear, onYearChange, loading }) =
         </div>
       </div>
 
-      {/* Gráfico - ocupa la mayor parte del espacio */}
+      {/* Gráfico */}
       <div className="relative flex-1 border-b border-l border-gray-200 bg-gray-50 min-h-[250px]">
         <svg className="absolute inset-0 w-full h-full">
           {/* Líneas de grid horizontales */}
@@ -140,25 +136,8 @@ const TreatmentsByMonthChart = ({ data, selectedYear, onYearChange, loading }) =
             );
           })}
 
-          {/* Líneas principales - renderizar cada segmento por separado */}
-          {lineSegments.map((segment, segmentIndex) => {
-            const points = segment.split(' ');
-            if (points.length === 1) {
-              // Es un punto individual (valor cero), no dibujar línea
-              return null;
-            }
-            return (
-              <polyline
-                key={segmentIndex}
-                fill="none"
-                stroke="#2563eb"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                points={segment}
-              />
-            );
-          })}
+          {/* Líneas entre puntos consecutivos con valores > 0 */}
+          {renderLines()}
 
           {/* Puntos y etiquetas */}
           {data.map((item, index) => {
@@ -168,18 +147,18 @@ const TreatmentsByMonthChart = ({ data, selectedYear, onYearChange, loading }) =
             
             return (
               <g key={index}>
-                {/* Punto */}
+                {/* Punto - todos los puntos, incluyendo los 0 */}
                 <circle
                   cx={`${x}%`}
                   cy={`${y}%`}
                   r="4"
-                  fill={isZero ? "#ef4444" : "#2563eb"} // Rojo para ceros, azul para valores positivos
+                  fill={isZero ? "#ef4444" : "#2563eb"}
                   stroke="white"
                   strokeWidth="2"
                   className="cursor-pointer transition-all"
                 />
                 
-                {/* Área hover invisible para tooltip */}
+                {/* Área hover para tooltip */}
                 <circle
                   cx={`${x}%`}
                   cy={`${y}%`}
@@ -190,10 +169,10 @@ const TreatmentsByMonthChart = ({ data, selectedYear, onYearChange, loading }) =
                   <title>{`${formatMonth(item.month)} ${item.month.split('-')[0]}: ${item.total_treatments} tratamientos`}</title>
                 </circle>
                 
-                {/* Etiqueta de cantidad */}
+                {/* Etiqueta de cantidad - mostrar todos los valores */}
                 <text
                   x={`${x}%`}
-                  y={`${Math.max(y - 8, 8)}%`}
+                  y={`${Math.max(y - 3, 5)}%`}
                   textAnchor="middle"
                   className={`text-xs font-semibold ${isZero ? 'fill-red-500' : 'fill-gray-700'}`}
                 >
@@ -222,7 +201,7 @@ const TreatmentsByMonthChart = ({ data, selectedYear, onYearChange, loading }) =
         ))}
       </div>
 
-      {/* Información detallada con más espacio */}
+      {/* Información detallada */}
       <div className="mt-4 flex-shrink-0">
         <div className="text-center text-xs text-gray-600 font-medium mb-3">
           Detalle Mensual

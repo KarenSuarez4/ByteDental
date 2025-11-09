@@ -5,13 +5,27 @@ import { getAuthToken } from '../../services/getToken';
 import { statisticsService } from '../../services/statisticsService';
 import ProcedureDistributionChart from '../../components/Charts/ProcedureDistributionChart';
 import ProceduresByDoctorChart from '../../components/Charts/ProceduresByDoctorChart';
-import TreatmentsByMonthChart from '../../components/Charts/TreatmentsByMonthChart'; // Importar la nueva gráfica
+import TreatmentsByMonthChart from '../../components/Charts/TreatmentsByMonthChart';
 
 const StatisticsDashboard = () => {
   const { currentUser } = useAuth();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Calcular fechas por defecto: últimos 30 días
+  const getDefaultDates = () => {
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    
+    return {
+      startDate: thirtyDaysAgo.toISOString().split('T')[0],
+      endDate: today.toISOString().split('T')[0]
+    };
+  };
+
+  const defaultDates = getDefaultDates();
   
   // Estados para los datos de estadísticas
   const [procedureDistribution, setProcedureDistribution] = useState({ total_procedures: 0, distribution: [] });
@@ -23,7 +37,7 @@ const StatisticsDashboard = () => {
   // Estados para datos de filtros
   const [activeDoctors, setActiveDoctors] = useState([]);
   
-  // Estados para filtros
+  // Estados para filtros - SIN fechas predefinidas
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -45,21 +59,22 @@ const StatisticsDashboard = () => {
 
   const loadStatisticsData = async () => {
     try {
+      // Obtener pacientes activos del sistema (sin filtros de fecha)
+      const totalPatientsData = await statisticsService.getActivePatientsCount({});
+
       const [
         distributionData,
         doctorData,
-        patientsData,
         employeesData
       ] = await Promise.all([
         statisticsService.getProcedureDistribution(filters),
         statisticsService.getProceduresByDoctor(filters),
-        statisticsService.getActivePatientsCount(filters),
         statisticsService.getEmployeesCount({ isActive: true })
       ]);
 
       setProcedureDistribution(distributionData || { total_procedures: 0, distribution: [] });
       setProceduresByDoctor(doctorData || { procedures_by_doctor: [] });
-      setActivePatientsCount(patientsData || { total_active_patients: 0, active_patients_period: 0 });
+      setActivePatientsCount(totalPatientsData || { total_active_patients: 0, active_patients_period: 0 });
       setEmployeesCount(employeesData || { total_general: 0, detail_by_role: [] });
       
     } catch (error) {
@@ -104,10 +119,10 @@ const StatisticsDashboard = () => {
         const userData = await getUserById(currentUser.uid, token);
         setUser(userData);
 
-        // Cargar datos de filtros y estadísticas
+        // Cargar datos de filtros y estadísticas con fechas por defecto
         await loadFilterData();
         await loadStatisticsData();
-        await loadTreatmentsData(); // Cargar tratamientos inicialmente
+        await loadTreatmentsData();
 
       } catch (err) {
         setError(err.message);
@@ -129,8 +144,35 @@ const StatisticsDashboard = () => {
   const handleApplyFilters = async () => {
     try {
       setLoading(true);
-      await loadStatisticsData();
-      await loadTreatmentsData(selectedYear); // Recargar con el año seleccionado
+      
+      // Obtener pacientes activos del sistema (sin filtros de fecha)
+      const totalPatientsData = await statisticsService.getActivePatientsCount({});
+
+      const [
+        distributionData,
+        doctorData,
+        employeesData
+      ] = await Promise.all([
+        statisticsService.getProcedureDistribution(filters),
+        statisticsService.getProceduresByDoctor(filters),
+        statisticsService.getEmployeesCount({ isActive: true })
+      ]);
+
+      setProcedureDistribution(distributionData || { total_procedures: 0, distribution: [] });
+      setProceduresByDoctor(doctorData || { procedures_by_doctor: [] });
+      setActivePatientsCount(totalPatientsData || { total_active_patients: 0, active_patients_period: 0 });
+      setEmployeesCount(employeesData || { total_general: 0, detail_by_role: [] });
+      
+      setTreatmentsLoading(true);
+      const treatmentsFilters = {
+        ...filters,
+        year: selectedYear
+      };
+      
+      const monthlyData = await statisticsService.getTreatmentsByMonth(treatmentsFilters);
+      setTreatmentsByMonth(monthlyData || { treatments_per_month: [] });
+      setTreatmentsLoading(false);
+      
     } catch (error) {
       setError('Error al aplicar filtros');
     } finally {
@@ -146,12 +188,34 @@ const StatisticsDashboard = () => {
     };
     
     setFilters(clearedFilters);
-    setSelectedYear(null); // Limpiar también el año seleccionado
+    setSelectedYear(null);
     
     try {
       setLoading(true);
-      await loadStatisticsData();
-      await loadTreatmentsData(null); // Recargar sin año específico
+      
+      // Obtener pacientes activos del sistema (sin filtros de fecha)
+      const totalPatientsData = await statisticsService.getActivePatientsCount({});
+
+      const [
+        distributionData,
+        doctorData,
+        employeesData
+      ] = await Promise.all([
+        statisticsService.getProcedureDistribution(clearedFilters),
+        statisticsService.getProceduresByDoctor(clearedFilters),
+        statisticsService.getEmployeesCount({ isActive: true })
+      ]);
+
+      setProcedureDistribution(distributionData || { total_procedures: 0, distribution: [] });
+      setProceduresByDoctor(doctorData || { procedures_by_doctor: [] });
+      setActivePatientsCount(totalPatientsData || { total_active_patients: 0, active_patients_period: 0 });
+      setEmployeesCount(employeesData || { total_general: 0, detail_by_role: [] });
+      
+      setTreatmentsLoading(true);
+      const monthlyData = await statisticsService.getTreatmentsByMonth(clearedFilters);
+      setTreatmentsByMonth(monthlyData || { treatments_per_month: [] });
+      setTreatmentsLoading(false);
+      
     } catch (error) {
       setError('Error al limpiar filtros');
     } finally {
@@ -242,9 +306,8 @@ const StatisticsDashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           <div className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="text-sm font-medium text-gray-600 mb-1">Pacientes Activos</h3>
-            <p className="text-3xl font-bold text-gray-900">{activePatientsCount.active_patients_period}</p>
-            <p className="text-sm text-gray-500 mt-1">En el período filtrado</p>
-            <p className="text-xs text-gray-400 mt-1">Total sistema: {activePatientsCount.total_active_patients}</p>
+            <p className="text-3xl font-bold text-gray-900">{activePatientsCount.total_active_patients}</p>
+            <p className="text-sm text-gray-500 mt-1">Total del sistema</p>
           </div>
           
           <div className="bg-white p-6 rounded-lg shadow-md">
@@ -304,16 +367,16 @@ const StatisticsDashboard = () => {
         </div>
 
         {/* Gráfica de tratamientos por mes - Pantalla completa con más altura */}
-        <div className="bg-white p-8 rounded-lg shadow-md mb-6 min-h-[600px]"> {/* Aumentado padding y agregado min-height */}
-          <h3 className="text-lg font-semibold mb-6 text-gray-800"> {/* Aumentado margen inferior */}
-            Total de Tratamientos por Mes
+        <div className="bg-white p-8 rounded-lg shadow-md mb-6 min-h-[600px]">
+          <h3 className="text-lg font-semibold mb-6 text-gray-800">
+            Total de Tratamientos
             {filters.doctorId && activeDoctors.find(d => d.uid === filters.doctorId) && (
               <span className="text-sm font-normal text-gray-600 block">
                 Dr. {activeDoctors.find(d => d.uid === filters.doctorId)?.first_name} {activeDoctors.find(d => d.uid === filters.doctorId)?.last_name}
               </span>
             )}
           </h3>
-          <div className="h-96"> {/* Contenedor con altura específica para la gráfica */}
+          <div className="h-96">
             <TreatmentsByMonthChart 
               data={treatmentsByMonth.treatments_per_month}
               selectedYear={selectedYear}

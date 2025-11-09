@@ -11,8 +11,6 @@ const ProcedureDistributionChart = ({ data, totalProcedures }) => {
       </div>
     );
   }
-
-  const maxQuantity = Math.max(...data.map(item => item.quantity));
   
   // Función para generar colores únicos para cada procedimiento
   const getColor = (index) => {
@@ -23,6 +21,13 @@ const ProcedureDistributionChart = ({ data, totalProcedures }) => {
   const getHoverColor = (index) => {
     return `hsl(${220 + (index * 30)}, 70%, 40%)`;
   };
+
+  // Log para debug
+  console.log('📊 Datos del gráfico de distribución:', data.map(item => ({
+    procedure: item.procedure,
+    percentage: item.percentage,
+    quantity: item.quantity
+  })));
   
   return (
     <div className="h-80">
@@ -35,45 +40,64 @@ const ProcedureDistributionChart = ({ data, totalProcedures }) => {
 
       {/* Gráfico */}
       <div className="relative h-48 border-b border-l border-gray-200 bg-gray-50">
-        <div className="absolute inset-0 flex items-end justify-around px-2">
+        {/* Contenedor con altura fija para las barras */}
+        <div className="absolute bottom-0 left-0 right-0 h-full flex items-end justify-around px-2 py-2">
           {data.map((item, index) => {
-            const barHeight = maxQuantity > 0 ? (item.quantity / maxQuantity) * 100 : 0;
+            // Usar el porcentaje directamente para la altura
+            const heightPercentage = Math.max(item.percentage, 0);
+            
             const barColor = getColor(index);
             const hoverColor = getHoverColor(index);
             
+            console.log(`Barra ${item.procedure}: ${heightPercentage}% de altura`);
+            
             return (
-              <div key={index} className="flex flex-col items-center" style={{ width: `${85 / data.length}%` }}>
-                {/* Valor y porcentaje encima de la barra - más pegado */}
-                <div className="mb-0.5 text-center">
-                  <div className="text-xs font-semibold text-gray-700">{item.quantity}</div>
-                  <div className="text-xs font-medium" style={{ color: barColor }}>
-                    {item.percentage.toFixed(1)}%
+              <div 
+                key={index} 
+                className="flex flex-col items-center justify-end h-full"
+                style={{ 
+                  width: `${Math.min(85 / data.length, 20)}%`,
+                  maxWidth: '120px'
+                }}
+              >
+                {/* Contenedor de la información y la barra */}
+                <div className="flex flex-col items-center w-full" style={{ height: '95%' }}>
+                  {/* Espaciador flexible */}
+                  <div style={{ flex: `${100 - heightPercentage}` }} />
+                  
+                  {/* Información encima de la barra */}
+                  <div className="mb-0.5 text-center flex-shrink-0">
+                    <div className="text-xs font-semibold text-gray-700">{item.quantity}</div>
+                    <div className="text-xs font-medium" style={{ color: barColor }}>
+                      {item.percentage.toFixed(1)}%
+                    </div>
                   </div>
-                </div>
-                
-                {/* Barra */}
-                <div
-                  className="w-full transition-all duration-200 rounded-t-sm relative group cursor-pointer"
-                  style={{
-                    backgroundColor: barColor,
-                    height: `${barHeight}%`,
-                    minHeight: item.quantity > 0 ? '8px' : '0'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = hoverColor;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = barColor;
-                  }}
-                  title={`${item.procedure}: ${item.quantity} procedimientos (${item.percentage.toFixed(1)}%)`}
-                >
-                  {/* Tooltip on hover */}
-                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-10">
-                    {item.procedure}
-                    <br />
-                    {item.quantity} procedimientos
-                    <br />
-                    {item.percentage.toFixed(1)}% del total
+                  
+                  {/* Barra */}
+                  <div
+                    className="w-full transition-all duration-200 rounded-t-sm relative group cursor-pointer flex-shrink-0"
+                    style={{
+                      backgroundColor: barColor,
+                      height: `${heightPercentage}%`,
+                      minHeight: item.quantity > 0 ? (heightPercentage < 5 ? '8px' : '12px') : '0',
+                      maxHeight: '95%'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = hoverColor;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = barColor;
+                    }}
+                    title={`${item.procedure}: ${item.quantity} procedimientos (${item.percentage.toFixed(1)}%)`}
+                  >
+                    {/* Tooltip on hover */}
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-10 pointer-events-none">
+                      {item.procedure}
+                      <br />
+                      {item.quantity} procedimientos
+                      <br />
+                      {item.percentage.toFixed(1)}% del total
+                    </div>
                   </div>
                 </div>
               </div>
@@ -82,7 +106,7 @@ const ProcedureDistributionChart = ({ data, totalProcedures }) => {
         </div>
         
         {/* Etiquetas de los ejes */}
-        <div className="absolute -left-9 top-1/2 transform -translate-y-1/2 -rotate-90 text-xs text-gray-600">
+        <div className="absolute -left-9 top-1/2 transform -translate-y-1/2 -rotate-90 text-xs text-gray-600 whitespace-nowrap">
           Cantidad
         </div>
       </div>
