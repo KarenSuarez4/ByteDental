@@ -16,6 +16,8 @@ import DateInput from './DateInput';
  * @param {Function} props.onSubmit - Function to handle form submission
  * @param {Array} props.dentalServices - List of available dental services
  * @param {boolean} props.loading - Loading state during submission
+ * @param {boolean} props.allowPerTreatmentPassword - Allow password per treatment
+ * @param {string} props.globalDoctorPassword - Global doctor password
  * @returns {JSX.Element} Modal to add treatment
  */
 const AddTreatmentModal = ({
@@ -23,7 +25,9 @@ const AddTreatmentModal = ({
     onClose,
     onSubmit,
     dentalServices = [],
-    loading = false
+    loading = false,
+    allowPerTreatmentPassword = false, // <-- nuevo prop opcional
+    globalDoctorPassword = "" // <-- nuevo prop opcional (contraseña global desde el formulario)
 }) => {
     // Calculate minimum and maximum dates only once
     const dateConstraints = useMemo(() => {
@@ -43,7 +47,8 @@ const AddTreatmentModal = ({
         dental_service_id: '',
         treatment_date: '',
         reason: '', // Nuevo campo
-        notes: ''
+        notes: '',
+        doctor_password: '' // <-- agregar campo de contraseña por tratamiento (opcional)
     });
 
     const [errors, setErrors] = useState({});
@@ -56,7 +61,8 @@ const AddTreatmentModal = ({
                 dental_service_id: '',
                 treatment_date: dateConstraints.today, // ✅ Current date by default
                 reason: '', // Nuevo campo
-                notes: ''
+                notes: '',
+                doctor_password: '' // <-- reset
             });
             setErrors({});
             setTouched({});
@@ -112,6 +118,12 @@ const AddTreatmentModal = ({
                 break;
             case 'reason':
                 if (!value || value.trim() === '') return 'El motivo de la consulta es obligatorio';
+                break;
+            case 'doctor_password':
+                // validar solo si se requiere ingreso por tratamiento
+                if (allowPerTreatmentPassword && (!value || value.trim() === '')) {
+                    return 'La contraseña del doctor es requerida';
+                }
                 break;
             default:
                 break;
@@ -188,7 +200,8 @@ const AddTreatmentModal = ({
             dental_service_id: true,
             treatment_date: true,
             reason: true, // Nuevo campo
-            notes: true
+            notes: true,
+            doctor_password: allowPerTreatmentPassword ? true : false
         });
 
         if (validateForm()) {
@@ -196,8 +209,9 @@ const AddTreatmentModal = ({
             const treatmentData = {
                 dental_service_id: parseInt(formData.dental_service_id),
                 treatment_date: new Date(formData.treatment_date).toISOString(),
-                reason: formData.reason.trim(), // Nuevo campo
-                notes: formData.notes.trim() || null
+                reason: formData.reason.trim(),
+                notes: formData.notes.trim() || null,
+                doctor_password: globalDoctorPassword
             };
 
             onSubmit(treatmentData);
