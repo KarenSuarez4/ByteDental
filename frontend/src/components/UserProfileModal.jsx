@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import { FaUser, FaTimes } from 'react-icons/fa';
 
 /**
  * UserProfileModal Component
@@ -15,14 +16,9 @@ import ReactDOM from 'react-dom';
  * @returns {JSX.Element|null} Modal component or null if closed
  */
 const UserProfileModal = ({ isOpen, onClose, userData }) => {
-    console.log('🎭 UserProfileModal rendered:', { isOpen, hasUserData: !!userData, userData });
-    
     if (!isOpen || !userData) {
-        console.log('❌ Modal not showing - isOpen:', isOpen, 'userData:', !!userData);
         return null;
     }
-
-    console.log('✅ Modal should be visible now');
 
     const documentTypes = {
         'CC': 'Cédula de Ciudadanía',
@@ -44,7 +40,7 @@ const UserProfileModal = ({ isOpen, onClose, userData }) => {
                     <div className="relative z-10 flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                             <div className="bg-white bg-opacity-20 p-3 rounded-full">
-                                👤
+                                <FaUser className="text-26 text-gray-700" />
                             </div>
                             <div>
                                 <h2 className="text-26 font-bold font-poppins">Mi Información Personal</h2>
@@ -52,10 +48,10 @@ const UserProfileModal = ({ isOpen, onClose, userData }) => {
                             </div>
                         </div>
                         <button
-                            className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-full transition-all duration-200"
+                            className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2.5 rounded-full transition-all duration-200"
                             onClick={onClose}
                         >
-                            ✖️
+                            <FaTimes className="text-20 text-gray-700" />
                         </button>
                     </div>
                 </div>
@@ -146,18 +142,6 @@ const UserProfileModal = ({ isOpen, onClose, userData }) => {
                                     </div>
                                 </div>
                             )}
-                        </div>
-
-                        {/* Estado de la cuenta */}
-                        <div className={`p-4 rounded-lg border-l-4 ${userData.is_active ? 'bg-green-50 border-green-400' : 'bg-red-50 border-red-400'}`}>
-                            <div className="flex items-center">
-                                <div className={`w-3 h-3 rounded-full ${userData.is_active ? 'bg-green-500' : 'bg-red-500'} animate-pulse mr-3`}></div>
-                                <p className="font-poppins text-16">
-                                    Estado de la cuenta: <span className={`font-semibold ${userData.is_active ? 'text-green-700' : 'text-red-700'}`}>
-                                        {userData.is_active ? 'Activa' : 'Inactiva'}
-                                    </span>
-                                </p>
-                            </div>
                         </div>
 
                         {/* Advertencia de cambio de contraseña (si aplica) */}

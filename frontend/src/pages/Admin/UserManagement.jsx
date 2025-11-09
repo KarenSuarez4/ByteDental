@@ -7,6 +7,8 @@ import ConfirmDialog from "../../components/ConfirmDialog";
 import SearchInput from "../../components/SearchInput"; 
 import FilterBar from "../../components/FilterBar"; 
 import DateInput from "../../components/DateInput";  
+import { FaTimes } from "react-icons/fa";
+import { MdEdit } from "react-icons/md";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { getAllUsers as getUsers, updateUser, deactivateUser, activateUser, getRoles } from "../../services/userService";
@@ -710,7 +712,7 @@ function UserManagement() {
                 <div className="relative z-10 flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="bg-white bg-opacity-20 p-3 rounded-full">
-                      ✏️
+                      <MdEdit className="text-24 text-blue-400" />
                     </div>
                     <div>
                       <h2 className="text-26 font-bold font-poppins">Editar Usuario</h2>
@@ -718,10 +720,10 @@ function UserManagement() {
                     </div>
                   </div>
                   <button
-                    className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-full transition-all duration-200"
+                    className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2.5 rounded-full transition-all duration-200"
                     onClick={handleCancelEdit}
                   >
-                    ✖️
+                    <FaTimes className="text-20 text-gray-700" />
                   </button>
                 </div>
               </div>
