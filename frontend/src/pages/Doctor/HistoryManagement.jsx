@@ -236,13 +236,25 @@ const HistoryManagement = () => {
         doctor_signature: response.doctor_signature,
         created_at: response.created_at,
         // Treatments history mapping
-        treatments: response.treatments?.map(treatment => ({
-          id: treatment.id || Math.random(),
-          date: treatment.date || treatment.treatment_date,
-          name: treatment.name || treatment.dental_service?.name || 'Tratamiento no especificado',
-          doctor_name: treatment.doctor_name || 'Doctor no especificado',
-          notes: treatment.notes || 'Sin observaciones'
-        })) || []
+        treatments: response.treatments?.map(treatment => {
+          const reason = (
+            treatment.reason ??
+            treatment.treatment_reason ??
+            treatment.motive ??
+            treatment.motivo ??
+            ""
+          );
+
+          return {
+            id: treatment.id ?? Math.random(),
+            date: treatment.date ?? treatment.treatment_date ?? null,
+            name: treatment.name ?? treatment.dental_service?.name ?? 'Tratamiento no especificado',
+            doctor_name: treatment.doctor_name ?? (treatment.doctor ? `${treatment.doctor.first_name || ''} ${treatment.doctor.last_name || ''}`.trim() : 'Doctor no especificado'),
+            reason: reason && String(reason).trim() ? String(reason) : null,
+            notes: treatment.notes ?? 'Sin observaciones',
+            raw: treatment
+          };
+        }) || []
       };
 
       return mappedData;

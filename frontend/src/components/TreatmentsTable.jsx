@@ -73,7 +73,10 @@ const TreatmentsTable = ({ treatments }) => {
                                     {formatDate(treatment.date)}
                                 </td>
                                 <td className="text-center px-4 py-4 text-18 text-gray-800 font-poppins">
-                                    {treatment.reason || 'N/A'}
+                                    {(() => {
+                                        const r = treatment?.reason ?? treatment?.treatment_reason ?? treatment?.motive ?? treatment?.motivo ?? '';
+                                        return r && String(r).trim() ? r : 'N/A';
+                                    })()}
                                 </td>
                                 <td className="text-center px-4 py-4 text-18 text-gray-800 font-poppins">
                                     {treatment.name || 'N/A'}
