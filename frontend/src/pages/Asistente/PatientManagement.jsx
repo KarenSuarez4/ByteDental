@@ -251,7 +251,7 @@ function PatientManagement() {
         navigate(`/doctor/register-first-history/${patient.id}`);
       }
     } catch (error) {
-      setEditError(`Error al verificar historias: ${error.message}`);
+      toast.error(`Error al verificar historias: ${error.message}`);
 
       setTimeout(() => {
         navigate(`/doctor/register-first-history/${patient.id}`);
@@ -786,7 +786,6 @@ function PatientManagement() {
       }
 
       await updatePatient(editPatient.id, updateData, token);
-      setSuccessMsg("Paciente actualizado correctamente");
       toast.success("Paciente actualizado correctamentes");
       setEditPatient(null);
       setLoading(true);
@@ -840,7 +839,6 @@ function PatientManagement() {
 
     try {
       await deactivatePatient(deactivationModal.patient.id, deactivationModal.reason.trim(), token);
-      setSuccessMsg("Paciente desactivado correctamente");
       toast.success("Paciente desactivado correctamente");
 
       // Cerrar modal
@@ -863,14 +861,12 @@ function PatientManagement() {
   const handleActivate = async (patient) => {
     try {
       await activatePatient(patient.id, token);
-      setSuccessMsg("Paciente activado correctamente");
       toast.success("Paciente activado correctamente")
       setLoading(true);
       const updatedPatients = await getAllPatients(token);
       setPatients(updatedPatients);
       setLoading(false);
     } catch (err) {
-      setEditError(err.message || "Error al activar paciente");
       toast.error(err.message || "Error al activar paciente");
     }
   };

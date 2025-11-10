@@ -12,7 +12,8 @@ import ConsultationReason from '../../components/ConsultationReason';
 import MedicalInfoCarousel from '../../components/MedicalInfoCarousel';
 import AddTreatmentModal from '../../components/AddTreatmentModal';
 import ClosureReasonModal from '../../components/ClosureReasonModal';
-
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import {
   FaSyringe,
   FaPills,
@@ -347,7 +348,8 @@ const HistoryManagement = () => {
       }));
 
       // Mostrar mensaje de éxito
-      setSuccessMessage('Tratamiento agregado exitosamente');
+      toast.success('Tratamiento agregado exitosamente');
+      
       setIsModalOpen(false);
 
       // Limpiar mensaje después de 5 segundos
@@ -357,7 +359,7 @@ const HistoryManagement = () => {
 
     } catch (err) {
       console.error('Error al agregar tratamiento:', err);
-      setError(err.message || 'Error al agregar el tratamiento');
+      toast.error(err.message || 'Error al agregar el tratamiento');
     } finally {
       setModalLoading(false);
     }
@@ -385,12 +387,11 @@ const HistoryManagement = () => {
       setStatusError(result.error);
     } else {
       setShowClosureModal(false); // Cierra el modal
-      setSuccessMessage('Historia clínica cerrada exitosamente.'); // Notificación de éxito
+      toast.success('Historia clínica cerrada exitosamente.'); // Notificación de éxito
+      
       // Recarga la historia clínica actualizada
       const updatedData = await fetchMedicalRecord(historyId);
       setMedicalRecord(updatedData);
-      // Limpia el mensaje después de unos segundos
-      setTimeout(() => setSuccessMessage(''), 5000);
       setClosureReason('');
     }
   };
@@ -411,10 +412,9 @@ const HistoryManagement = () => {
     if (result.error) {
       setStatusError(result.error);
     } else {
-      setSuccessMessage('Historia clínica reactivada exitosamente.');
+      toast.success('Historia clínica reactivada exitosamente.');
       const updatedData = await fetchMedicalRecord(historyId);
       setMedicalRecord(updatedData);
-      setTimeout(() => setSuccessMessage(''), 5000);
     }
   };
 

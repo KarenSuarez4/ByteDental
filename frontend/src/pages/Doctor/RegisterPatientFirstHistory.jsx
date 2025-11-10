@@ -482,7 +482,7 @@ const RegisterPatientFirstHistory = () => {
       const response = await createClinicalHistory(historyData, token);
 
       // Reset form state on success
-      setSuccessMessage("¡Historia clínica registrada con éxito!");
+      toast.success("¡Historia clínica registrada con éxito!");
       setFormData(INITIAL_FORM_STATE);
       setFormErrors({});
       setSelectedPatient(null);
