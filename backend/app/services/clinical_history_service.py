@@ -250,14 +250,8 @@ class ClinicalHistoryService:
                 "date": treatment.treatment_date,
                 "name": service_name,
                 "doctor_name": doctor_name,
-                "reason": treatment.reason,  # Agregar motivo de consulta
+                "reason": treatment.reason,  # <- aseguramos que venga el motivo
                 "notes": treatment.notes
-            })
-
-            previous_treatments.append({
-                "date": treatment.treatment_date,
-                "service_name": service_name,
-                "doctor_name": doctor_name
             })
 
         return previous_treatments
