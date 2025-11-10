@@ -969,14 +969,16 @@ function PatientManagement() {
     <main className="flex min-h-[calc(100vh-94px)] bg-gray-50 overflow-hidden">
       <section className="flex-1 flex flex-col items-center px-3 relative">
         {/* Botón de ayuda - Posición fija superior derecha */}
-        <button
-          onClick={startTour}
-          className="fixed top-24 right-8 bg-primary-blue hover:bg-primary-blue-hover text-white rounded-full p-4 shadow-xl hover:shadow-2xl transition-all duration-200 transform hover:scale-110 z-50"
-          title="Iniciar tour guiado"
-          aria-label="Ayuda - Iniciar tour guiado"
-        >
-          <FaQuestionCircle className="text-28" />
-        </button>
+        {userRole !== 'Doctor' && (
+          <button
+            onClick={startTour}
+            className="fixed top-24 right-8 bg-primary-blue hover:bg-primary-blue-hover text-white rounded-full p-4 shadow-xl hover:shadow-2xl transition-all duration-200 transform hover:scale-110 z-50"
+            title="Iniciar tour guiado"
+            aria-label="Ayuda - Iniciar tour guiado"
+          >
+            <FaQuestionCircle className="text-28" />
+          </button>
+        )}
 
         <h1 id="page-title" className="text-header-blue text-46 font-bold font-poppins mb-1 pt-6 text-center pb-6">
           GESTIÓN DE PACIENTES
