@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-
 // Components
 import Button from "../../components/Button";
 import Input from "../../components/Input";
@@ -29,6 +28,9 @@ import { useFormSections } from "../../hooks/useFormSections";
 import { getActivePatients, getPatientById } from "../../services/patientService";
 import { createClinicalHistory, formatClinicalHistoryData } from "../../services/historyPatientService";
 import { getDentalServices } from "../../services/dentalServiceService";
+
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 // Constants
 import {
