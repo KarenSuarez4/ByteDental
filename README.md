@@ -43,14 +43,14 @@ Sistema integral de gestión clínica dental diseñado para optimizar la adminis
 
 ## 📋 Características Principales
 
-- ✅ Gestión completa de pacientes y acudientes
-- ✅ Historias clínicas electrónicas (SOAP)
-- ✅ Control de tratamientos y servicios dentales
-- ✅ Sistema de roles (Administrador, Doctor, Asistente)
-- ✅ Auditoría automática de operaciones
-- ✅ Autenticación segura con Firebase
-- ✅ Recuperación de contraseña con OTP por email
-- ✅ Validaciones de negocio en tiempo real
+- Gestión completa de pacientes y acudientes
+- Historias clínicas electrónicas (SOAP)
+- Control de tratamientos y servicios dentales
+- Sistema de roles (Administrador, Doctor, Asistente)
+- Auditoría automática de operaciones
+- Autenticación segura con Firebase
+- Recuperación de contraseña con OTP por email
+- Validaciones de negocio en tiempo real
 
 ## 🛠️ Instalación
 
