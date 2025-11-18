@@ -4,11 +4,17 @@ Sistema integral de gestión clínica dental diseñado para optimizar la adminis
 
 ## 🏗️ Arquitectura
 
-**Monorepo Full-Stack** con arquitectura cliente-servidor:
-- **Frontend:** SPA (Single Page Application) con React
-- **Backend:** API REST con FastAPI
-- **Base de Datos:** PostgreSQL con funciones de auditoría
-- **Autenticación:** Firebase Authentication
+**Arquitectura en Capas (Layered Architecture)** diseñada para escalabilidad y mantenibilidad:
+
+### Capas del Sistema
+- **Presentation Layer:** Componentes React (UI + Process Interface)
+- **Business Layer:** Servicios de negocio (PatientService, ClinicalRecordService, ReportService)
+- **Persistence Layer:** DTOs y mapeo objeto-relacional
+- **Database Layer:** PostgreSQL con triggers de auditoría
+
+### Servicios Externos
+- **Firebase Authentication Service:** Gestión de usuarios y autenticación
+- **Sendgrid Email Service:** Envío de notificaciones y OTPs
 
 ## 🚀 Tecnologías
 
@@ -178,7 +184,10 @@ Este proyecto es privado y está protegido por derechos de autor.
 
 Desarrollado como proyecto de Trabajo de Campo - 8vo Semestre
 
----
+- **Camilo Andrés Arias Tenjo**
+- **Karen Juliana Peña Suárez**
+- **Lunna Karina Sosa Espitia**
+- **María Fernanda Sogamoso Rodríguez**
+- **Ronald Samir Molinares Sanabria**
 
-**API Docs:** http://localhost:8000/docs  
-**Redoc:** http://localhost:8000/redoc
+---
