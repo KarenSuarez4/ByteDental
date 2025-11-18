@@ -12,8 +12,12 @@ import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { getAllPatients, updatePatient, deactivatePatient, activatePatient } from "../../services/patientService";
 import { getClinicalHistoriesByPatient, checkPatientHasHistory } from "../../services/historyPatientService";
-import { FaEye } from "react-icons/fa";
+import { FaEye, FaQuestionCircle, FaSearch, FaFilter, FaUserPlus, FaPowerOff, FaHistory, FaTable, FaChevronLeft, FaChevronRight, FaTimes, FaUser, FaClipboardList, FaEnvelope, FaWheelchair, FaShieldAlt, FaExclamationTriangle, FaFileAlt } from "react-icons/fa";
+import { MdEdit } from "react-icons/md";
 import { motion } from "framer-motion";
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
+import "../../styles/driverTour.css";
 
 
 
@@ -46,6 +50,103 @@ function PatientManagement() {
   const [totalPages, setTotalPages] = useState(1);
 
   const navigate = useNavigate();
+
+  // Función para iniciar el tour
+  const startTour = () => {
+    const driverObj = driver({
+      showProgress: true,
+      steps: [
+        {
+          element: '#page-title',
+          popover: {
+            title: 'Gestión de Pacientes',
+            description: 'Bienvenido a la página de gestión de pacientes. Aquí podrás administrar toda la información de los pacientes del consultorio.',
+            side: "bottom",
+            align: 'start'
+          }
+        },
+        {
+          element: '#filter-bar-section',
+          popover: {
+            title: 'Búsqueda y Filtros',
+            description: 'En la parte izquierda puedes buscar pacientes por nombre o número de documento. En la parte derecha puedes filtrar por estado (Todos, Activos o Inactivos).',
+            side: "bottom",
+            align: 'start'
+          }
+        },
+        {
+          element: '#patients-table',
+          popover: {
+            title: 'Tabla de Pacientes',
+            description: 'Esta tabla muestra todos los pacientes registrados con información como nombre, documento, teléfono, email, edad, estado o demas información pertinente. Cada fila representa un paciente diferente.',
+            side: "top",
+            align: 'start'
+          }
+        },
+        {
+          element: '.action-view-info',
+          popover: {
+            title: 'Ver Información Completa',
+            description: 'Este botón te permite ver toda la información detallada del paciente, incluyendo datos personales, información médica y datos del guardián por si el paciente lo requiere.',
+            side: "left",
+            align: 'start'
+          }
+        },
+        {
+          element: '.action-edit',
+          popover: {
+            title: 'Modificar Paciente',
+            description: 'Permite modificar la información del paciente. Se abrirá un modal con un formulario donde podrás actualizar datos personales, de contacto y médicos.',
+            side: "left",
+            align: 'start'
+          }
+        },
+        {
+          element: '.action-status',
+          popover: {
+            title: 'Desactivar/Activar Paciente',
+            description: 'Activa o desactiva un paciente. Al desactivar, deberás proporcionar un motivo. Los pacientes inactivos tendrán estado "inactivo" en la tabla.',
+            side: "left",
+            align: 'start'
+          }
+        },
+        {
+          element: '#pagination-controls',
+          popover: {
+            title: 'Controles de Paginación',
+            description: 'Navega entre las diferentes páginas de pacientes. Se muestran 4 pacientes por página. Usa las flechas o los números para moverte entre páginas.',
+            side: "top",
+            align: 'center'
+          }
+        },
+        {
+          element: '#pagination-info',
+          popover: {
+            title: 'Información de Paginación',
+            description: 'Aquí puedes ver cuántos pacientes estás visualizando actualmente y el total de pacientes que coinciden con tu búsqueda y filtros.',
+            side: "top",
+            align: 'center'
+          }
+        },
+        {
+          popover: {
+            title: 'Tour Completado',
+            description: 'Ahora conoces todas las funcionalidades de la gestión de pacientes. Puedes volver a ver este tour en cualquier momento haciendo clic en el botón de ayuda en la esquina superior derecha.',
+          }
+        }
+      ],
+      nextBtnText: 'Siguiente →',
+      prevBtnText: '← Anterior',
+      doneBtnText: 'Finalizar',
+      progressText: '{{current}} de {{total}}',
+      popoverClass: 'driver-popover-custom',
+      onDestroyed: () => {
+        // Tour finalizado
+      }
+    });
+
+    driverObj.drive();
+  };
 
   // ✅ Configuración de filtros para FilterBar
   const filterConfig = [
@@ -150,7 +251,7 @@ function PatientManagement() {
         navigate(`/doctor/register-first-history/${patient.id}`);
       }
     } catch (error) {
-      setEditError(`Error al verificar historias: ${error.message}`);
+      toast.error(`Error al verificar historias: ${error.message}`);
 
       setTimeout(() => {
         navigate(`/doctor/register-first-history/${patient.id}`);
@@ -685,7 +786,6 @@ function PatientManagement() {
       }
 
       await updatePatient(editPatient.id, updateData, token);
-      setSuccessMsg("Paciente actualizado correctamente");
       toast.success("Paciente actualizado correctamentes");
       setEditPatient(null);
       setLoading(true);
@@ -739,7 +839,6 @@ function PatientManagement() {
 
     try {
       await deactivatePatient(deactivationModal.patient.id, deactivationModal.reason.trim(), token);
-      setSuccessMsg("Paciente desactivado correctamente");
       toast.success("Paciente desactivado correctamente");
 
       // Cerrar modal
@@ -762,14 +861,12 @@ function PatientManagement() {
   const handleActivate = async (patient) => {
     try {
       await activatePatient(patient.id, token);
-      setSuccessMsg("Paciente activado correctamente");
       toast.success("Paciente activado correctamente")
       setLoading(true);
       const updatedPatients = await getAllPatients(token);
       setPatients(updatedPatients);
       setLoading(false);
     } catch (err) {
-      setEditError(err.message || "Error al activar paciente");
       toast.error(err.message || "Error al activar paciente");
     }
   };
@@ -866,8 +963,20 @@ function PatientManagement() {
 
   return (
     <main className="flex min-h-[calc(100vh-94px)] bg-gray-50 overflow-hidden">
-      <section className="flex-1 flex flex-col items-center px-3">
-        <h1 className="text-header-blue text-46 font-bold font-poppins mb-1 pt-6 text-center pb-6">
+      <section className="flex-1 flex flex-col items-center px-3 relative">
+        {/* Botón de ayuda - Posición fija superior derecha */}
+        {userRole !== 'Doctor' && (
+          <button
+            onClick={startTour}
+            className="fixed top-24 right-8 bg-primary-blue hover:bg-primary-blue-hover text-white rounded-full p-4 shadow-xl hover:shadow-2xl transition-all duration-200 transform hover:scale-110 z-50"
+            title="Iniciar tour guiado"
+            aria-label="Ayuda - Iniciar tour guiado"
+          >
+            <FaQuestionCircle className="text-28" />
+          </button>
+        )}
+
+        <h1 id="page-title" className="text-header-blue text-46 font-bold font-poppins mb-1 pt-6 text-center pb-6">
           GESTIÓN DE PACIENTES
         </h1>
 
@@ -883,19 +992,20 @@ function PatientManagement() {
           </div>
         )}
 
-        {/*Usar FilterBar con configuración correcta */}
+        {/* Barra de búsqueda y filtros */}
         <FilterBar
-          searchValue={searchTerm} // Cambiar de searchDoc a searchTerm
-          onSearchChange={(e) => setSearchTerm(e.target.value)} // Cambiar función
+          id="filter-bar-section"
+          searchValue={searchTerm}
+          onSearchChange={(e) => setSearchTerm(e.target.value)}
           filters={filterConfig}
           onPageReset={resetToFirstPage}
-          searchPlaceholder="Buscar por documento, nombres o apellidos" // Actualizar placeholder
-          searchAriaLabel="Buscar paciente por documento, nombres o apellidos" // Actualizar aria-label
+          searchPlaceholder="Buscar por documento, nombres o apellidos"
+          searchAriaLabel="Buscar paciente por documento, nombres o apellidos"
           className="max-w-[1200px]"
         />
 
         {/* Tabla de pacientes - no changes to this section */}
-        <div className="w-full max-w-[1200px] bg-white rounded-[12px] shadow-md overflow-x-auto"
+        <div id="patients-table" className="w-full max-w-[1200px] bg-white rounded-[12px] shadow-md overflow-x-auto"
           style={{ maxHeight: "calc(100vh - 226px)", overflowY: "auto" }}>
           <table className="w-full border-collapse">
             <thead className="sticky top-0 z-10 h-10">
@@ -944,7 +1054,7 @@ function PatientManagement() {
                   {userRole !== "Doctor" && (
                     <td className={tableCellClass}>
                       <span
-                        className="text-blue-600 font-semibold hover:text-blue-800 hover:underline cursor-pointer"
+                        className="action-view-info text-blue-600 font-semibold hover:text-blue-800 hover:underline cursor-pointer"
                         onClick={() => handlePatientInfo(patient)}
                         title="Haga clic para ver la información completa del paciente"
                       >
@@ -959,7 +1069,7 @@ function PatientManagement() {
                           aria-label="Ver historia clínica del paciente"
                           title="Ver historia clínica"
                           onClick={() => handleViewHistory(patient)}
-                          className="flex items-center justify-center gap-2 bg-primary-blue hover:bg-primary-blue-hover text-white 
+                          className="action-view-history flex items-center justify-center gap-2 bg-primary-blue hover:bg-primary-blue-hover text-white 
                           px-1 py-2 rounded-full font-poppins text-[12px] font-semibold 
                           w-[160px] h-[44px] shadow-sm hover:shadow-md transition-all duration-200"
                         >
@@ -976,13 +1086,13 @@ function PatientManagement() {
                         patient.is_active ? (
                           <>
                             <Button
-                              className="bg-primary-blue hover:bg-primary-blue-hover text-white px-4 py-2 rounded-[40px] font-poppins text-16 font-bold w-[130px] h-[35px]"
+                              className="action-edit bg-primary-blue hover:bg-primary-blue-hover text-white px-4 py-2 rounded-[40px] font-poppins text-16 font-bold w-[130px] h-[35px]"
                               onClick={() => handleEdit(patient)}
                             >
                               Modificar
                             </Button>
                             <Button
-                              className="bg-header-blue hover:bg-header-blue-hover text-white px-4 py-2 rounded-[40px] font-poppins text-16 font-bold w-[130px] h-[35px]"
+                              className="action-status bg-header-blue hover:bg-header-blue-hover text-white px-4 py-2 rounded-[40px] font-poppins text-16 font-bold w-[130px] h-[35px]"
                               onClick={() => handleDeactivateClick(patient)}
                             >
                               Desactivar
@@ -990,7 +1100,7 @@ function PatientManagement() {
                           </>
                         ) : (
                           <Button
-                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-[40px] font-poppins text-16 font-bold w-[130px] h-[35px]"
+                            className="action-status bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-[40px] font-poppins text-16 font-bold w-[130px] h-[35px]"
                             onClick={() => handleActivate(patient)}
                           >
                             Activar
@@ -1014,7 +1124,7 @@ function PatientManagement() {
 
         {/* Controles de paginación */}
         {totalPages > 1 && (
-          <div className="w-full max-w-[1200px] flex justify-center items-center mt-6 gap-3">
+          <div id="pagination-controls" className="w-full max-w-[1200px] flex justify-center items-center mt-6 gap-3">
             {/* Botón Primera página (solo si hay más de 5 páginas y no estamos en las primeras) */}
             {totalPages > 5 && currentPage > 3 && (
               <button
@@ -1123,7 +1233,7 @@ function PatientManagement() {
         {/* Información de paginación */}
         {filteredPatients.length > 0 && (
           <div className="w-full max-w-[1200px] flex justify-center mt-3">
-            <div className="bg-gray-50 px-4 py-2 rounded-full border border-gray-200">
+            <div id="pagination-info" className="bg-gray-50 px-4 py-2 rounded-full border border-gray-200">
               <p className="text-gray-600 font-poppins text-12 font-medium">
                 <span className="text-primary-blue font-semibold">
                   {(currentPage - 1) * itemsPerPage + 1}
@@ -1152,8 +1262,8 @@ function PatientManagement() {
                 <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full -ml-12 -mb-12"></div>
                 <div className="relative z-10 flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="bg-white bg-opacity-20 p-2 rounded-full">
-                      ✏️
+                    <div className="bg-white bg-opacity-20 p-3 rounded-full">
+                      <MdEdit className="text-24 text-blue-400" />
                     </div>
                     <div>
                       <h2 className="text-24 font-bold font-poppins">Editar Paciente</h2>
@@ -1161,10 +1271,10 @@ function PatientManagement() {
                     </div>
                   </div>
                   <button
-                    className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-full transition-all duration-200"
+                    className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2.5 rounded-full transition-all duration-200"
                     onClick={handleCancelEdit}
                   >
-                    ✖️
+                    <FaTimes className="text-20 text-gray-700" />
                   </button>
                 </div>
               </div>
@@ -1372,7 +1482,7 @@ function PatientManagement() {
                     <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-[16px] border border-blue-200">
                       <div className="flex items-center mb-4">
                         <div className="bg-blue-100 p-2 rounded-full mr-3">
-                          🛡️
+                          <FaShieldAlt className="text-18 text-blue-600" />
                         </div>
                         <div>
                           <h3 className="text-20 font-semibold font-poppins text-gray-800">Información del Tutor Legal</h3>
@@ -1559,7 +1669,7 @@ function PatientManagement() {
                 <div className="relative z-10 flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="bg-white bg-opacity-20 p-3 rounded-full">
-                      👤
+                      <FaUser className="text-26 text-gray-700" />
                     </div>
                     <div>
                       <h2 className="text-26 font-bold font-poppins">Información Completa del Paciente</h2>
@@ -1569,10 +1679,10 @@ function PatientManagement() {
                     </div>
                   </div>
                   <button
-                    className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-full transition-all duration-200"
+                    className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2.5 rounded-full transition-all duration-200"
                     onClick={() => setPatientInfoModal({ open: false, patient: null })}
                   >
-                    ✖️
+                    <FaTimes className="text-20 text-gray-700" />
                   </button>
                 </div>
               </div>
@@ -1583,7 +1693,7 @@ function PatientManagement() {
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-[16px] p-6 mb-6">
                   <div className="flex items-center mb-4">
                     <div className="bg-blue-100 p-2 rounded-full mr-3">
-                      📋
+                      <FaClipboardList className="text-18 text-blue-600" />
                     </div>
                     <h3 className="text-20 font-semibold font-poppins text-gray-800">Datos Personales</h3>
                   </div>
@@ -1627,7 +1737,7 @@ function PatientManagement() {
                   <div className="bg-gradient-to-r from-green-50 to-teal-50 rounded-[16px] p-6 mb-6">
                     <div className="flex items-center mb-4">
                       <div className="bg-green-100 p-2 rounded-full mr-3">
-                        📧
+                        <FaEnvelope className="text-18 text-green-600" />
                       </div>
                       <h3 className="text-20 font-semibold font-poppins text-gray-800">Información de Contacto</h3>
                     </div>
@@ -1656,7 +1766,7 @@ function PatientManagement() {
                 <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-[16px] p-6 mb-6">
                   <div className="flex items-center mb-4">
                     <div className="bg-orange-100 p-2 rounded-full mr-3">
-                      ♿
+                      <FaWheelchair className="text-18 text-orange-600" />
                     </div>
                     <h3 className="text-20 font-semibold font-poppins text-gray-800">Información de Discapacidad</h3>
                   </div>
@@ -1681,7 +1791,7 @@ function PatientManagement() {
                   <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-[16px] p-6 mb-6">
                     <div className="flex items-center mb-4">
                       <div className="bg-purple-100 p-2 rounded-full mr-3">
-                        🛡️
+                        <FaShieldAlt className="text-18 text-purple-600" />
                       </div>
                       <h3 className="text-20 font-semibold font-poppins text-gray-800">Información del Tutor Legal</h3>
                     </div>
@@ -1757,7 +1867,7 @@ function PatientManagement() {
                 <div className="relative z-10 flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="bg-white bg-opacity-20 p-3 rounded-full">
-                      ⚠️
+                      <FaExclamationTriangle className="text-26 text-red-500" />
                     </div>
                     <div>
                       <h2 className="text-26 font-bold font-poppins">Desactivar Paciente</h2>
@@ -1767,11 +1877,11 @@ function PatientManagement() {
                     </div>
                   </div>
                   <button
-                    className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-full transition-all duration-200"
+                    className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2.5 rounded-full transition-all duration-200"
                     onClick={() => setDeactivationModal({ open: false, patient: null, reason: '', loading: false })}
                     disabled={deactivationModal.loading}
                   >
-                    ✖️
+                    <FaTimes className="text-20 text-gray-700" />
                   </button>
                 </div>
               </div>
@@ -1781,7 +1891,7 @@ function PatientManagement() {
                 <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-[16px] p-6 mb-6">
                   <div className="flex items-center mb-4">
                     <div className="bg-red-100 p-2 rounded-full mr-3">
-                      📝
+                      <FaFileAlt className="text-18 text-red-600" />
                     </div>
                     <h3 className="text-20 font-semibold font-poppins text-gray-800">Motivo de Desactivación</h3>
                   </div>

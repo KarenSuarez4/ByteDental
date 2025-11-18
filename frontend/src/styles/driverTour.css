@@ -1,0 +1,112 @@
+/* --- Variables de Color y Estilo --- */
+:root {
+  --driver-bg-color: #2F7BA8;    /* Fondo del Popover (Azul) */
+  --driver-text-color: #FFFFFF;  /* Texto Principal (Blanco) */
+  --driver-button-color: #FFFFFF; /* Fondo de los botones */
+  --driver-button-text: #2F7BA8; /* Texto de los botones (azul) */
+  --driver-border-radius: 8px;   /* Bordes redondeados del Popover */
+}
+
+/* --- Estilos Generales del Popover --- */
+.driver-popover {
+  background-color: var(--driver-bg-color);
+  color: var(--driver-text-color);
+  border-radius: var(--driver-border-radius);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3); 
+  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+}
+
+/* --- Título y Descripción --- */
+.driver-popover-title {
+  color: var(--driver-text-color);
+  font-size: 1.3em; 
+  font-weight: 600; 
+  margin-bottom: 10px;
+}
+
+.driver-popover-description {
+  color: var(--driver-text-color);
+  font-size: 1em;
+  line-height: 1.5;
+  margin-bottom: 15px;
+}
+
+/* --- Estilo del Progreso (4 de 11) --- */
+.driver-popover-progress-text {
+  color: var(--driver-text-color); /* Progreso en color blanco */
+  font-weight: bold;
+  margin-right: 15px; 
+  font-size: 0.95em;
+}
+
+/* Pie de Página del Popover */
+.driver-popover-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 10px;
+}
+.driver-popover-footer-actions {
+  display: flex;
+  align-items: center;
+}
+.driver-popover-footer > span {
+    order: -1; /* Mueve el progreso al inicio (izquierda) del pie de página */
+}
+
+/* --- Estilos de Botones (Anterior, Siguiente, Finalizar) --- */
+.driver-popover-navigation-btn {
+  /* Estilos principales */
+  background-color: var(--driver-button-color); /* Fondo blanco */
+  color: var(--driver-button-text); /* Texto azul (Aquí aparecerá 'Siguiente →' si lo configuraste bien en JS) */
+  border: none;
+  border-radius: 4px; 
+  padding: 8px 15px;
+  margin-left: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 600;
+  min-width: 90px;
+  text-align: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  
+  /* --- LÍNEAS CLAVE: Aseguran que el texto por defecto NO se oculte o modifique --- */
+  font-size: 1rem; /* Asegura que el texto no esté oculto */
+  /* NO HAY pseudo-clases ::before/::after que sobrescriban el contenido */
+}
+
+/* Efecto al pasar el ratón */
+.driver-popover-navigation-btn:hover {
+  background-color: #E8E8E8;
+  color: var(--driver-button-text); 
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* Estilo para el botón deshabilitado */
+.driver-popover-navigation-btn:disabled {
+  background-color: rgba(255, 255, 255, 0.5); 
+  color: rgba(47, 123, 168, 0.7); 
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* --- Arrow y Close Button (Sin cambios) --- */
+
+.driver-popover-close-btn {
+  color: var(--driver-text-color);
+  opacity: 0.9;
+  font-size: 1.2em;
+  font-weight: bold;
+}
+.driver-popover[data-popper-placement^='top'] .driver-popover-arrow::before {
+  border-top-color: var(--driver-bg-color) !important;
+}
+/* ... (demás estilos de flecha) ... */
+
+/* Si usas la versión antigua de Driver.js que usa .driver-stage-lock, configúralo para ser transparente */
+.driver-stage-lock {
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0); /* Hace el 'highlight' invisible si lo usas con showOverlay: false */
+}

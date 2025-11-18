@@ -5,6 +5,8 @@ import Input from "../../components/Input";
 import Select from "../../components/Select";
 import TextArea from "../../components/TextArea";
 import ConfirmDialog from "../../components/ConfirmDialog";
+import { FaTimes } from "react-icons/fa";
+import { MdEdit } from "react-icons/md";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import {
@@ -543,8 +545,8 @@ function DentalServiceManagement() {
                 <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full -ml-12 -mb-12"></div>
                 <div className="relative z-10 flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="bg-white bg-opacity-20 p-2 rounded-full">
-                      ✏️
+                    <div className="bg-white bg-opacity-20 p-3 rounded-full">
+                      <MdEdit className="text-24 text-blue-400" />
                     </div>
                     <div>
                       <h2 className="text-24 font-bold font-poppins">Editar Servicio</h2>
@@ -552,10 +554,10 @@ function DentalServiceManagement() {
                     </div>
                   </div>
                   <button
-                    className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-full transition-all duration-200"
+                    className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2.5 rounded-full transition-all duration-200"
                     onClick={handleCancelEdit}
                   >
-                    ✖️
+                    <FaTimes className="text-20 text-gray-700" />
                   </button>
                 </div>
               </div>

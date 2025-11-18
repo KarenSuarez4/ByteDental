@@ -250,14 +250,8 @@ class ClinicalHistoryService:
                 "date": treatment.treatment_date,
                 "name": service_name,
                 "doctor_name": doctor_name,
-                "reason": treatment.reason,  # Agregar motivo de consulta
+                "reason": treatment.reason,  # <- aseguramos que venga el motivo
                 "notes": treatment.notes
-            })
-
-            previous_treatments.append({
-                "date": treatment.treatment_date,
-                "service_name": service_name,
-                "doctor_name": doctor_name
             })
 
         return previous_treatments
@@ -591,32 +585,26 @@ class ClinicalHistoryService:
         Agregar un nuevo tratamiento a una historia clínica existente
         """
         try:
-            # ✅ VALIDAR CONTRASEÑA DEL DOCTOR (Firma Digital)
+            # doctor_password es opcional para agregar tratamientos.
+            # Si llega, intentamos verificar la firma; si no, permitimos agregar el tratamiento sin firma.
             doctor_password = treatment_data.get('doctor_password')
-            
-            if not doctor_password:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="La contraseña del doctor es requerida para firmar el tratamiento"
+            digital_verified = False
+            if doctor_password:
+                if not self.current_user or not self.current_user.email:
+                    raise HTTPException(
+                        status_code=401,
+                        detail="No se pudo identificar al usuario actual"
+                    )
+                is_password_valid = FirebaseService.verify_password(
+                    email=self.current_user.email,
+                    password=doctor_password
                 )
-            
-            if not self.current_user or not self.current_user.email:
-                raise HTTPException(
-                    status_code=401,
-                    detail="No se pudo identificar al usuario actual"
-                )
-            
-            # Verificar contraseña con Firebase
-            is_password_valid = FirebaseService.verify_password(
-                email=self.current_user.email,
-                password=doctor_password
-            )
-            
-            if not is_password_valid:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Contraseña incorrecta. La firma digital no pudo ser verificada."
-                )
+                if not is_password_valid:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Contraseña incorrecta. La firma digital no pudo ser verificada."
+                    )
+                digital_verified = True
             
             # Verificar que la historia clínica existe
             clinical_history = self.db.query(ClinicalHistory).filter(
@@ -679,7 +667,7 @@ class ClinicalHistoryService:
                         "treatment_date": str(treatment_data.get('treatment_date')),
                         "reason": treatment_data.get('reason'),  # Incluir motivo en auditoría
                         "notes": treatment_data.get('notes'),
-                        "digital_signature_verified": True  # Indicar que se verificó la firma
+                        "digital_signature_verified": digital_verified
                     },
                     ip_origen=ip_cliente,
                     usuario_rol=self.current_user.role.name if self.current_user.role else None,
@@ -693,8 +681,9 @@ class ClinicalHistoryService:
                     "date": new_treatment.treatment_date,
                     "name": dental_service.name,
                     "doctor_name": f"{self.current_user.first_name} {self.current_user.last_name}",
-                    "reason": new_treatment.reason,  # Incluir en la respuesta
-                    "notes": new_treatment.notes
+                    "reason": new_treatment.reason,
+                    "notes": new_treatment.notes,
+                    "digital_signature_verified": digital_verified
                 }
             }
             

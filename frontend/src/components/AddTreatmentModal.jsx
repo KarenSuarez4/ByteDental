@@ -1,8 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useContext } from 'react';
 import { FaTimes, FaSave, FaCalendarAlt, FaNotesMedical, FaStethoscope } from 'react-icons/fa';
 import Button from './Button';
 import Select from './Select';
 import DateInput from './DateInput';
+import SignatureCredentialField from './SignatureCredentialField';
+import { useAuth } from '../contexts/AuthContext';
 
 /**
  * AddTreatmentModal Component
@@ -16,6 +18,8 @@ import DateInput from './DateInput';
  * @param {Function} props.onSubmit - Function to handle form submission
  * @param {Array} props.dentalServices - List of available dental services
  * @param {boolean} props.loading - Loading state during submission
+ * @param {boolean} props.allowPerTreatmentPassword - Allow password per treatment
+ * @param {string} props.globalDoctorPassword - Global doctor password
  * @returns {JSX.Element} Modal to add treatment
  */
 const AddTreatmentModal = ({
@@ -23,8 +27,50 @@ const AddTreatmentModal = ({
     onClose,
     onSubmit,
     dentalServices = [],
-    loading = false
+    loading = false,
+    allowPerTreatmentPassword = false, // <-- nuevo prop opcional
+    globalDoctorPassword = "" // <-- nuevo prop opcional (contraseña global desde el formulario)
 }) => {
+    // obtener usuario y token con el hook que ya usa el proyecto
+    const auth = useAuth() || {};
+    const currentUser = auth.currentUser || auth.user || {};
+    const token = auth.token || auth?.accessToken || null;
+
+    // info del doctor proveniente del backend (igual que en la creación de historia)
+    const [doctorBackendInfo, setDoctorBackendInfo] = useState(null);
+
+    useEffect(() => {
+        if (!token) return;
+
+        // Solicitar /api/users/me (mismo endpoint que usan otras páginas)
+        (async () => {
+            try {
+                const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/users/me`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+                if (!res.ok) {
+                    // no interrumpir si falla; fallback a currentUser
+                    console.warn('No se pudo cargar users/me:', res.status);
+                    return;
+                }
+                const data = await res.json();
+                setDoctorBackendInfo(data);
+            } catch (err) {
+                console.warn('Error cargando información del doctor:', err);
+            }
+        })();
+    }, [token]);
+
+    // construir nombre y licencia preferiendo la info del backend (igual que en RegisterPatientFirstHistory)
+    const doctorDisplayName = doctorBackendInfo
+        ? `${doctorBackendInfo.first_name || ''} ${doctorBackendInfo.last_name || ''}`.trim()
+        : `${currentUser?.first_name || currentUser?.firstName || ''} ${currentUser?.last_name || currentUser?.lastName || ''}`.trim();
+
+    const doctorLicense = doctorBackendInfo?.document_number || currentUser?.document_number || currentUser?.documentNumber || '';
+
     // Calculate minimum and maximum dates only once
     const dateConstraints = useMemo(() => {
         const today = new Date();
@@ -43,7 +89,8 @@ const AddTreatmentModal = ({
         dental_service_id: '',
         treatment_date: '',
         reason: '', // Nuevo campo
-        notes: ''
+        notes: '',
+        doctor_password: '' // <-- agregar campo de contraseña por tratamiento (opcional)
     });
 
     const [errors, setErrors] = useState({});
@@ -56,7 +103,8 @@ const AddTreatmentModal = ({
                 dental_service_id: '',
                 treatment_date: dateConstraints.today, // ✅ Current date by default
                 reason: '', // Nuevo campo
-                notes: ''
+                notes: '',
+                doctor_password: '' // <-- reset
             });
             setErrors({});
             setTouched({});
@@ -112,6 +160,12 @@ const AddTreatmentModal = ({
                 break;
             case 'reason':
                 if (!value || value.trim() === '') return 'El motivo de la consulta es obligatorio';
+                break;
+            case 'doctor_password':
+                // validar solo si se requiere ingreso por tratamiento
+                if (allowPerTreatmentPassword && (!value || value.trim() === '')) {
+                    return 'La contraseña del doctor es requerida';
+                }
                 break;
             default:
                 break;
@@ -187,17 +241,22 @@ const AddTreatmentModal = ({
         setTouched({
             dental_service_id: true,
             treatment_date: true,
-            reason: true, // Nuevo campo
-            notes: true
+            reason: true,
+            notes: true,
+            doctor_password: allowPerTreatmentPassword ? true : false
         });
 
         if (validateForm()) {
-            // Format data to send
+            // Format data to send — uso de radix explícito y logic de doctor_password
             const treatmentData = {
-                dental_service_id: parseInt(formData.dental_service_id),
+                dental_service_id: parseInt(formData.dental_service_id, 10),
                 treatment_date: new Date(formData.treatment_date).toISOString(),
-                reason: formData.reason.trim(), // Nuevo campo
-                notes: formData.notes.trim() || null
+                reason: formData.reason.trim(),
+                notes: formData.notes.trim() || null,
+                // enviar doctor_password solo si existe: preferir lo ingresado en modal, si no usar globalDoctorPassword
+                ...(formData.doctor_password && formData.doctor_password.trim()
+                    ? { doctor_password: formData.doctor_password.trim() }
+                    : (globalDoctorPassword && globalDoctorPassword.trim() ? { doctor_password: globalDoctorPassword.trim() } : {}))
             };
 
             onSubmit(treatmentData);
@@ -363,6 +422,23 @@ const AddTreatmentModal = ({
                                     </p>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Firma Digital Profesional (misma UI usada en creación de historia) */}
+                        <div className="group">
+                            <SignatureCredentialField
+                                value={formData.doctor_password}
+                                onChange={(e) => {
+                                    const val = (e.target?.value || '').slice(0, 12);
+                                    setFormData(prev => ({ ...prev, doctor_password: val }));
+                                    setTouched(prev => ({ ...prev, doctor_password: true }));
+                                    setErrors(prev => ({ ...prev, doctor_password: validateField('doctor_password', val) }));
+                                }}
+                                error={errors.doctor_password}
+                                doctorName={doctorDisplayName}
+                                doctorLicense={doctorLicense}
+                                disabled={loading}
+                            />
                         </div>
 
                         {/* Footer - Botones */}

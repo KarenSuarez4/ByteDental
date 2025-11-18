@@ -856,7 +856,7 @@ const RegisterPatient = () => {
       setLoading(true);
       console.log('🚀 Payload being sent:', JSON.stringify(patientPayload, null, 2));
       await createPatient(patientPayload, token);
-      setSuccessMessage("¡Paciente registrado con éxito!");
+      toast.success("Paciente registrado con éxito");
 
       // Resetear el formulario después del éxito
       setFormData({

@@ -7,10 +7,10 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const TABS = [
   { key: "login", label: "Ingresos y Salidas" },
-  { key: "users", label: "Gestión de Usuarios" },
+  { key: "users", label: "Eventos de Usuarios" },
   { key: "patients", label: "Eventos de Pacientes" },
-  { key: "guardians", label: "Eventos de Guardianes" },
-  { key: "persons", label: "Eventos de Personas" },
+  { key: "guardians", label: "Eventos de Tutor" },
+  // { key: "persons", label: "Eventos de Personas" },
   { key: "services", label: "Eventos de Servicios" },
   { key: "histories", label: "Eventos de Historias" },
 ];
@@ -427,7 +427,7 @@ function AuditLog() {
                 <option value="ALL">Todos</option>
                 <option value="CREATE">Creaciones</option>
                 <option value="UPDATE">Modificaciones</option>
-                <option value="DELETE">Eliminaciones</option>
+                {/* <option value="DELETE">Eliminaciones</option> */}
                 <option value="DEACTIVATE">Desactivaciones</option>
                 <option value="ACTIVATE">Activaciones</option>
               </Select>
@@ -447,7 +447,8 @@ function AuditLog() {
                 <option value="ALL">Todos</option>
                 <option value="CREATE">Creaciones</option>
                 <option value="UPDATE">Modificaciones</option>
-                <option value="DELETE">Eliminaciones</option>
+                <option value="REACTIVATE">Activaciones</option>
+                <option value="DEACTIVATE">Desactivaciones</option>
               </Select>
             </>
           )}
@@ -465,7 +466,7 @@ function AuditLog() {
                 <option value="ALL">Todos</option>
                 <option value="CREATE">Creaciones</option>
                 <option value="UPDATE">Modificaciones</option>
-                <option value="DELETE">Eliminaciones</option>
+                {/* <option value="DELETE">Eliminaciones</option> */}
                 <option value="REACTIVATE">Activaciones</option>
                 <option value="DEACTIVATE">Desactivaciones</option>
               </Select>
@@ -485,7 +486,8 @@ function AuditLog() {
                 <option value="ALL">Todos</option>
                 <option value="CREATE">Creaciones</option>
                 <option value="UPDATE">Modificaciones</option>
-                <option value="DELETE">Eliminaciones</option>
+                <option value="AUTO_REACTIVATE">Activaciones</option>
+                <option value="AUTO_DEACTIVATE">Desactivaciones</option>
               </Select>
             </>
           )}
@@ -520,9 +522,11 @@ function AuditLog() {
               >
                 <option value="ALL">Todos</option>
                 <option value="CREACION_HISTORIA_CLINICA">Creaciones</option>
-                <option value="ACTUALIZACION_HISTORIA_CLINICA">Actualizaciones</option>
-                <option value="CONSULTA_HISTORIA_CLINICA">Consultas</option>
-                <option value="AGREGAR_TRATAMIENTO">Actulizaciones</option>
+                <option value="UPDATE">Actualizaciones</option>
+                <option value="READ">Consultas</option>
+                <option value="REACTIVATE">Activaciones</option>
+                <option value="DEACTIVATE">Desactivaciones</option>
+                {/* <option value="AGREGAR_TRATAMIENTO">Actulizaciones</option> */}
               </Select>
             </>
           )}

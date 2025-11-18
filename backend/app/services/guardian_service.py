@@ -172,8 +172,30 @@ class GuardianService:
         if not guardian:
             return None
         
+        # Guardar datos anteriores para auditoría
+        datos_anteriores = {
+            "relationship_type": guardian.relationship_type.value if guardian.relationship_type else None,
+            "is_active": guardian.is_active
+        }
+        
+        # Si se van a actualizar datos de persona, guardarlos también
+        person_data_anterior = None
+        if guardian_data.person:
+            person_data_anterior = {
+                "document_type": guardian.person.document_type.value if guardian.person.document_type else None,
+                "document_number": guardian.person.document_number,
+                "first_name": guardian.person.first_name,
+                "first_surname": guardian.person.first_surname,
+                "second_surname": guardian.person.second_surname,
+                "middle_name": guardian.person.middle_name,
+                "email": guardian.person.email,
+                "phone": guardian.person.phone,
+                "birthdate": guardian.person.birthdate.isoformat() if guardian.person.birthdate else None
+            }
+        
         try:
             # Actualizar datos de la persona si se proporcionan
+            person_updates = {}
             if guardian_data.person:
                 self.person_service.update_person(
                     guardian.person_id, 
@@ -187,6 +209,9 @@ class GuardianService:
                 age = self.person_service.calculate_age(updated_person.birthdate)
                 if age < 18:
                     raise ValueError("El guardian debe ser mayor de edad")
+                
+                # Guardar los cambios de persona para auditoría
+                person_updates = guardian_data.person.model_dump(exclude_unset=True)
             
             # Actualizar datos específicos del guardian
             guardian_fields = guardian_data.model_dump(exclude_unset=True, exclude={'person'})
@@ -196,6 +221,36 @@ class GuardianService:
             
             self.db.commit()
             self.db.refresh(guardian)
+            
+            # Registrar evento de auditoría en Eventos de Guardianes
+            person_info = f"{guardian.person.first_name} {guardian.person.first_surname}" if guardian.person else "N/A"
+            
+            detalles_cambios = {
+                "guardian_data": {
+                    "antes": datos_anteriores,
+                    "despues": serialize_for_audit(guardian_fields)
+                }
+            }
+            
+            # Agregar cambios de persona si los hubo
+            if person_data_anterior and person_updates:
+                detalles_cambios["person_data"] = {
+                    "antes": person_data_anterior,
+                    "despues": serialize_for_audit(person_updates)
+                }
+            
+            self.auditoria_service.registrar_evento(
+                db=self.db,
+                usuario_id=self.user_id,
+                tipo_evento="UPDATE",
+                registro_afectado_id=str(guardian.id),
+                registro_afectado_tipo="guardians",
+                descripcion_evento=f"Guardian actualizado: {person_info}",
+                detalles_cambios=detalles_cambios,
+                ip_origen=self.user_ip,
+                usuario_rol=self.user_role,
+                usuario_email=self.user_email
+            )
             
             return self.get_guardian_by_id(guardian.id, include_all=True)
             
