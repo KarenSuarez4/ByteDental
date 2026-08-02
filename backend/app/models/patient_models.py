@@ -7,7 +7,7 @@ from app.database import Base
 blood_group_enum = ENUM(
     'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-',
     name='blood_group_enum',
-    create_type=False  # No crear el tipo porque ya existe en la BD
+    create_type=True
 )
 
 class Patient(Base):

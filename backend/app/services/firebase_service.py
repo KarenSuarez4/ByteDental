@@ -15,9 +15,9 @@ if not firebase_admin._apps:
     app_dir = os.path.dirname(current_dir)   # app/
     backend_dir = os.path.dirname(app_dir)   # backend/
     
-    # Usar directamente el nombre del archivo que sabemos que existe
-    filename = "bytedental-6701e-firebase-adminsdk-fbsvc-1aa4de4cff.json"
-    cred_path = os.path.join(backend_dir, filename)
+    # Permitir que el archivo de credenciales se configure desde .env
+    filename = os.getenv("FIREBASE_CREDENTIALS_PATH", "bytedental-6701e-firebase-adminsdk-fbsvc-1aa4de4cff.json")
+    cred_path = filename if os.path.isabs(filename) else os.path.join(backend_dir, filename)
     
     print(f"🔍 Intentando cargar credenciales de Firebase desde: {cred_path}")
     

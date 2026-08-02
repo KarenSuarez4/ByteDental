@@ -207,6 +207,8 @@ async def register_login_event(
             user_name=user_name if user else None
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         logging.error(f"Error registrando evento de login: {e}")
         raise HTTPException(

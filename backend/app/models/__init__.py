@@ -7,6 +7,9 @@ from .rol_models import Role
 from .person_models import Person, DocumentTypeEnum
 from .patient_models import Patient
 from .guardian_models import Guardian, PatientRelationshipEnum
+from .clinical_history_models import ClinicalHistory
+from .treatment_models import Treatment
+from .dental_service_models import DentalService
 from .otp_models import OTPRequest
 from .email_models import EmailRequest, EmailResponse, EmailType
 from .auditoria_models import Audit
@@ -18,6 +21,9 @@ __all__ = [
     "Patient",
     "Guardian", 
     "PatientRelationshipEnum",
+    "ClinicalHistory",
+    "Treatment",
+    "DentalService",
     "User",
     "Role", 
     "OTPRequest",

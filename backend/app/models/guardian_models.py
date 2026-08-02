@@ -21,7 +21,7 @@ class Guardian(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     person_id = Column(Integer, ForeignKey("persons.id", ondelete="CASCADE"), nullable=False)
-    relationship_type = Column(Enum(PatientRelationshipEnum, name='patient_relationship_enum', create_type=False), nullable=False)
+    relationship_type = Column(Enum(PatientRelationshipEnum, name='patient_relationship_enum', create_type=True), nullable=False)
     is_active = Column(Boolean, default=True)
 
     # Relaciones

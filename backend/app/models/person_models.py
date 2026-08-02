@@ -15,7 +15,7 @@ class Person(Base):
     __tablename__ = "persons"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    document_type = Column(Enum(DocumentTypeEnum, name='document_type', create_type=False), nullable=False)
+    document_type = Column(Enum(DocumentTypeEnum, name='document_type', create_type=True), nullable=False)
     document_number = Column(String(30), unique=True, nullable=False)
     first_name = Column(String(100), nullable=False)
     middle_name = Column(String(100), nullable=True)
